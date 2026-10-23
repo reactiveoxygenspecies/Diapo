@@ -1,0 +1,33 @@
+# Line endings: LF in the repository and in every checkout, on every system, so
+# shell scripts and shebang lines work on macOS and Linux and diffs never show a
+# whole file changed for its line ends. Windows-only scripts keep CRLF.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files: stored and checked out as they are.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.bmp binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pptx binary
+*.pdf binary
+*.zip binary
+*.exe binary
+*.mp4 binary
+*.webm binary
+*.mov binary
+*.mp3 binary
+*.m4a binary
+*.wav binary
+*.ogg binary

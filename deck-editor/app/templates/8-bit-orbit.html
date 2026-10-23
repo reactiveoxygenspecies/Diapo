@@ -1,0 +1,2477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>8-Bit Orbit</title>
+<!-- 8-Bit Orbit: adapted from beautiful-html-templates (github.com/zarazhangrui/beautiful-html-templates, MIT)
+     for the deck editor's fixed 1920x1080 stage. Pixel-art neon arcade aesthetic on a deep navy void: scanlines, starfields, CRT glow. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Space+Mono:wght@400;700&family=Tektur:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these; the properties panel offers the
+   colours as swatches. The template's own variables follow below.
+   =========================================== */
+:root {
+    --ink: #F4D03F;
+    --ink-2: #E2D5F2;
+    --ink-3: #8f9bc9;
+    --rule: #2a3a6e;
+    --paper: #0A0E27;
+    --paper-2: #0F1B3D;
+    --accent: #5EDCF4;
+    --accent-2: #F0A6CA;
+    --stage-bg: #05071a;
+    --slide-bg: #0A0E27;
+    --font: 'Chakra Petch', sans-serif;
+    --font-display: 'Tektur', sans-serif;
+
+    --pad-x: 96px;
+    --pad-top: 72px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur: 0.7s;
+    --stagger: 0.12s;
+    --reveal-y: 28px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ===========================================
+   FIXED STAGE - MANDATORY BASE STYLES
+   Include this ENTIRE file, unchanged, in every deck's <style> block,
+   right after the :root theme variables and the * reset.
+
+   Slides are authored at 1920x1080 and the whole stage is scaled to the
+   window by the controller (deck-controller.js). The deck editor relies on
+   exactly these selectors and classes:
+     .deck-viewport > .deck-stage > .slide     the structure it opens
+     .slide.active / .slide.visible            how a slide is shown
+     .reveal / .reveal-img / .reveal-right     entrances it can keep when
+                                               an element is moved (--dx/--dy)
+     --i                                       the stagger index it shows
+                                               in the Animation panel
+   Taken from the editor's own template (deck-editor/app/templates/blank.html),
+   with fallbacks for the variables a deck may leave out.
+   Part of the Diapo Format. Copyright (c) 2026 Daniele Rossetto. MIT licence (SPDX-License-Identifier: MIT);
+   free to keep in any deck.
+   =========================================== */
+
+/* 1. Lock the browser viewport */
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--stage-bg, #000); }
+
+/* 2. Full-window deck viewport */
+.deck-viewport { position: fixed; inset: 0; overflow: hidden; background: var(--stage-bg, #000); }
+
+/* 3. Fixed design canvas. The controller sets transform: translate() scale().
+   For another slide size, override width/height here AND on .slide below
+   (the controller reads the stage's laid-out size, the editor does too). */
+.deck-stage {
+    position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;
+    overflow: hidden; transform-origin: 0 0; background: var(--slide-bg, #fff);
+}
+
+/* 4. Slides stack inside the stage. Visibility is switched with classes,
+   NEVER with display:none (a later `display:flex` rule would show every
+   slide at once, and the editor's thumbnails and PDF need the box). */
+.slide {
+    position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: hidden;
+    display: block; visibility: hidden; opacity: 0; pointer-events: none;
+    background: var(--slide-bg, #fff);
+    font-family: var(--font); color: var(--ink-2, var(--ink, #222));
+}
+.slide.active, .slide.visible { visibility: visible; opacity: 1; pointer-events: auto; z-index: 1; }
+
+/* 5. Keep media inside authored slide bounds */
+img, video, canvas, svg { max-width: 100%; max-height: 100%; }
+
+/* 6. Speaker notes never render on the slide (the presenter view reads them) */
+.notes { display: none; }
+
+/* 7. Presentation chrome outside the stage (the controller's prev/next and page number).
+   Thin CSS chevrons in white blended by difference, so they read as dark ink on a light
+   slide and light on a dark one; faint until hovered. The controller adds
+   deck-controls-idle to <html> after 2 s without mouse movement (removed on the next
+   move) and toggles deck-controls-off with the H key. Keep the markup: two buttons
+   around the .page span, the chevrons are drawn on button:first-child / :last-child. */
+.deck-controls { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: 14px; color: #fff; mix-blend-mode: difference; transition: opacity 0.4s; }
+.deck-controls button { width: 24px; height: 24px; padding: 0; border: 0; background: none; color: inherit; font-size: 0; cursor: pointer; opacity: 0.4; transition: opacity 0.15s; }
+.deck-controls button:hover { opacity: 1; }
+.deck-controls button::before { content: ""; display: block; width: 8px; height: 8px; margin: auto; border: solid currentColor; border-width: 0 0 1.6px 1.6px; transform: translateX(2px) rotate(45deg); }
+.deck-controls button:last-child::before { transform: translateX(-2px) rotate(-135deg); }
+.deck-controls .page { font: 500 11px var(--font, system-ui, sans-serif); letter-spacing: 0.06em; opacity: 0.5; font-variant-numeric: tabular-nums; }
+html.deck-controls-idle .deck-controls { opacity: 0; pointer-events: none; }
+html.deck-controls-off .deck-controls { display: none; }
+
+/* 8. Print: one fixed-size slide per page (the editor's PDF export builds on this) */
+@media print {
+    html, body { width: 1920px; height: auto; overflow: visible; background: #fff; }
+    .deck-viewport { position: static; overflow: visible; background: #fff; }
+    .deck-stage { position: static; width: auto; height: auto; transform: none !important; background: none; }
+    .slide { position: relative; display: block !important; visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; width: 1920px; height: 1080px; break-after: page; page-break-after: always; }
+    .slide:last-child { break-after: auto; page-break-after: auto; }
+    .slide .reveal, .slide .reveal-img, .slide .reveal-right { opacity: 1 !important; transform: translate(var(--dx, 0px), var(--dy, 0px)) !important; }
+    .deck-controls { display: none !important; }
+}
+
+/* 9. Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; }
+}
+
+/* 10. Superscript and subscript at a typographic size: about two thirds of the text
+   (word processors use 65%, TeX 70%), raised or lowered by the browser as usual, without
+   changing the line height. The editor's text bar writes plain <sup> and <sub>. */
+sup, sub { font-size: 65%; line-height: 0; }
+
+/* ===========================================
+   REVEAL ANIMATIONS (the deck's own entrances)
+   Elements with .reveal / .reveal-img / .reveal-right animate in when
+   the slide becomes .visible. The visible state MUST end in
+   translate(var(--dx, 0px), var(--dy, 0px)): the editor writes --dx/--dy
+   when the user drags such an element, so it stays where they put it and
+   still animates. --i staggers the delay (style="--i:2").
+   Change the durations, distances and easing to suit the style; keep
+   the selectors, the custom properties and the visible transform.
+   =========================================== */
+.reveal, .reveal-img, .reveal-right {
+    opacity: 0;
+    transition: opacity var(--dur, 0.7s) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+                transform var(--dur, 0.7s) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: calc(var(--i, 0) * var(--stagger, 0.12s));
+}
+.reveal { transform: translateY(var(--reveal-y, 28px)); }
+.reveal-img { transform: translateY(calc(var(--reveal-y, 28px) * 0.65)) scale(0.985); }
+.reveal-right { transform: translateX(calc(var(--reveal-y, 28px) * 1.4)); }
+.slide.visible .reveal, .slide.visible .reveal-img, .slide.visible .reveal-right {
+    opacity: 1; transform: translate(var(--dx, 0px), var(--dy, 0px));
+}
+
+/* ===========================================
+   TYPE - base styles for slides added in the editor ("New slide" keeps its tags)
+   =========================================== */
+h1, h2, h3 { font-family: var(--font-display); font-weight: 800; line-height: 1.05; letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink); }
+h1 { font-size: 120px; } h2 { font-size: 80px; } h3 { font-size: 44px; }
+p { font-size: 28px; line-height: 1.5; color: var(--ink-2); } ul, ol { font-size: 28px; line-height: 1.5; padding-left: 40px; } li { margin-bottom: 10px; }
+.eyebrow { font-family: 'Space Mono', monospace; font-size: 18px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 20px; }
+
+/* ===========================================
+   8-BIT ORBIT - the template's own design system
+   =========================================== */
+:root {
+      --neon-pink: #F0A6CA;
+      --neon-cyan: #5EDCF4;
+      --neon-yellow: #F4D03F;
+      --deep-navy: #0F1B3D;
+      --dark-void: #0A0E27;
+      --soft-lavender: #E2D5F2;
+      --pixel-size: 4px;
+      --font-display: 'Tektur', cursive;
+      --font-body: 'Chakra Petch', sans-serif;
+      --font-mono: 'Space Mono', monospace;
+    }
+.slide {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 32.4px 76.8px;
+}
+/* === GLOBAL ATMOSPHERIC OVERLAYS === */
+
+    /* Scanlines */
+    .scanlines::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent 0px,
+        transparent 2px,
+        rgba(10, 14, 39, 0.04) 2px,
+        rgba(10, 14, 39, 0.04) 4px
+      );
+      pointer-events: none;
+      z-index: 50;
+      mix-blend-mode: multiply;
+    }
+/* Grain / Noise */
+    .grain::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      opacity: 0.035;
+      pointer-events: none;
+      z-index: 49;
+    }
+/* CRT vignette glow */
+    .crt-glow::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(10, 14, 39, 0.25) 100%);
+      pointer-events: none;
+      z-index: 51;
+    }
+/* Pixel grid background pattern */
+    .bg-grid {
+      background-color: var(--dark-void);
+      background-image:
+        linear-gradient(rgba(94, 220, 244, 0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(94, 220, 244, 0.07) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+.bg-grid-pink {
+      background-color: var(--neon-pink);
+      background-image:
+        linear-gradient(rgba(15, 27, 61, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 27, 61, 0.06) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+.bg-grid-cyan {
+      background-color: var(--neon-cyan);
+      background-image:
+        linear-gradient(rgba(15, 27, 61, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 27, 61, 0.08) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+.bg-grid-lavender {
+      background-color: var(--soft-lavender);
+      background-image:
+        linear-gradient(rgba(15, 27, 61, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 27, 61, 0.05) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+/* Moving starfield for dark slides */
+    .starfield {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      z-index: 1;
+    }
+.starfield .star {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: var(--neon-cyan);
+      opacity: 0.6;
+      animation: twinkle 3s infinite ease-in-out;
+    }
+.starfield .star:nth-child(2n) { background: var(--neon-yellow); }
+.starfield .star:nth-child(3n) { background: var(--neon-pink); }
+.starfield .star:nth-child(4n) { width: 6px; height: 6px; }
+@keyframes twinkle {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 0.9; transform: scale(1.3); }
+    }
+/* Floating pixel particles */
+    .pixel-particles {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      z-index: 1;
+      pointer-events: none;
+    }
+.pixel-particles .p {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      opacity: 0.4;
+      animation: float 8s infinite ease-in-out;
+    }
+@keyframes float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-30px) rotate(90deg); }
+    }
+/* === PIXEL UI COMPONENTS === */
+
+    /* Pixel border effect */
+    .pixel-box {
+      position: relative;
+      background: var(--deep-navy);
+      color: white;
+    }
+.pixel-box::before {
+      content: "";
+      position: absolute;
+      inset: -4px;
+      background: var(--neon-cyan);
+      z-index: -1;
+      clip-path: polygon(
+        0 4px, 4px 4px, 4px 0,
+        calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px,
+        100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%,
+        4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px)
+      );
+    }
+.pixel-box.yellow::before { background: var(--neon-yellow); }
+.pixel-box.pink::before { background: var(--neon-pink); }
+/* Pixel button */
+    .pixel-btn {
+      display: inline-block;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 16px 36px;
+      background: var(--neon-cyan);
+      color: var(--deep-navy);
+      border: none;
+      cursor: pointer;
+      position: relative;
+      box-shadow:
+        4px 0 0 0 var(--deep-navy),
+        0 4px 0 0 var(--deep-navy),
+        4px 4px 0 0 var(--deep-navy),
+        8px 4px 0 0 var(--neon-yellow),
+        4px 8px 0 0 var(--neon-yellow),
+        8px 8px 0 0 var(--neon-yellow);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+.pixel-btn:hover {
+      transform: translate(2px, 2px);
+      box-shadow:
+        2px 0 0 0 var(--deep-navy),
+        0 2px 0 0 var(--deep-navy),
+        2px 2px 0 0 var(--deep-navy),
+        4px 2px 0 0 var(--neon-yellow),
+        2px 4px 0 0 var(--neon-yellow),
+        4px 4px 0 0 var(--neon-yellow);
+    }
+.pixel-btn.pink-btn {
+      background: var(--neon-pink);
+      box-shadow:
+        4px 0 0 0 var(--deep-navy),
+        0 4px 0 0 var(--deep-navy),
+        4px 4px 0 0 var(--deep-navy),
+        8px 4px 0 0 var(--neon-cyan),
+        4px 8px 0 0 var(--neon-cyan),
+        8px 8px 0 0 var(--neon-cyan);
+    }
+/* Pixel text shadow like the reference image */
+    .pixel-hero-text {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 128px;
+      line-height: 1.05;
+      color: var(--neon-cyan);
+      text-shadow:
+        4px 4px 0 var(--neon-yellow),
+        8px 8px 0 var(--deep-navy);
+      letter-spacing: 0.04em;
+    }
+/* Decorative pixel corners */
+    .pixel-corners {
+      position: relative;
+    }
+.pixel-corners::before,
+    .pixel-corners::after {
+      content: "";
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border: 4px solid var(--neon-cyan);
+    }
+.pixel-corners::before {
+      top: -8px;
+      left: -8px;
+      border-right: none;
+      border-bottom: none;
+    }
+.pixel-corners::after {
+      bottom: -8px;
+      right: -8px;
+      border-left: none;
+      border-top: none;
+    }
+.pixel-corners.yellow-corners::before,
+    .pixel-corners.yellow-corners::after { border-color: var(--neon-yellow); }
+.pixel-corners.pink-corners::before,
+    .pixel-corners.pink-corners::after { border-color: var(--neon-pink); }
+/* Section labels */
+    .pixel-label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--neon-yellow);
+      background: var(--deep-navy);
+      padding: 6px 14px;
+      display: inline-block;
+      margin-bottom: 24px;
+    }
+/* === SLIDE CONTENT LAYOUTS === */
+
+    .slide-content {
+      
+      z-index: 10;
+      
+      max-width: 1200px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+h1, h2, h3, h4 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      line-height: 1.15;
+    }
+h1 { font-size: 64px; }
+h2 { font-size: 44.8px; }
+h3 { font-size: 24px; }
+p, li {
+      font-family: var(--font-body);
+      font-size: 18.4px;
+      line-height: 1.7;
+      font-weight: 400;
+    }
+.nav-dot::after {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      background: var(--neon-cyan);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+.nav-dot.active::after { opacity: 1; }
+/* === SPECIFIC SLIDE STYLES === */
+
+    /* Slide 1: Hero */
+    .hero-subtitle {
+      font-family: var(--font-mono);
+      font-size: 13.6px;
+      letter-spacing: 0.3em;
+      color: var(--neon-pink);
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+.hero-tagline {
+      font-family: var(--font-body);
+      font-size: 19.2px;
+      color: rgba(255,255,255,0.7);
+      max-width: 500px;
+      text-align: center;
+      margin-top: 32px;
+      line-height: 1.8;
+    }
+.hero-badges {
+      display: flex;
+      gap: 16px;
+      margin-top: 48px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+.hero-badge {
+      font-family: var(--font-mono);
+      font-size: 11.2px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 8px 16px;
+      border: 2px solid var(--neon-yellow);
+      color: var(--neon-yellow);
+    }
+/* Slide 2: Split Intro */
+    .split-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 76.8px;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+      max-width: 1100px;
+    }
+.pixel-avatar-zone {
+      width: 100%;
+      aspect-ratio: 1;
+      max-width: 380px;
+      margin: 0 auto;
+      background: var(--deep-navy);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+.pixel-avatar-zone::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 10px,
+          rgba(94, 220, 244, 0.1) 10px,
+          rgba(94, 220, 244, 0.1) 20px
+        );
+    }
+.pixel-face {
+      width: 120px;
+      height: 120px;
+      position: relative;
+    }
+.pixel-face .eye {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      background: var(--neon-cyan);
+      top: 30px;
+    }
+.pixel-face .eye.left { left: 16px; }
+.pixel-face .eye.right { right: 16px; }
+.pixel-face .mouth {
+      position: absolute;
+      width: 60px;
+      height: 16px;
+      background: var(--neon-pink);
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+/* Slide 3: Feature Grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      width: 100%;
+      max-width: 1000px;
+    }
+.feature-card {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(8px);
+      padding: 32px 24px;
+      text-align: center;
+      position: relative;
+      border: 2px solid rgba(15, 27, 61, 0.2);
+    }
+.feature-card::before {
+      content: "";
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      width: 16px;
+      height: 16px;
+      border-top: 4px solid var(--deep-navy);
+      border-left: 4px solid var(--deep-navy);
+    }
+.feature-card::after {
+      content: "";
+      position: absolute;
+      bottom: -2px;
+      right: -2px;
+      width: 16px;
+      height: 16px;
+      border-bottom: 4px solid var(--deep-navy);
+      border-right: 4px solid var(--deep-navy);
+    }
+.feature-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 16px;
+      position: relative;
+    }
+.feature-icon.cube {
+      background: var(--deep-navy);
+      box-shadow: 6px 6px 0 var(--neon-yellow);
+    }
+.feature-icon.diamond {
+      background: var(--neon-cyan);
+      transform: rotate(45deg);
+      width: 36px;
+      height: 36px;
+      margin-bottom: 22px;
+      margin-top: 6px;
+    }
+.feature-icon.cross {
+      background: var(--neon-pink);
+      position: relative;
+    }
+.feature-icon.cross::before,
+    .feature-icon.cross::after {
+      content: "";
+      position: absolute;
+      background: var(--deep-navy);
+    }
+.feature-icon.cross::before { inset: 10px 4px; }
+.feature-icon.cross::after { inset: 4px 10px; }
+.feature-icon.circle {
+      border: 6px solid var(--neon-yellow);
+      border-radius: 0; /* pixel circle = square with careful shading? actually keep square for pixel aesthetic */
+      background: transparent;
+      position: relative;
+    }
+.feature-icon.circle::after {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      background: var(--neon-yellow);
+    }
+.feature-card h3 {
+      font-size: 17.6px;
+      margin-bottom: 8px;
+      color: var(--deep-navy);
+    }
+.feature-card p {
+      font-size: 13.6px;
+      color: rgba(15, 27, 61, 0.75);
+      line-height: 1.6;
+    }
+/* Slide 4 & 5: Charts */
+    .chart-slide-layout {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+.pixel-chart-title {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+.pixel-chart-title h2 {
+      color: var(--neon-cyan);
+      margin-bottom: 8px;
+    }
+.pixel-chart-title .subtitle {
+      font-family: var(--font-mono);
+      font-size: 12.8px;
+      color: var(--neon-pink);
+      letter-spacing: 0.15em;
+    }
+/* Bar Chart */
+    .pixel-bar-chart {
+      width: 100%;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 24px;
+      height: 320px;
+      padding: 0 20px;
+      position: relative;
+    }
+.pixel-bar-chart::before {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--neon-cyan);
+      opacity: 0.5;
+    }
+.chart-bar-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      max-width: 100px;
+    }
+.chart-bar {
+      width: 100%;
+      background: var(--neon-cyan);
+      position: relative;
+      box-shadow: 4px 0 0 0 var(--deep-navy), 0 4px 0 0 var(--deep-navy), 4px 4px 0 0 var(--deep-navy);
+      transition: height 1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+.chart-bar.alt { background: var(--neon-pink); }
+.chart-bar.alt2 { background: var(--neon-yellow); }
+.chart-bar-label {
+      font-family: var(--font-mono);
+      font-size: 11.2px;
+      color: rgba(255,255,255,0.8);
+      text-align: center;
+      letter-spacing: 0.05em;
+    }
+.chart-value {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--neon-yellow);
+      margin-bottom: 4px;
+    }
+/* Horizontal Bar Chart */
+    .pixel-hbar-chart {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+.hbar-row {
+      display: grid;
+      grid-template-columns: 120px 1fr 50px;
+      align-items: center;
+      gap: 16px;
+    }
+.hbar-label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--deep-navy);
+      text-align: right;
+      font-weight: 700;
+    }
+.hbar-track {
+      height: 32px;
+      background: rgba(15, 27, 61, 0.1);
+      position: relative;
+    }
+.hbar-fill {
+      height: 100%;
+      background: var(--deep-navy);
+      position: relative;
+      box-shadow: 4px 4px 0 var(--neon-yellow);
+      transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+.hbar-fill.alt { background: var(--neon-cyan); box-shadow: 4px 4px 0 var(--deep-navy); }
+.hbar-fill.alt2 { background: var(--neon-pink); box-shadow: 4px 4px 0 var(--deep-navy); }
+.hbar-value {
+      font-family: var(--font-mono);
+      font-size: 12.8px;
+      font-weight: 700;
+      color: var(--deep-navy);
+    }
+/* Slide 6: Timeline */
+    .timeline-container {
+      width: 100%;
+      max-width: 900px;
+      position: relative;
+    }
+.timeline-line {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: repeating-linear-gradient(
+        to bottom,
+        var(--deep-navy) 0px,
+        var(--deep-navy) 16px,
+        transparent 16px,
+        transparent 24px
+      );
+      transform: translateX(-50%);
+    }
+.timeline-events {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      position: relative;
+    }
+.timeline-event {
+      display: grid;
+      grid-template-columns: 1fr 60px 1fr;
+      align-items: center;
+      gap: 24px;
+    }
+.timeline-event:nth-child(even) .timeline-text { grid-column: 3; text-align: left; }
+.timeline-event:nth-child(even) .timeline-spacer { grid-column: 2; }
+.timeline-event:nth-child(even) .timeline-empty { grid-column: 1; }
+.timeline-event:nth-child(odd) .timeline-text { grid-column: 1; text-align: right; }
+.timeline-event:nth-child(odd) .timeline-spacer { grid-column: 2; }
+.timeline-event:nth-child(odd) .timeline-empty { grid-column: 3; }
+.timeline-node {
+      width: 24px;
+      height: 24px;
+      background: var(--neon-cyan);
+      border: 4px solid var(--deep-navy);
+      justify-self: center;
+      position: relative;
+      z-index: 2;
+    }
+.timeline-node.active { background: var(--neon-yellow); }
+.timeline-text h4 {
+      font-size: 16px;
+      color: var(--deep-navy);
+      margin-bottom: 4px;
+    }
+.timeline-text p {
+      font-size: 13.6px;
+      color: rgba(15, 27, 61, 0.7);
+      line-height: 1.5;
+    }
+.timeline-text .date {
+      font-family: var(--font-mono);
+      font-size: 11.2px;
+      color: var(--neon-cyan);
+      background: var(--deep-navy);
+      display: inline-block;
+      padding: 2px 10px;
+      margin-bottom: 8px;
+    }
+/* Slide 7: Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 32px;
+      width: 100%;
+      max-width: 900px;
+    }
+.stat-block {
+      text-align: center;
+      padding: 32px 16px;
+      background: rgba(94, 220, 244, 0.08);
+      border: 2px solid rgba(94, 220, 244, 0.2);
+      position: relative;
+    }
+.stat-block::before {
+      content: "";
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      width: 20px;
+      height: 20px;
+      border-top: 4px solid var(--neon-cyan);
+      border-left: 4px solid var(--neon-cyan);
+    }
+.stat-block::after {
+      content: "";
+      position: absolute;
+      bottom: -2px;
+      right: -2px;
+      width: 20px;
+      height: 20px;
+      border-bottom: 4px solid var(--neon-cyan);
+      border-right: 4px solid var(--neon-cyan);
+    }
+.stat-number {
+      font-family: var(--font-display);
+      font-size: 56px;
+      font-weight: 900;
+      color: var(--neon-cyan);
+      line-height: 1;
+      margin-bottom: 8px;
+      text-shadow: 3px 3px 0 var(--deep-navy);
+    }
+.stat-label {
+      font-family: var(--font-mono);
+      font-size: 11.2px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--neon-pink);
+    }
+/* Slide 8: Quote */
+    .quote-container {
+      max-width: 700px;
+      text-align: center;
+      position: relative;
+      padding: 48px;
+    }
+.quote-mark {
+      font-family: var(--font-display);
+      font-size: 128px;
+      line-height: 1;
+      color: var(--deep-navy);
+      opacity: 0.15;
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+.quote-text {
+      font-family: var(--font-body);
+      font-size: 25.6px;
+      font-weight: 500;
+      
+      color: var(--deep-navy);
+      line-height: 1.8;
+      position: relative;
+      z-index: 2;
+    }
+.quote-author {
+      margin-top: 32px;
+      font-family: var(--font-mono);
+      font-size: 12.8px;
+      color: rgba(15, 27, 61, 0.7);
+      letter-spacing: 0.1em;
+    }
+.quote-line {
+      width: 60px;
+      height: 4px;
+      background: var(--neon-yellow);
+      margin: 24px auto 0;
+      box-shadow: 4px 4px 0 var(--deep-navy);
+    }
+/* Slide 9: Comparison / Cards */
+    .tier-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      width: 100%;
+      max-width: 900px;
+    }
+.tier-card {
+      background: white;
+      padding: 36px 28px;
+      position: relative;
+      text-align: center;
+    }
+.tier-card.featured {
+      background: var(--deep-navy);
+      color: white;
+      transform: translateY(-12px);
+      box-shadow: 8px 8px 0 var(--neon-yellow);
+    }
+.tier-card:not(.featured) {
+      box-shadow: 6px 6px 0 rgba(15, 27, 61, 0.15);
+    }
+.tier-name {
+      font-family: var(--font-display);
+      font-size: 19.2px;
+      margin-bottom: 8px;
+    }
+.tier-price {
+      font-family: var(--font-mono);
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--neon-cyan);
+      margin-bottom: 4px;
+    }
+.tier-price span {
+      font-size: 12.8px;
+      color: rgba(15, 27, 61, 0.5);
+    }
+.tier-card.featured .tier-price span { color: rgba(255,255,255,0.5); }
+.tier-desc {
+      font-size: 12.8px;
+      color: rgba(15, 27, 61, 0.6);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+.tier-card.featured .tier-desc { color: rgba(255,255,255,0.6); }
+.tier-features {
+      list-style: none;
+      text-align: left;
+      margin-bottom: 24px;
+    }
+.tier-features li {
+      font-size: 12.8px;
+      padding: 6px 0;
+      border-bottom: 1px dashed rgba(15, 27, 61, 0.15);
+      position: relative;
+      padding-left: 20px;
+    }
+.tier-features li::before {
+      content: "+";
+      position: absolute;
+      left: 0;
+      font-family: var(--font-mono);
+      color: var(--neon-cyan);
+      font-weight: 700;
+    }
+.tier-card.featured .tier-features li { border-color: rgba(255,255,255,0.1); }
+/* Slide 10: CTA */
+    .cta-content {
+      text-align: center;
+      max-width: 600px;
+    }
+.cta-content h2 {
+      font-size: 56px;
+      color: var(--neon-cyan);
+      margin-bottom: 16px;
+      text-shadow: 4px 4px 0 var(--deep-navy), 8px 8px 0 var(--neon-yellow);
+    }
+.cta-content p {
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 40px;
+      font-size: 17.6px;
+    }
+.cta-buttons {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+/* Decorative pixel landscape at bottom of CTA */
+    .pixel-landscape {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 120px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 0;
+      z-index: 2;
+      opacity: 0.3;
+      pointer-events: none;
+    }
+.mountain {
+      background: var(--deep-navy);
+      width: 80px;
+      position: relative;
+    }
+/* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      .slides-container { transition: none; }
+      .starfield .star, .pixel-particles .p { animation: none; }
+      .chart-bar, .hbar-fill { transition: none; }
+    }
+
+/* editor adaptation */
+.slide-counter { position: absolute; bottom: 24px; right: 24px; font-family: var(--font-mono); font-size: 13px; color: var(--neon-cyan); background: rgba(10, 14, 39, 0.8); padding: 8px 20px; z-index: 5; letter-spacing: 0.15em; }
+/* charts: the bars carry their value as --h / --w and grow when the slide shows */
+.chart-bar-group { height: 100%; justify-content: flex-end; } .chart-bar { height: var(--h, 0%); } .slide:not(.visible) .chart-bar { height: 0%; }
+.hbar-fill { width: var(--w, 0%); } .slide:not(.visible) .hbar-fill { width: 0%; }
+@media print { .chart-bar { height: var(--h, 0%) !important; } .hbar-fill { width: var(--w, 0%) !important; } }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ========== SLIDE 1: HERO ========== -->
+<section class="slide bg-grid scanlines grain crt-glow active" data-name="-bitorbit">
+      <div class="starfield"><div class="star" style="left:56.1%;top:11.5%;animation-delay:0.73s"></div><div class="star" style="left:44.3%;top:50.6%;animation-delay:0.24s"></div><div class="star" style="left:87.9%;top:58.9%;animation-delay:1.23s"></div><div class="star" style="left:28.4%;top:78.1%;animation-delay:1.97s"></div><div class="star" style="left:7.7%;top:49.9%;animation-delay:0.71s"></div><div class="star" style="left:67.2%;top:15.8%;animation-delay:1.68s"></div><div class="star" style="left:48.7%;top:17.6%;animation-delay:0.15s"></div><div class="star" style="left:93.9%;top:97.0%;animation-delay:0.36s"></div><div class="star" style="left:44.4%;top:95.6%;animation-delay:0.57s"></div><div class="star" style="left:41.9%;top:55.0%;animation-delay:2.02s"></div><div class="star" style="left:28.1%;top:17.0%;animation-delay:2.96s"></div><div class="star" style="left:44.6%;top:23.3%;animation-delay:1.64s"></div><div class="star" style="left:33.0%;top:15.4%;animation-delay:2.32s"></div><div class="star" style="left:35.2%;top:35.0%;animation-delay:0.24s"></div><div class="star" style="left:92.6%;top:23.9%;animation-delay:2.65s"></div><div class="star" style="left:47.1%;top:23.6%;animation-delay:1.81s"></div><div class="star" style="left:40.2%;top:75.9%;animation-delay:1.96s"></div><div class="star" style="left:13.6%;top:22.4%;animation-delay:1.35s"></div><div class="star" style="left:9.0%;top:4.8%;animation-delay:1.24s"></div><div class="star" style="left:68.1%;top:64.7%;animation-delay:2.87s"></div><div class="star" style="left:32.5%;top:43.8%;animation-delay:1.49s"></div><div class="star" style="left:43.9%;top:83.8%;animation-delay:1.35s"></div><div class="star" style="left:43.9%;top:26.4%;animation-delay:0.71s"></div><div class="star" style="left:74.3%;top:13.2%;animation-delay:0.81s"></div><div class="star" style="left:76.7%;top:85.8%;animation-delay:2.91s"></div><div class="star" style="left:92.7%;top:86.0%;animation-delay:2.24s"></div><div class="star" style="left:64.0%;top:55.5%;animation-delay:0.07s"></div><div class="star" style="left:32.4%;top:35.7%;animation-delay:0.65s"></div><div class="star" style="left:39.4%;top:68.6%;animation-delay:2.21s"></div><div class="star" style="left:26.7%;top:95.6%;animation-delay:0.02s"></div><div class="star" style="left:36.0%;top:58.6%;animation-delay:1.32s"></div><div class="star" style="left:8.9%;top:99.1%;animation-delay:1.37s"></div><div class="star" style="left:87.2%;top:58.7%;animation-delay:1.41s"></div><div class="star" style="left:12.5%;top:79.3%;animation-delay:2.69s"></div><div class="star" style="left:26.4%;top:2.4%;animation-delay:0.46s"></div><div class="star" style="left:70.7%;top:69.8%;animation-delay:1.98s"></div><div class="star" style="left:87.0%;top:23.0%;animation-delay:2.49s"></div><div class="star" style="left:16.9%;top:3.7%;animation-delay:0.25s"></div><div class="star" style="left:2.1%;top:53.7%;animation-delay:2.49s"></div><div class="star" style="left:84.3%;top:14.6%;animation-delay:1.48s"></div></div>
+      <div class="pixel-particles"><div class="p" style="background:var(--neon-cyan);left:5.2%;top:28.0%;animation-delay:2.44s;animation-duration:6.38s"></div><div class="p" style="background:var(--neon-pink);left:35.6%;top:23.0%;animation-delay:1.48s;animation-duration:10.74s"></div><div class="p" style="background:var(--neon-yellow);left:13.7%;top:16.5%;animation-delay:0.00s;animation-duration:9.74s"></div><div class="p" style="background:var(--neon-cyan);left:8.6%;top:40.3%;animation-delay:0.55s;animation-duration:8.87s"></div><div class="p" style="background:var(--neon-pink);left:41.5%;top:0.8%;animation-delay:3.78s;animation-duration:8.71s"></div><div class="p" style="background:var(--neon-yellow);left:73.9%;top:33.8%;animation-delay:4.65s;animation-duration:10.30s"></div><div class="p" style="background:var(--neon-cyan);left:63.9%;top:26.8%;animation-delay:1.80s;animation-duration:6.46s"></div><div class="p" style="background:var(--neon-pink);left:88.1%;top:8.3%;animation-delay:0.34s;animation-duration:7.12s"></div><div class="p" style="background:var(--neon-yellow);left:30.4%;top:3.0%;animation-delay:3.00s;animation-duration:8.64s"></div><div class="p" style="background:var(--neon-cyan);left:37.7%;top:54.0%;animation-delay:4.53s;animation-duration:9.17s"></div><div class="p" style="background:var(--neon-pink);left:42.2%;top:12.0%;animation-delay:4.49s;animation-duration:9.97s"></div><div class="p" style="background:var(--neon-yellow);left:49.9%;top:90.6%;animation-delay:3.39s;animation-duration:8.75s"></div><div class="p" style="background:var(--neon-cyan);left:96.7%;top:88.6%;animation-delay:2.08s;animation-duration:8.99s"></div><div class="p" style="background:var(--neon-pink);left:70.3%;top:78.7%;animation-delay:4.57s;animation-duration:9.27s"></div><div class="p" style="background:var(--neon-yellow);left:99.0%;top:63.5%;animation-delay:4.15s;animation-duration:8.64s"></div><div class="p" style="background:var(--neon-cyan);left:7.5%;top:97.3%;animation-delay:2.77s;animation-duration:9.91s"></div></div>
+      <div class="slide-content" style="z-index:10;">
+        <div class="hero-subtitle reveal" style="--i: 0;">Pixel Perfect Presentation System</div>
+        <h1 class="pixel-hero-text reveal" style="text-align: center; --i: 1;">8-BIT<br>ORBIT</h1>
+        <p class="hero-tagline reveal" style="--i: 2;">A retro-futuristic deck engine for bold storytellers. Built for arcades, engineered for boardrooms.</p>
+        <div class="hero-badges reveal" style="--i: 3;">
+          <span class="hero-badge">10 Slides</span>
+          <span class="hero-badge">CSS Native</span>
+          <span class="hero-badge">Zero Dependencies</span>
+        </div>
+      </div>
+    </section>
+
+<!-- ========== SLIDE 2: SPLIT INTRO ========== -->
+<section class="slide bg-grid-pink scanlines grain" data-name="rewiring how we share id">
+      <div class="slide-content reveal" style="--i: 0;">
+        <div class="split-layout">
+          <div class="pixel-avatar-zone pixel-corners yellow-corners">
+            <div class="pixel-face">
+              <div class="eye left"></div>
+              <div class="eye right"></div>
+              <div class="mouth"></div>
+            </div>
+          </div>
+          <div style="max-width: 460px;">
+            <span class="pixel-label">Mission Brief</span>
+            <h2 style="color: var(--deep-navy); margin-bottom: 1.2rem; font-size: clamp(1.6rem, 3vw, 2.4rem);">Rewiring How We Share Ideas</h2>
+            <p style="color: rgba(15,27,61,0.75); margin-bottom: 1rem;">
+              Every presentation is an opportunity to transport your audience. This template fuses the tactile nostalgia of 16-bit aesthetics with modern typographic discipline.
+            </p>
+            <p style="color: rgba(15,27,61,0.75);">
+              No canvas limits. No cookie-cutter layouts. Just pure CSS architecture delivering cinematic slide transitions and atmospheric depth through scanlines, grain, and glowing grids.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+<!-- ========== SLIDE 3: FEATURE GRID ========== -->
+<section class="slide bg-grid-cyan scanlines grain" data-name="four engines running">
+      <div class="slide-content">
+        <div style="text-align: center; margin-bottom: 2.5rem; --i: 0;" class="reveal">
+          <span class="pixel-label" style="background: var(--deep-navy); color: var(--neon-cyan);">Core Systems</span>
+          <h2 style="color: var(--deep-navy);">Four Engines Running</h2>
+        </div>
+        <div class="feature-grid reveal" style="--i: 1;">
+          <div class="feature-card">
+            <div class="feature-icon cube"></div>
+            <h3>Modular Blocks</h3>
+            <p>Swap components without breaking the grid. Every element is containerized and responsive by default.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon diamond"></div>
+            <h3>Crisp Vectors</h3>
+            <p>All visual effects are native CSS. No image assets required for borders, shadows, or patterns.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon cross"></div>
+            <h3>Live Data</h3>
+            <p>Chart slides accept dynamic values. Bars grow with CSS transitions triggered on navigation.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon circle"></div>
+            <h3>Retro Atmosphere</h3>
+            <p>Scanlines, CRT vignettes, starfields, and noise layers create an immersive viewing environment.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+<!-- ========== SLIDE 4: VERTICAL BAR CHART ========== -->
+<section class="slide bg-grid scanlines grain crt-glow" data-name="quarterly growth metrics">
+      <div class="starfield"><div class="star" style="left:6.9%;top:50.2%;animation-delay:2.67s"></div><div class="star" style="left:28.2%;top:69.6%;animation-delay:2.00s"></div><div class="star" style="left:46.5%;top:99.9%;animation-delay:1.07s"></div><div class="star" style="left:3.5%;top:82.8%;animation-delay:1.14s"></div><div class="star" style="left:40.8%;top:59.8%;animation-delay:0.45s"></div><div class="star" style="left:0.1%;top:72.7%;animation-delay:0.25s"></div><div class="star" style="left:23.1%;top:63.2%;animation-delay:1.79s"></div><div class="star" style="left:51.4%;top:72.9%;animation-delay:0.33s"></div><div class="star" style="left:26.7%;top:43.5%;animation-delay:0.11s"></div><div class="star" style="left:90.6%;top:16.6%;animation-delay:2.39s"></div><div class="star" style="left:84.9%;top:33.9%;animation-delay:2.41s"></div><div class="star" style="left:51.1%;top:37.1%;animation-delay:1.42s"></div><div class="star" style="left:31.0%;top:67.9%;animation-delay:0.67s"></div><div class="star" style="left:66.3%;top:67.9%;animation-delay:1.42s"></div><div class="star" style="left:98.5%;top:78.7%;animation-delay:1.91s"></div><div class="star" style="left:69.4%;top:42.1%;animation-delay:0.39s"></div><div class="star" style="left:20.6%;top:99.7%;animation-delay:1.12s"></div><div class="star" style="left:93.8%;top:93.2%;animation-delay:2.33s"></div><div class="star" style="left:30.6%;top:64.3%;animation-delay:2.30s"></div><div class="star" style="left:72.8%;top:54.5%;animation-delay:2.25s"></div><div class="star" style="left:62.0%;top:5.6%;animation-delay:0.45s"></div><div class="star" style="left:39.8%;top:59.3%;animation-delay:1.14s"></div><div class="star" style="left:47.9%;top:57.2%;animation-delay:2.58s"></div><div class="star" style="left:28.1%;top:41.0%;animation-delay:0.00s"></div><div class="star" style="left:21.9%;top:52.3%;animation-delay:0.67s"></div><div class="star" style="left:71.0%;top:32.8%;animation-delay:2.84s"></div><div class="star" style="left:17.1%;top:24.2%;animation-delay:1.74s"></div><div class="star" style="left:1.9%;top:68.2%;animation-delay:1.64s"></div><div class="star" style="left:67.0%;top:6.3%;animation-delay:0.79s"></div><div class="star" style="left:54.1%;top:80.4%;animation-delay:0.42s"></div><div class="star" style="left:4.8%;top:32.0%;animation-delay:1.80s"></div><div class="star" style="left:60.9%;top:2.8%;animation-delay:0.17s"></div><div class="star" style="left:63.9%;top:34.4%;animation-delay:2.79s"></div><div class="star" style="left:55.6%;top:68.7%;animation-delay:1.89s"></div><div class="star" style="left:77.7%;top:47.1%;animation-delay:1.75s"></div><div class="star" style="left:71.7%;top:11.4%;animation-delay:0.59s"></div><div class="star" style="left:79.4%;top:3.3%;animation-delay:2.68s"></div><div class="star" style="left:42.4%;top:64.4%;animation-delay:0.26s"></div><div class="star" style="left:2.4%;top:36.4%;animation-delay:0.58s"></div><div class="star" style="left:1.1%;top:60.9%;animation-delay:1.90s"></div><div class="star" style="left:80.1%;top:79.6%;animation-delay:2.46s"></div><div class="star" style="left:81.0%;top:34.2%;animation-delay:0.51s"></div></div>
+      <div class="slide-content reveal" style="--i: 0;">
+        <div class="chart-slide-layout">
+          <div class="pixel-chart-title">
+            <span class="pixel-label">Analytics Core</span>
+            <h2>Quarterly Growth Metrics</h2>
+            <p class="subtitle">Fiscal performance across four sectors — normalized index</p>
+          </div>
+          <div class="pixel-bar-chart">
+            <div class="chart-bar-group">
+              <div class="chart-value">78</div>
+              <div class="chart-bar" style="--h: 78%;"></div>
+              <div class="chart-bar-label">Alpha</div>
+            </div>
+            <div class="chart-bar-group">
+              <div class="chart-value">92</div>
+              <div class="chart-bar alt" style="--h: 92%;"></div>
+              <div class="chart-bar-label">Beta</div>
+            </div>
+            <div class="chart-bar-group">
+              <div class="chart-value">64</div>
+              <div class="chart-bar alt2" style="--h: 64%;"></div>
+              <div class="chart-bar-label">Gamma</div>
+            </div>
+            <div class="chart-bar-group">
+              <div class="chart-value">85</div>
+              <div class="chart-bar" style="--h: 85%;"></div>
+              <div class="chart-bar-label">Delta</div>
+            </div>
+            <div class="chart-bar-group">
+              <div class="chart-value">56</div>
+              <div class="chart-bar alt" style="--h: 56%;"></div>
+              <div class="chart-bar-label">Epsilon</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+<!-- ========== SLIDE 5: HORIZONTAL BAR CHART ========== -->
+<section class="slide bg-grid-lavender scanlines grain" data-name="resource allocation">
+      <div class="slide-content reveal" style="--i: 0;">
+        <div class="chart-slide-layout">
+          <div class="pixel-chart-title" style="margin-bottom: 2.5rem;">
+            <span class="pixel-label" style="background: var(--deep-navy); color: var(--neon-yellow);">System Load</span>
+            <h2 style="color: var(--deep-navy);">Resource Allocation</h2>
+            <p class="subtitle" style="color: rgba(15,27,61,0.6);">Percentage distribution across operational units</p>
+          </div>
+          <div class="pixel-hbar-chart">
+            <div class="hbar-row">
+              <div class="hbar-label">Compute</div>
+              <div class="hbar-track">
+                <div class="hbar-fill" style="--w: 88%;"></div>
+              </div>
+              <div class="hbar-value">88%</div>
+            </div>
+            <div class="hbar-row">
+              <div class="hbar-label">Storage</div>
+              <div class="hbar-track">
+                <div class="hbar-fill alt" style="--w: 72%;"></div>
+              </div>
+              <div class="hbar-value">72%</div>
+            </div>
+            <div class="hbar-row">
+              <div class="hbar-label">Network</div>
+              <div class="hbar-track">
+                <div class="hbar-fill alt2" style="--w: 95%;"></div>
+              </div>
+              <div class="hbar-value">95%</div>
+            </div>
+            <div class="hbar-row">
+              <div class="hbar-label">Memory</div>
+              <div class="hbar-track">
+                <div class="hbar-fill" style="--w: 61%;"></div>
+              </div>
+              <div class="hbar-value">61%</div>
+            </div>
+            <div class="hbar-row">
+              <div class="hbar-label">Graphics</div>
+              <div class="hbar-track">
+                <div class="hbar-fill alt" style="--w: 44%;"></div>
+              </div>
+              <div class="hbar-value">44%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+<!-- ========== SLIDE 6: TIMELINE ========== -->
+<section class="slide bg-grid-pink scanlines grain" data-name="development roadmap">
+      <div class="slide-content">
+        <div style="text-align: center; margin-bottom: 2.5rem; --i: 0;" class="reveal">
+          <span class="pixel-label">Chronology</span>
+          <h2 style="color: var(--deep-navy);">Development Roadmap</h2>
+        </div>
+        <div class="timeline-container reveal" style="--i: 1;">
+          <div class="timeline-line"></div>
+          <div class="timeline-events">
+            <div class="timeline-event">
+              <div class="timeline-text">
+                <span class="date">Q1 2026</span>
+                <h4>Concept &amp; Architecture</h4>
+                <p>Wireframes, palette selection, and core grid system established.</p>
+              </div>
+              <div class="timeline-spacer">
+                <div class="timeline-node active"></div>
+              </div>
+              <div class="timeline-empty"></div>
+            </div>
+            <div class="timeline-event">
+              <div class="timeline-empty"></div>
+              <div class="timeline-spacer">
+                <div class="timeline-node active"></div>
+              </div>
+              <div class="timeline-text">
+                <span class="date">Q2 2026</span>
+                <h4>Asset Generation</h4>
+                <p>Pixel components, iconography, and atmospheric effects coded.</p>
+              </div>
+            </div>
+            <div class="timeline-event">
+              <div class="timeline-text">
+                <span class="date">Q3 2026</span>
+                <h4>Data Integration</h4>
+                <p>Charting engine, animated counters, and dynamic state binding.</p>
+              </div>
+              <div class="timeline-spacer">
+                <div class="timeline-node"></div>
+              </div>
+              <div class="timeline-empty"></div>
+            </div>
+            <div class="timeline-event">
+              <div class="timeline-empty"></div>
+              <div class="timeline-spacer">
+                <div class="timeline-node"></div>
+              </div>
+              <div class="timeline-text">
+                <span class="date">Q4 2026</span>
+                <h4>Global Launch</h4>
+                <p>Public release with full documentation and community support.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+<!-- ========== SLIDE 7: STATS / COUNTERS ========== -->
+<section class="slide bg-grid scanlines grain crt-glow" data-name="platform vitals">
+      <div class="starfield"><div class="star" style="left:57.6%;top:88.9%;animation-delay:1.60s"></div><div class="star" style="left:12.1%;top:88.6%;animation-delay:0.76s"></div><div class="star" style="left:5.2%;top:40.9%;animation-delay:0.91s"></div><div class="star" style="left:78.6%;top:87.4%;animation-delay:0.30s"></div><div class="star" style="left:74.0%;top:69.8%;animation-delay:0.19s"></div><div class="star" style="left:33.1%;top:29.7%;animation-delay:1.82s"></div><div class="star" style="left:97.5%;top:8.8%;animation-delay:0.44s"></div><div class="star" style="left:8.9%;top:48.8%;animation-delay:0.30s"></div><div class="star" style="left:8.9%;top:91.4%;animation-delay:2.66s"></div><div class="star" style="left:39.3%;top:78.2%;animation-delay:2.76s"></div><div class="star" style="left:41.7%;top:50.8%;animation-delay:1.86s"></div><div class="star" style="left:57.7%;top:51.0%;animation-delay:1.19s"></div><div class="star" style="left:29.0%;top:20.5%;animation-delay:2.02s"></div><div class="star" style="left:97.4%;top:0.7%;animation-delay:2.60s"></div><div class="star" style="left:4.4%;top:33.6%;animation-delay:1.16s"></div><div class="star" style="left:91.7%;top:60.6%;animation-delay:1.97s"></div><div class="star" style="left:1.0%;top:23.6%;animation-delay:0.27s"></div><div class="star" style="left:73.9%;top:64.1%;animation-delay:0.32s"></div><div class="star" style="left:52.2%;top:23.7%;animation-delay:0.36s"></div><div class="star" style="left:77.5%;top:44.3%;animation-delay:1.64s"></div><div class="star" style="left:91.4%;top:67.4%;animation-delay:2.41s"></div><div class="star" style="left:35.7%;top:34.8%;animation-delay:0.93s"></div><div class="star" style="left:52.0%;top:88.0%;animation-delay:1.44s"></div><div class="star" style="left:81.9%;top:68.7%;animation-delay:2.20s"></div><div class="star" style="left:67.1%;top:18.7%;animation-delay:1.44s"></div><div class="star" style="left:49.3%;top:79.6%;animation-delay:0.43s"></div><div class="star" style="left:70.2%;top:93.0%;animation-delay:0.41s"></div><div class="star" style="left:71.4%;top:0.6%;animation-delay:2.64s"></div><div class="star" style="left:94.6%;top:44.1%;animation-delay:2.36s"></div><div class="star" style="left:81.5%;top:65.1%;animation-delay:0.82s"></div><div class="star" style="left:73.6%;top:5.3%;animation-delay:2.28s"></div><div class="star" style="left:12.8%;top:6.5%;animation-delay:1.98s"></div><div class="star" style="left:40.6%;top:10.1%;animation-delay:1.17s"></div><div class="star" style="left:98.8%;top:58.0%;animation-delay:1.10s"></div><div class="star" style="left:28.9%;top:91.8%;animation-delay:0.03s"></div><div class="star" style="left:72.7%;top:53.1%;animation-delay:2.20s"></div><div class="star" style="left:71.8%;top:83.6%;animation-delay:2.86s"></div><div class="star" style="left:68.0%;top:25.0%;animation-delay:0.27s"></div><div class="star" style="left:2.7%;top:19.0%;animation-delay:1.67s"></div><div class="star" style="left:17.8%;top:7.2%;animation-delay:2.31s"></div><div class="star" style="left:54.9%;top:31.2%;animation-delay:0.45s"></div><div class="star" style="left:55.6%;top:32.8%;animation-delay:0.33s"></div><div class="star" style="left:61.7%;top:53.6%;animation-delay:0.20s"></div><div class="star" style="left:14.8%;top:35.3%;animation-delay:1.31s"></div><div class="star" style="left:56.5%;top:19.5%;animation-delay:1.92s"></div></div>
+      <div class="slide-content">
+        <div style="text-align: center; margin-bottom: 2.5rem; --i: 0;" class="reveal">
+          <span class="pixel-label">Live Telemetry</span>
+          <h2 style="color: var(--neon-cyan);">Platform Vitals</h2>
+          <p style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 0.5rem;">Real-time aggregate figures from active deployments</p>
+        </div>
+        <div class="stats-grid reveal" style="--i: 1;">
+          <div class="stat-block">
+            <div class="stat-number">847</div>
+            <div class="stat-label">Active Worlds</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-number">12.4M</div>
+            <div class="stat-label">Pixels Rendered</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-number">99.9%</div>
+            <div class="stat-label">Uptime Score</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-number">2048</div>
+            <div class="stat-label">Max Resolution</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+<!-- ========== SLIDE 8: QUOTE ========== -->
+<section class="slide bg-grid-cyan scanlines grain" data-name="slide 8">
+      <div class="slide-content reveal" style="--i: 0;">
+        <div class="quote-container pixel-corners">
+          <div class="quote-mark">"</div>
+          <p class="quote-text">
+            The best presentations do not merely inform. They immerse. They transform the conference room into an arcade cabinet where every slide is a new level waiting to be unlocked.
+          </p>
+          <div class="quote-line"></div>
+          <div class="quote-author">— Lead Creative Technologist, Studio Orbital</div>
+        </div>
+      </div>
+    </section>
+
+<!-- ========== SLIDE 9: PRICING TIERS ========== -->
+<section class="slide bg-grid-lavender scanlines grain" data-name="choose your loadout">
+      <div class="slide-content">
+        <div style="text-align: center; margin-bottom: 2.5rem; --i: 0;" class="reveal">
+          <span class="pixel-label" style="background: var(--deep-navy); color: var(--neon-pink);">Access Tiers</span>
+          <h2 style="color: var(--deep-navy);">Choose Your Loadout</h2>
+        </div>
+        <div class="tier-grid reveal" style="--i: 1;">
+          <div class="tier-card">
+            <div class="tier-name">Rookie</div>
+            <div class="tier-price">$0<span>/mo</span></div>
+            <div class="tier-desc">For solo explorers testing the waters.</div>
+            <ul class="tier-features">
+              <li>5 slide maximum</li>
+              <li>Standard grid themes</li>
+              <li>Community support</li>
+              <li>Static export only</li>
+            </ul>
+            <button class="pixel-btn" style="font-size: 0.8rem; padding: 12px 24px;">Select</button>
+          </div>
+          <div class="tier-card featured">
+            <div class="tier-name" style="color: var(--neon-yellow);">Arcade</div>
+            <div class="tier-price" style="color: var(--neon-pink);">$29<span>/mo</span></div>
+            <div class="tier-desc">Serious builders need serious tooling.</div>
+            <ul class="tier-features">
+              <li>Unlimited slides</li>
+              <li>All atmospheric packs</li>
+              <li>Live data binding</li>
+              <li>Priority rendering</li>
+              <li>Custom cursor sets</li>
+            </ul>
+            <button class="pixel-btn pink-btn" style="font-size: 0.8rem; padding: 12px 24px;">Select</button>
+          </div>
+          <div class="tier-card">
+            <div class="tier-name">Boss</div>
+            <div class="tier-price">$79<span>/mo</span></div>
+            <div class="tier-desc">Enterprise-grade control and compliance.</div>
+            <ul class="tier-features">
+              <li>Everything in Arcade</li>
+              <li>White-label export</li>
+              <li>SSO &amp; audit logs</li>
+              <li>Dedicated pipeline</li>
+            </ul>
+            <button class="pixel-btn" style="font-size: 0.8rem; padding: 12px 24px;">Select</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+<!-- ========== SLIDE 10: CLOSING CTA ========== -->
+<section class="slide bg-grid scanlines grain crt-glow" data-name="ready playerone?">
+      <div class="starfield"><div class="star" style="left:8.4%;top:27.5%;animation-delay:0.54s"></div><div class="star" style="left:95.9%;top:7.6%;animation-delay:2.52s"></div><div class="star" style="left:63.8%;top:81.9%;animation-delay:0.75s"></div><div class="star" style="left:53.7%;top:92.0%;animation-delay:2.47s"></div><div class="star" style="left:7.2%;top:79.7%;animation-delay:2.93s"></div><div class="star" style="left:66.0%;top:86.6%;animation-delay:0.38s"></div><div class="star" style="left:71.9%;top:54.4%;animation-delay:2.08s"></div><div class="star" style="left:66.4%;top:24.8%;animation-delay:0.27s"></div><div class="star" style="left:91.2%;top:39.3%;animation-delay:2.21s"></div><div class="star" style="left:88.0%;top:39.8%;animation-delay:0.13s"></div><div class="star" style="left:98.5%;top:67.7%;animation-delay:1.30s"></div><div class="star" style="left:64.2%;top:64.9%;animation-delay:0.97s"></div><div class="star" style="left:27.0%;top:73.0%;animation-delay:0.37s"></div><div class="star" style="left:28.5%;top:33.6%;animation-delay:0.77s"></div><div class="star" style="left:10.2%;top:88.5%;animation-delay:0.42s"></div><div class="star" style="left:14.0%;top:79.2%;animation-delay:0.55s"></div><div class="star" style="left:81.4%;top:47.4%;animation-delay:2.43s"></div><div class="star" style="left:54.1%;top:34.9%;animation-delay:1.30s"></div><div class="star" style="left:73.8%;top:83.2%;animation-delay:1.42s"></div><div class="star" style="left:82.2%;top:34.1%;animation-delay:1.03s"></div><div class="star" style="left:20.9%;top:29.2%;animation-delay:1.38s"></div><div class="star" style="left:31.6%;top:10.2%;animation-delay:0.72s"></div><div class="star" style="left:56.0%;top:18.8%;animation-delay:0.31s"></div><div class="star" style="left:35.6%;top:96.5%;animation-delay:1.39s"></div><div class="star" style="left:12.3%;top:85.1%;animation-delay:2.21s"></div><div class="star" style="left:27.6%;top:26.3%;animation-delay:1.03s"></div><div class="star" style="left:23.3%;top:61.7%;animation-delay:2.09s"></div><div class="star" style="left:40.9%;top:33.0%;animation-delay:0.64s"></div><div class="star" style="left:22.2%;top:81.8%;animation-delay:0.93s"></div><div class="star" style="left:8.9%;top:49.8%;animation-delay:1.22s"></div><div class="star" style="left:42.5%;top:78.7%;animation-delay:2.75s"></div><div class="star" style="left:64.7%;top:10.2%;animation-delay:0.78s"></div><div class="star" style="left:17.3%;top:85.8%;animation-delay:2.55s"></div><div class="star" style="left:41.9%;top:47.4%;animation-delay:0.31s"></div><div class="star" style="left:80.2%;top:36.5%;animation-delay:1.31s"></div><div class="star" style="left:73.7%;top:94.8%;animation-delay:0.81s"></div><div class="star" style="left:64.3%;top:64.0%;animation-delay:0.05s"></div><div class="star" style="left:93.5%;top:85.7%;animation-delay:0.28s"></div><div class="star" style="left:3.0%;top:1.6%;animation-delay:2.76s"></div><div class="star" style="left:34.6%;top:53.5%;animation-delay:2.73s"></div><div class="star" style="left:29.7%;top:82.8%;animation-delay:1.44s"></div><div class="star" style="left:30.3%;top:31.4%;animation-delay:0.14s"></div><div class="star" style="left:77.8%;top:40.9%;animation-delay:0.09s"></div><div class="star" style="left:13.9%;top:52.9%;animation-delay:2.53s"></div><div class="star" style="left:80.4%;top:9.1%;animation-delay:2.72s"></div><div class="star" style="left:18.9%;top:51.2%;animation-delay:1.89s"></div><div class="star" style="left:71.0%;top:20.8%;animation-delay:1.31s"></div></div>
+      <div class="pixel-particles"><div class="p" style="background:var(--neon-cyan);left:78.5%;top:59.7%;animation-delay:3.71s;animation-duration:10.97s"></div><div class="p" style="background:var(--neon-pink);left:9.4%;top:96.1%;animation-delay:1.30s;animation-duration:6.70s"></div><div class="p" style="background:var(--neon-yellow);left:51.1%;top:49.4%;animation-delay:0.41s;animation-duration:10.85s"></div><div class="p" style="background:var(--neon-cyan);left:94.9%;top:40.6%;animation-delay:1.35s;animation-duration:6.24s"></div><div class="p" style="background:var(--neon-pink);left:50.5%;top:31.4%;animation-delay:0.92s;animation-duration:10.78s"></div><div class="p" style="background:var(--neon-yellow);left:35.4%;top:79.7%;animation-delay:3.48s;animation-duration:10.85s"></div><div class="p" style="background:var(--neon-cyan);left:29.8%;top:62.2%;animation-delay:0.48s;animation-duration:6.61s"></div><div class="p" style="background:var(--neon-pink);left:99.0%;top:62.9%;animation-delay:3.12s;animation-duration:7.30s"></div><div class="p" style="background:var(--neon-yellow);left:82.7%;top:28.5%;animation-delay:3.59s;animation-duration:6.63s"></div><div class="p" style="background:var(--neon-cyan);left:49.9%;top:91.3%;animation-delay:4.41s;animation-duration:10.09s"></div><div class="p" style="background:var(--neon-pink);left:21.6%;top:57.3%;animation-delay:1.26s;animation-duration:6.27s"></div><div class="p" style="background:var(--neon-yellow);left:59.6%;top:62.5%;animation-delay:4.07s;animation-duration:8.19s"></div><div class="p" style="background:var(--neon-cyan);left:21.8%;top:94.4%;animation-delay:1.50s;animation-duration:8.69s"></div><div class="p" style="background:var(--neon-pink);left:84.9%;top:81.5%;animation-delay:3.65s;animation-duration:11.67s"></div><div class="p" style="background:var(--neon-yellow);left:32.7%;top:48.3%;animation-delay:3.26s;animation-duration:7.53s"></div><div class="p" style="background:var(--neon-cyan);left:12.3%;top:38.3%;animation-delay:0.06s;animation-duration:6.39s"></div></div>
+      <div class="pixel-landscape"><div class="mountain" style="height:30px;width:60px"></div><div class="mountain" style="height:50px;width:80px"></div><div class="mountain" style="height:70px;width:100px"></div><div class="mountain" style="height:40px;width:60px"></div><div class="mountain" style="height:60px;width:80px"></div><div class="mountain" style="height:35px;width:100px"></div><div class="mountain" style="height:55px;width:60px"></div><div class="mountain" style="height:45px;width:80px"></div><div class="mountain" style="height:80px;width:100px"></div><div class="mountain" style="height:25px;width:60px"></div><div class="mountain" style="height:50px;width:80px"></div><div class="mountain" style="height:40px;width:100px"></div></div>
+      <div class="slide-content reveal" style="z-index: 10; --i: 0;">
+        <div class="cta-content">
+          <h2>Ready Player<br>One?</h2>
+          <p>Deploy your first 8-BIT ORBIT deck in under sixty seconds. No dependencies. No friction. Just pure presentation power.</p>
+          <div class="cta-buttons">
+            <button class="pixel-btn">Initialize Deck</button>
+            <button class="pixel-btn pink-btn">View Documentation</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+<!-- The master layer: shown on every slide, edited once in the editor -->
+<div class="slide-counter"><span data-page-now>1</span> / <span data-page-total>10</span></div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">10</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   Scales the stage (1920x1080 unless the deck's CSS says otherwise)
+   into the window, navigates with the
+   keyboard, touch and wheel, and exposes the hooks the editor uses:
+   - reads --ed-panel on <html> (space reserved for a side panel)
+   - listens for deck:rescale
+   - dispatches deck:slide (detail = slide index)
+   - honours #n in the URL to show slide n
+   Part of the Diapo Format. Copyright (c) 2026 Daniele Rossetto. MIT licence (SPDX-License-Identifier: MIT);
+   free to keep in any deck.
+   =========================================== */
+class SlidePresentation {
+    constructor() {
+        this.stage = document.getElementById('deckStage');
+        this.current = 0;
+        this.setupStageScale();
+        this.setupKeyboardNav();
+        this.setupTouchNav();
+        this.setupWheelNav();
+        this.setupControls();
+        const fromHash = () => parseInt(location.hash.replace('#', ''), 10);
+        this.showSlide(Number.isFinite(fromHash()) ? fromHash() - 1 : 0, true);
+        window.addEventListener('hashchange', () => {
+            const n = fromHash();
+            if (Number.isFinite(n) && n - 1 !== this.current) this.showSlide(n - 1);
+        });
+    }
+
+    /* Slides are read live so the editor can add and remove them. */
+    get slides() { return Array.from(this.stage.querySelectorAll('.slide')); }
+
+    setupStageScale() {
+        const scale = () => {
+            const pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ed-panel')) || 0;
+            const vw = window.innerWidth - pad, vh = window.innerHeight;
+            const sw = this.stage.offsetWidth || 1920, sh = this.stage.offsetHeight || 1080;
+            const factor = Math.min(vw / sw, vh / sh);
+            const x = (vw - sw * factor) / 2, y = (vh - sh * factor) / 2;
+            this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
+        };
+        scale();
+        window.addEventListener('resize', scale);
+        document.addEventListener('deck:rescale', scale);
+    }
+
+    setupKeyboardNav() {
+        document.addEventListener('keydown', (e) => {
+            if (e.target.getAttribute && e.target.getAttribute('contenteditable') === 'true') return;
+            switch (e.key) {
+                case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': e.preventDefault(); this.next(); break;
+                case 'ArrowLeft': case 'ArrowUp': case 'PageUp': e.preventDefault(); this.prev(); break;
+                case 'Home': e.preventDefault(); this.showSlide(0); break;
+                case 'End': e.preventDefault(); this.showSlide(this.slides.length - 1); break;
+                case 'h': case 'H': if (!e.ctrlKey && !e.metaKey && !e.altKey) document.documentElement.classList.toggle('deck-controls-off'); break;
+            }
+        });
+    }
+
+    /* The on-screen controls: click to move, faded out after 2 s without mouse
+       movement (not while the mouse is over them) and back on the first move or
+       touch. H hides them altogether, for when the mouse is needed where they sit. */
+    setupControls() {
+        document.getElementById('btnPrev').addEventListener('click', () => this.prev());
+        document.getElementById('btnNext').addEventListener('click', () => this.next());
+        const root = document.documentElement, box = document.querySelector('.deck-controls');
+        let timer = null, over = false;
+        const idle = () => { if (!over) root.classList.add('deck-controls-idle'); };
+        const wake = () => { root.classList.remove('deck-controls-idle'); clearTimeout(timer); timer = setTimeout(idle, 2000); };
+        box.addEventListener('mouseenter', () => { over = true; });
+        box.addEventListener('mouseleave', () => { over = false; wake(); });
+        document.addEventListener('mousemove', wake, { passive: true });
+        document.addEventListener('touchstart', wake, { passive: true });
+        timer = setTimeout(idle, 2000);
+    }
+
+    setupTouchNav() {
+        let x0 = null, y0 = null;
+        document.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+        document.addEventListener('touchend', (e) => {
+            if (x0 === null) return;
+            const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) (dx < 0 ? this.next() : this.prev());
+            x0 = y0 = null;
+        }, { passive: true });
+    }
+
+    setupWheelNav() {
+        let lock = false;
+        document.addEventListener('wheel', (e) => {
+            if (lock || Math.abs(e.deltaY) < 30) return;
+            lock = true; setTimeout(() => lock = false, 700);
+            e.deltaY > 0 ? this.next() : this.prev();
+        }, { passive: true });
+    }
+
+    next() { this.showSlide(this.current + 1); }
+    prev() { this.showSlide(this.current - 1); }
+
+    showSlide(index, initial = false) {
+        const slides = this.slides;
+        this.current = Math.max(0, Math.min(index, slides.length - 1));
+        slides.forEach((s, i) => {
+            const on = i === this.current;
+            s.classList.toggle('active', on);
+            if (on) requestAnimationFrame(() => requestAnimationFrame(() => s.classList.add('visible')));
+            else s.classList.remove('visible');
+        });
+        document.querySelectorAll('#pageNow, [data-page-now]').forEach(e => { e.textContent = this.current + 1; });
+        document.querySelectorAll('#pageTotal, [data-page-total]').forEach(e => { e.textContent = slides.length; });
+        document.dispatchEvent(new CustomEvent('deck:slide', { detail: this.current }));
+        // A sandboxed preview (Teams, SharePoint, a srcdoc frame) cannot change its URL: keep the page going.
+        if (!initial || location.hash) { try { history.replaceState(null, '', '#' + (this.current + 1)); } catch (e) { /* URL stays as it is */ } }
+    }
+}
+
+new SlidePresentation();
+</script>
+
+<!-- Presentation features: P presenter, O overview, L laser, D draw, Space steps through fragments. Added by the deck editor; safe to delete. -->
+<script id="deck-runtime">
+/* ============================================================
+   DECK RUNTIME - presentation features for standalone HTML decks.
+   No dependencies. The deck editor puts this script at the end of the body
+   (Presenter menu > "Add presentation features to this deck"); it is
+   also part of new decks. Safe to delete: the deck then only has
+   its own navigation.
+
+   Keys in the deck
+     P, Shift+F5      presenter window (current + next slide, notes,
+                      timer, clock); arrows there move the deck too
+     O                overview: a grid of all slides; click or arrows +
+                      Enter to jump,
+                      O or Esc closes
+     A                run by itself: each slide (and each fragment) waits
+                      its data-auto-advance seconds, then moves on
+     L                laser pointer on / off
+     D                draw on the slide (a layer over it, never saved):
+                      1-5 colours, [ ] thinner / thicker, Ctrl+Z undo,
+                      C clear this slide, D or Esc done
+     Space / Right / Down / PgDn   next fragment, then next slide
+     Left / Up / PgUp              previous fragment, then previous slide
+
+   Markup it understands
+     [data-fragment]                    revealed one step at a time
+     [data-fragment-index="n"]          order (equal numbers together)
+     <section class="slide" data-auto-animate>
+                                        morph matching elements into the
+                                        next slide (matched by data-id,
+                                        else by tag + text / image src):
+                                        they travel and resize into place,
+                                        colours and corners tween, a shape
+                                        (an svg of one path) morphs outline
+                                        to outline into another, and two
+                                        that do not look alike cross-fade
+     data-transition="fade|slide|zoom|up|none"
+                                        how a slide comes in (cross-fade, push,
+                                        push up, cross-zoom), on the slide or
+                                        (as the default) on .deck-stage;
+                                        data-transition-duration="0.5" in seconds
+     data-text-effect="letters|words|typewriter"
+                                        the text appears piece by piece when its
+                                        slide shows (or when it is revealed as a
+                                        fragment); data-text-effect-speed="1"
+                                        scales the pace
+     data-section="Name"                the slide starts a section (shown in the
+                                        overview and the editor's slide strip)
+     data-auto-advance="8"              the deck moves on by itself after 8 seconds
+                                        (fragments first, a step at a time); on a slide,
+                                        or on .deck-stage for every slide.
+                                        data-loop on .deck-stage starts again at the end.
+                                        A key or a click stops it; A starts and stops it
+     data-href="https://..."            a click on the element (a picture, an icon,
+                                        a shape, a text box) opens the address in a
+                                        new tab; data-href-target="_self" in this one
+     <aside class="notes" hidden>       speaker notes
+
+   Requirements
+     The deck shows slide n for location.hash "#n" and dispatches
+     deck:slide (or updates the hash) when it navigates. The deck
+     editor's template does both.
+
+   Licence
+     Part of the Diapo Format. Copyright (c) 2026 Daniele Rossetto. MIT licence (SPDX-License-Identifier: MIT);
+     free to keep in any deck.
+   ============================================================ */
+(function () {
+    'use strict';
+    if (window.deckRuntime) return;
+
+    var editing = function () { return document.documentElement.classList.contains('deck-editing'); };
+    var stage = document.querySelector('.deck-stage');
+    if (!stage) return;
+
+    /* ---------- reading the deck ---------- */
+    function slides() { return Array.prototype.slice.call(stage.querySelectorAll('.slide')); }
+    function current() {
+        var all = slides();
+        for (var i = 0; i < all.length; i++) if (all[i].classList.contains('active')) return i;
+        var n = parseInt(location.hash.replace('#', ''), 10);
+        return isFinite(n) && n >= 1 ? Math.min(n, all.length) - 1 : 0;
+    }
+    function stageScale() {
+        var m = getComputedStyle(stage).transform;
+        if (!m || m === 'none') return 1;
+        var a = parseFloat(m.split('(')[1]);
+        return a || 1;
+    }
+    function notesOf(slide) {
+        if (!slide) return '';
+        var aside = slide.querySelector(':scope > aside.notes, :scope > .notes');
+        if (aside) {
+            var t = document.createElement('div');
+            t.innerHTML = aside.innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li)>/gi, '\n');
+            return t.textContent.replace(/[ \t]+\n/g, '\n').trim();
+        }
+        var n = slide.previousSibling;
+        while (n && n.nodeType === 3 && !n.textContent.trim()) n = n.previousSibling;
+        if (n && n.nodeType === 8) {
+            var text = n.textContent.split('\n').map(function (l) { return l.replace(/^[\s=\-*#]+|[\s=\-*#]+$/g, ''); }).filter(Boolean).join('\n').trim();
+            if (text && !/^slides?\s*\d+(\s*[-\u2013\u2014]\s*\d+)?\b/i.test(text)) return text;
+        }
+        return '';
+    }
+    function labelOf(slide) {
+        if (slide.getAttribute('data-name')) return slide.getAttribute('data-name');
+        var h = slide.querySelector('h1, h2, h3');
+        return h ? h.textContent.trim().replace(/\s+/g, ' ').slice(0, 40) : '';
+    }
+    function goTo(index) {
+        var n = Math.max(0, Math.min(index, slides().length - 1));
+        if (n === current()) return;
+        location.hash = '#' + (n + 1);                         // the deck's controller does the rest
+    }
+
+    /* ---------- base styles for fragments and the overview ---------- */
+    var style = document.createElement('style');
+    style.id = 'deck-runtime-style';
+    style.textContent = [
+        '.deck-stage [data-href]{cursor:pointer}',
+        '.deck-stage [data-fragment]:not(.visible){opacity:0;pointer-events:none}',
+        '.deck-stage [data-fragment].visible{opacity:1}',
+        '.deck-stage [data-fragment]:not([data-anim]){transition:opacity .4s ease}',
+        'html.deck-editing .deck-stage [data-fragment]{opacity:1!important;pointer-events:auto!important}',
+        // The overview: a grid of framed tiles with a numbered caption under each, sections as
+        // headed rows. grid-auto-rows:max-content is what keeps the rows as tall as the tiles:
+        // with auto rows Chrome sizes the track from the aspect-ratio box's minimum contribution
+        // and the rows overlap.
+        '.deck-overview{position:fixed;inset:0;z-index:100000;background:#0f1013;overflow:auto;padding:24px 40px 56px;display:grid;gap:30px 28px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));grid-auto-rows:max-content;align-content:start;font:12px/1.3 system-ui,sans-serif;color:#9a9da6}',
+        '.deck-overview .ov-head{grid-column:1/-1;display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:-6px}',
+        '.deck-overview .ov-head b{color:#e8e9ec;font-weight:600;font-size:13px}',
+        '.deck-overview .ov-head kbd{font:inherit;color:#c8cad1;border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:1px 5px}',
+        '.deck-overview .ov-tile{position:relative;cursor:pointer;outline:none}',
+        '.deck-overview .ov-frame{position:relative;aspect-ratio:var(--deck-ar,16/9);background:#000;border-radius:6px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.14),0 6px 18px rgba(0,0,0,.45);transition:transform .15s ease,box-shadow .15s ease}',
+        '.deck-overview .ov-tile:hover .ov-frame{transform:translateY(-2px);box-shadow:0 0 0 2px #9ab8ff,0 10px 24px rgba(0,0,0,.5)}',
+        '.deck-overview .ov-tile.current .ov-frame{box-shadow:0 0 0 3px #4d8dff,0 6px 18px rgba(0,0,0,.45)}',
+        '.deck-overview .ov-cap{display:flex;align-items:baseline;gap:8px;margin-top:9px;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+        '.deck-overview .ov-tile.current .ov-cap{color:#c8cad1}',
+        '.deck-overview .ov-n{flex:none;font-weight:700;color:#e8e9ec;font-variant-numeric:tabular-nums}',
+        '.deck-overview .ov-t{overflow:hidden;text-overflow:ellipsis}',
+        '.deck-overview .ov-section{grid-column:1/-1;color:#c8cad1;font:600 13px/1.2 system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;padding:14px 2px 0;margin-bottom:-8px;border-top:1px solid rgba(255,255,255,.12)}',
+        '.deck-overview .ov-inner{position:absolute;left:0;top:0;width:var(--deck-w,1920px);height:var(--deck-h,1080px);transform-origin:0 0;background:#fff;pointer-events:none}',
+        '.deck-overview .ov-inner *{transition:none!important;animation:none!important}',
+        '.deck-overview .ov-inner [data-fragment]{opacity:1!important}',
+        'html.deck-laser-on, html.deck-laser-on *{cursor:none!important}',
+        '.deck-laser{position:fixed;left:-100px;top:-100px;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:radial-gradient(circle,#fff 0 18%,#ff2d2d 30%,rgba(255,45,45,.85) 55%,rgba(255,45,45,0) 75%);box-shadow:0 0 18px 6px rgba(255,45,45,.55);pointer-events:none;z-index:100001;opacity:0}',
+        '.deck-draw{position:fixed;inset:0;z-index:99999;cursor:crosshair;touch-action:none}',
+        'html.deck-drawing .deck-controls{display:none!important}',
+        '.deck-draw-bar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:100000;display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:12px;background:rgba(20,21,26,.92);box-shadow:0 8px 24px rgba(0,0,0,.35);font:12px system-ui,sans-serif}',
+        '.deck-draw-bar button{height:28px;min-width:28px;padding:0 8px;border:2px solid transparent;border-radius:8px;background:#2a2d35;color:#fff;font:inherit;cursor:pointer}',
+        '.deck-draw-bar button[data-colour]{width:28px;padding:0}.deck-draw-bar button.on{border-color:#fff}.deck-draw-bar button:hover{filter:brightness(1.15)}',
+        '.deck-draw-bar .sep{width:1px;height:20px;background:#3a3d46;margin:0 2px}',
+    ].join('\n');
+    document.head.appendChild(style);
+
+    /* ============================================================
+       FRAGMENTS
+       ============================================================ */
+    function fragmentsOf(slide) {
+        var els = Array.prototype.slice.call(slide.querySelectorAll('[data-fragment]'));
+        var items = els.map(function (el, i) {
+            var explicit = parseInt(el.getAttribute('data-fragment-index'), 10);
+            return { el: el, order: isFinite(explicit) ? explicit : i, pos: i };
+        });
+        items.sort(function (a, b) { return a.order - b.order || a.pos - b.pos; });
+        // Groups: equal order numbers reveal together.
+        var groups = [];
+        items.forEach(function (it) {
+            var last = groups[groups.length - 1];
+            if (last && last.order === it.order) last.els.push(it.el); else groups.push({ order: it.order, els: [it.el] });
+        });
+        return groups;
+    }
+    function nextFragment() {
+        var slide = slides()[current()]; if (!slide) return false;
+        var groups = fragmentsOf(slide);
+        for (var i = 0; i < groups.length; i++) {
+            if (!groups[i].els[0].classList.contains('visible')) {
+                groups[i].els.forEach(function (el) { el.classList.add('visible'); if (el.hasAttribute('data-text-effect')) playTextEffect(el); });
+                notify();
+                return true;
+            }
+        }
+        return false;
+    }
+    function prevFragment() {
+        var slide = slides()[current()]; if (!slide) return false;
+        var groups = fragmentsOf(slide);
+        for (var i = groups.length - 1; i >= 0; i--) {
+            if (groups[i].els[0].classList.contains('visible')) {
+                groups[i].els.forEach(function (el) { el.classList.remove('visible'); });
+                notify();
+                return true;
+            }
+        }
+        return false;
+    }
+    function setFragments(slide, visible) {
+        if (!slide) return;
+        Array.prototype.forEach.call(slide.querySelectorAll('[data-fragment]'), function (el) { el.classList.toggle('visible', visible); });
+    }
+    function fragmentState(slide) {
+        var groups = fragmentsOf(slide || slides()[current()]);
+        var shown = 0;
+        groups.forEach(function (g) { if (g.els[0].classList.contains('visible')) shown++; });
+        return { total: groups.length, shown: shown };
+    }
+
+    function next() { if (editing()) return; if (!nextFragment()) goTo(current() + 1); }
+    function prev() { if (editing()) return; if (!prevFragment()) goTo(current() - 1); }
+
+    /* When a slide is entered going forward its fragments start hidden; going back
+       they are all shown, so the audience sees what they saw before. */
+    var lastIndex = current();
+    /* A page counter in the master layer (Insert > Footer on every slide writes data-page-now /
+       data-page-total; the template's own script handles its #pageNow). */
+    function syncCounter() {
+        var all = slides(), i = current();
+        Array.prototype.forEach.call(document.querySelectorAll('.deck-stage [data-page-now]'), function (e) { e.textContent = String(i + 1); });
+        Array.prototype.forEach.call(document.querySelectorAll('.deck-stage [data-page-total]'), function (e) { e.textContent = String(all.length); });
+    }
+    function onSlideChange() {
+        var i = current();
+        if (autoOn) autoSchedule();
+        syncCounter();
+        if (i === lastIndex) return;
+        var forward = i > lastIndex;
+        var from = slides()[lastIndex], to = slides()[i];
+        lastIndex = i;
+        if (!editing()) {
+            setFragments(to, !forward);
+            var morphing = forward && from && to && from.hasAttribute('data-auto-animate');
+            if (morphing) autoAnimate(from, to);
+            else playTransition(to, forward, from);
+            textEffects(to);
+        }
+        notify();
+    }
+
+    /* ============================================================
+       SLIDE TRANSITIONS, with the Web Animations API so the deck's own
+       CSS needs nothing. Both slides take part: the deck's CSS hides
+       the outgoing slide at once, so it is kept visible (a keyframe
+       with visibility: visible wins over the stylesheet) while it
+       fades or moves out under the incoming one, which sits on top.
+       ============================================================ */
+    var SHOWN = { visibility: 'visible', opacity: 1 };     // the deck's CSS hides an inactive slide; these keyframes win
+    var TRANSITIONS = {
+        // cross-fade: the new slide fades in over the old one, which stays put
+        fade: function () { return { in: [{ opacity: 0 }, { opacity: 1 }], out: [SHOWN, SHOWN], ease: 'ease-in-out' }; },
+        // push sideways: both slides move together, one width
+        slide: function (fwd) {
+            var d = fwd ? 1 : -1;
+            return { in: [{ transform: 'translateX(' + (100 * d) + '%)' }, { transform: 'none' }], out: [{ visibility: 'visible', opacity: 1, transform: 'none' }, { visibility: 'visible', opacity: 1, transform: 'translateX(' + (-100 * d) + '%)' }] };
+        },
+        // push upwards (downwards going back)
+        up: function (fwd) {
+            var d = fwd ? 1 : -1;
+            return { in: [{ transform: 'translateY(' + (100 * d) + '%)' }, { transform: 'none' }], out: [{ visibility: 'visible', opacity: 1, transform: 'none' }, { visibility: 'visible', opacity: 1, transform: 'translateY(' + (-100 * d) + '%)' }] };
+        },
+        // the old slide grows and fades away while the new one settles in from slightly small
+        zoom: function (fwd) {
+            return { in: [{ opacity: 0, transform: 'scale(' + (fwd ? 0.92 : 1.08) + ')' }, { opacity: 1, transform: 'none' }], out: [{ visibility: 'visible', opacity: 1, transform: 'none' }, { visibility: 'visible', opacity: 0, transform: 'scale(' + (fwd ? 1.08 : 0.92) + ')' }] };
+        }
+    };
+    var MOVE_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+    function transitionOf(slide) {
+        var own = slide && slide.getAttribute('data-transition');
+        return own || stage.getAttribute('data-transition') || 'none';
+    }
+    function playTransition(to, forward, from) {
+        if (!to || !to.animate) return;
+        var make = TRANSITIONS[transitionOf(to)];
+        if (!make) return;
+        var t = make(forward !== false);
+        var dur = (parseFloat(to.getAttribute('data-transition-duration') || stage.getAttribute('data-transition-duration')) || 0.5) * 1000;
+        var opts = { duration: dur, easing: t.ease || MOVE_EASE };
+        // A transition still running on either slide (fast clicking) is cut short.
+        [to, from].forEach(function (s) { if (s && s.getAnimations) s.getAnimations().forEach(function (a) { if (a.__transition) a.cancel(); }); });
+        var a = to.animate(t.in, opts);
+        a.__transition = true;
+        if (from && from !== to && from.animate) {
+            var b = from.animate(t.out, opts);
+            b.__transition = true;
+        }
+    }
+
+    /* ============================================================
+       TEXT EFFECTS: letters, words or a typewriter. The text nodes are
+       wrapped in spans for the duration of the animation and unwrapped
+       afterwards, so the document (and a saved file) never carries them.
+       ============================================================ */
+    var FX = {
+        letters: { split: 'chars', stagger: 28, duration: 420, kf: [{ opacity: 0, transform: 'translateY(0.35em)' }, { opacity: 1, transform: 'none' }], block: true },
+        words: { split: 'words', stagger: 90, duration: 520, kf: [{ opacity: 0, transform: 'translateY(0.3em)' }, { opacity: 1, transform: 'none' }], block: true },
+        typewriter: { split: 'chars', stagger: 45, duration: 1, kf: [{ opacity: 0 }, { opacity: 1 }], block: false }
+    };
+    function textEffects(slide) {
+        if (!slide) return;
+        Array.prototype.forEach.call(slide.querySelectorAll('[data-text-effect]'), function (el) {
+            if (el.hasAttribute('data-fragment') && !el.classList.contains('visible')) return;
+            playTextEffect(el);
+        });
+    }
+    function unwrapTextEffect(el) {
+        if (!el.__fx) return;
+        el.__fx.animations.forEach(function (a) { try { a.cancel(); } catch (e) { /* done */ } });
+        el.__fx.spans.forEach(function (s) { if (s.parentNode) s.parentNode.replaceChild(document.createTextNode(s.textContent), s); });
+        el.normalize();
+        el.__fx = null;
+    }
+    function playTextEffect(el) {
+        var fx = FX[el.getAttribute('data-text-effect')];
+        if (!fx || !el.animate) return;
+        unwrapTextEffect(el);
+        var speed = parseFloat(el.getAttribute('data-text-effect-speed')) || 1;
+        var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        var spans = [];
+        nodes.forEach(function (node) {
+            if (!node.textContent.trim()) return;
+            var parts = fx.split === 'words' ? node.textContent.split(/(\s+)/) : Array.from(node.textContent);
+            var frag = document.createDocumentFragment();
+            parts.forEach(function (p) {
+                if (!p) return;
+                if (fx.split === 'words' && /^\s+$/.test(p)) { frag.appendChild(document.createTextNode(p)); return; }
+                var s = document.createElement('span');
+                s.className = 'de-fx';
+                s.textContent = p;
+                if (fx.block) { s.style.display = 'inline-block'; s.style.whiteSpace = 'pre'; }
+                frag.appendChild(s);
+                spans.push(s);
+            });
+            node.parentNode.replaceChild(frag, node);
+        });
+        if (!spans.length) return;
+        var animations = spans.map(function (s, i) {
+            return s.animate(fx.kf, { duration: fx.duration / speed, delay: i * fx.stagger / speed, fill: 'backwards', easing: fx.duration > 1 ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'steps(1, end)' });
+        });
+        el.__fx = { spans: spans, animations: animations };
+        var last = animations[animations.length - 1];
+        var done = function () { if (el.__fx && el.__fx.animations === animations) unwrapTextEffect(el); };
+        if (last.finished) last.finished.then(done, done); else last.onfinish = done;
+    }
+    document.addEventListener('deck:slide', onSlideChange);
+    window.addEventListener('hashchange', onSlideChange);
+    if (window.MutationObserver) {
+        var pending = 0;
+        new MutationObserver(function () { clearTimeout(pending); pending = setTimeout(onSlideChange, 30); })
+            .observe(stage, { attributes: true, attributeFilter: ['class'], subtree: true });
+    }
+
+    /* ============================================================
+       AUTO-ANIMATE: morph matching elements from one slide into the next
+       ============================================================ */
+    function matchKey(el) {
+        if (el.getAttribute('data-id')) return 'id:' + el.getAttribute('data-id');
+        var tag = el.tagName.toLowerCase();
+        if (tag === 'img') return 'img:' + el.getAttribute('src');
+        var text = (el.textContent || '').trim().replace(/\s+/g, ' ');
+        return text ? tag + ':' + text.slice(0, 120) : null;
+    }
+    function morphCandidates(slide) {
+        // Elements with a data-id, plus text blocks and images that are direct layout units.
+        var sel = '[data-id], h1, h2, h3, h4, p, li, img, [data-edit]';
+        return Array.prototype.filter.call(slide.querySelectorAll(sel), function (el) { return !el.closest('[data-fig]') && el.closest('.slide') === slide; });
+    }
+    function rectOf(el) {
+        var r = el.getBoundingClientRect(), s = stage.getBoundingClientRect(), k = stageScale();
+        return { x: (r.left - s.left) / k, y: (r.top - s.top) / k, w: r.width / k, h: r.height / k };
+    }
+    /* The look of an element, for the morph: what tweens between two linked elements, and what
+       a ghost of the old one needs to look the same on the new slide. */
+    var TWEEN_PROPS = ['background-color', 'color', 'border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius', 'border-color', 'opacity', 'box-shadow'];
+    var GHOST_PROPS = TWEEN_PROPS.concat(['background-image', 'background-size', 'background-position', 'border-width', 'border-style', 'padding', 'font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing', 'text-transform', 'text-align', 'white-space', 'display', 'align-items', 'justify-content', 'flex-direction', 'gap', 'object-fit', 'fill', 'stroke', 'stroke-width']);
+    function lookOf(el, props) {
+        var cs = getComputedStyle(el), out = {};
+        props.forEach(function (p) { out[p] = cs.getPropertyValue(p); });
+        return out;
+    }
+    /* A shape the polygon morph can take: an <svg> drawing one <path> of one subpath. */
+    function singlePath(el) {
+        if (!el || el.tagName.toLowerCase() !== 'svg') return null;
+        var shapes = el.querySelectorAll('path, rect, circle, ellipse, polygon, polyline, line');
+        if (shapes.length !== 1 || shapes[0].tagName.toLowerCase() !== 'path') return null;
+        var d = shapes[0].getAttribute('d') || '';
+        if ((d.match(/[Mm]/g) || []).length !== 1) return null;
+        return shapes[0];
+    }
+    function viewBoxOf(svg) {
+        var vb = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(parseFloat);
+        return vb.length === 4 && vb.every(isFinite) ? { x: vb[0], y: vb[1], w: vb[2] || 1, h: vb[3] || 1 } : null;
+    }
+    /* n points along the path, in its own user units. */
+    function samplePath(path, n) {
+        var L = path.getTotalLength(), pts = [];
+        if (!L) return null;
+        for (var i = 0; i < n; i++) { var p = path.getPointAtLength(L * i / n); pts.push([p.x, p.y]); }
+        return pts;
+    }
+    /* The old polygon, in the new svg's coordinates, started and wound so its points travel least. */
+    function alignPolygon(from, to) {
+        var n = to.length, best = null, bestCost = Infinity;
+        [from, from.slice().reverse()].forEach(function (cand) {
+            for (var k = 0; k < n; k++) {
+                var cost = 0;
+                for (var i = 0; i < n; i++) { var a = cand[(i + k) % n], b = to[i]; cost += (a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]); if (cost >= bestCost) break; }
+                if (cost < bestCost) { bestCost = cost; best = cand.slice(k).concat(cand.slice(0, k)); }
+            }
+        });
+        return best;
+    }
+    function polygonD(pts, closed) {
+        return pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(2) + ' ' + p[1].toFixed(2); }).join('') + (closed ? 'Z' : '');
+    }
+    /* The morph's easing: a gentle in-out (a start you can see, a soft landing), so a move
+       reads as a move and a turn as a turn. MORPH_EASE is the CSS form, easeOut the same curve
+       for the frames drawn by hand. */
+    var MORPH_BEZIER = [0.45, 0.05, 0.25, 1], MORPH_EASE = 'cubic-bezier(' + MORPH_BEZIER.join(', ') + ')';
+    function easeOut(u) {
+        var x1 = MORPH_BEZIER[0], y1 = MORPH_BEZIER[1], x2 = MORPH_BEZIER[2], y2 = MORPH_BEZIER[3], lo = 0, hi = 1, t;
+        for (var i = 0; i < 16; i++) { t = (lo + hi) / 2; var x = 3 * (1 - t) * (1 - t) * t * x1 + 3 * (1 - t) * t * t * x2 + t * t * t; if (x < u) lo = t; else hi = t; }
+        return 3 * (1 - t) * (1 - t) * t * y1 + 3 * (1 - t) * t * t * y2 + t * t * t;
+    }
+    /* Tween one shape into another: both sampled into polygons with the same number of points,
+       drawn frame by frame from the old shape to the new one, the real path put back at the end. */
+    function morphPath(oldPath, oldSvg, newPath, newSvg, ms) {
+        var n = 96, a = samplePath(oldPath, n), b = samplePath(newPath, n);
+        if (!a || !b) return false;
+        var va = viewBoxOf(oldSvg), vb = viewBoxOf(newSvg);
+        if (va && vb) a = a.map(function (p) { return [(p[0] - va.x) / va.w * vb.w + vb.x, (p[1] - va.y) / va.h * vb.h + vb.y]; });
+        a = alignPolygon(a, b);
+        var closed = /[zZ]\s*$/.test(newPath.getAttribute('d') || '');
+        var d0 = newPath.getAttribute('d'), t0 = null;
+        function frame(now) {
+            if (t0 === null) t0 = now;
+            var u = Math.min(1, (now - t0) / ms), e = easeOut(u);
+            var pts = b.map(function (p, i) { return [a[i][0] + (p[0] - a[i][0]) * e, a[i][1] + (p[1] - a[i][1]) * e]; });
+            if (u < 1) { newPath.setAttribute('d', polygonD(pts, closed)); requestAnimationFrame(frame); }
+            else newPath.setAttribute('d', d0);
+        }
+        requestAnimationFrame(frame);
+        return true;
+    }
+    /* A copy of the old element, laid over the new slide where the old one was, to fade out
+       while the new one fades in: the morph for two elements that do not look alike. */
+    function ghostOf(el, pose, look) {
+        var g = el.cloneNode(true);
+        g.removeAttribute('id'); g.removeAttribute('data-id');
+        Array.prototype.forEach.call(g.querySelectorAll('[id]'), function (n) { n.removeAttribute('id'); });
+        g.classList.add('deck-morph-ghost');
+        var st = '';
+        for (var p in look) if (look[p]) st += p + ':' + look[p] + ';';
+        // Its box is the old element's own (unrotated) box at the old centre; the old rotation and
+        // scale are one matrix about that centre, so the keyframes can replace it.
+        var m = pose.m;
+        st += 'position:absolute;left:' + (pose.cx - pose.w / 2) + 'px;top:' + (pose.cy - pose.h / 2) + 'px;width:' + pose.w + 'px;height:' + pose.h + 'px;margin:0;max-width:none;max-height:none;box-sizing:border-box;';
+        st += 'transform:matrix(' + [m.a, m.b, m.c, m.d, 0, 0].join(',') + ');transform-origin:center;translate:none;rotate:none;scale:none;pointer-events:none;z-index:2147483000;transition:none;animation:none;visibility:visible';
+        g.style.cssText = st;
+        return g;
+    }
+    /* Where an element is and how it is turned: its centre on the stage, its own (unrotated,
+       unscaled) box, and the matrix of all its transforms (translate, rotate, scale, transform,
+       in the order CSS applies them, about the centre of the box). A rotated element's bounding
+       box is not its box: the morph works with the pose, so a turn tweens as a turn. */
+    function matrixOf(el) {
+        var cs = getComputedStyle(el), m = new DOMMatrix(), v, p;
+        v = cs.translate; if (v && v !== 'none') { p = v.split(/\s+/).map(parseFloat); m = m.translate(p[0] || 0, p[1] || 0); }
+        v = cs.rotate; if (v && v !== 'none') { p = v.split(/\s+/); m = m.rotate(parseFloat(p[p.length - 1]) || 0); }
+        v = cs.scale; if (v && v !== 'none') { p = v.split(/\s+/).map(parseFloat); m = m.scale(p[0] || 1, p.length > 1 ? p[1] : (p[0] || 1)); }
+        v = cs.transform; if (v && v !== 'none') m = m.multiply(new DOMMatrix(v));
+        return m;
+    }
+    function poseOf(el, r) {
+        var m = matrixOf(el);
+        var w = el.offsetWidth !== undefined ? el.offsetWidth : el.clientWidth, h = el.offsetHeight !== undefined ? el.offsetHeight : el.clientHeight;
+        return { cx: r.x + r.w / 2, cy: r.y + r.h / 2, w: w || r.w, h: h || r.h, m: m,
+                 angle: Math.atan2(m.b, m.a) * 180 / Math.PI, sx: Math.hypot(m.a, m.b) || 1, sy: Math.hypot(m.c, m.d) || 1 };
+    }
+    /* The matrix that puts a box of size w x h, centred at c0 before any transform, at centre c,
+       turned by ang, scaled to the visual size vw x vh. */
+    function placed(c0x, c0y, w, h, cx, cy, ang, vw, vh) {
+        return new DOMMatrix().translate(cx - c0x, cy - c0y).rotate(ang).scale(vw / w, vh / h);
+    }
+    function matrixCss(m) { return 'matrix(' + [m.a, m.b, m.c, m.d, m.e, m.f].map(function (v) { return +v.toFixed(4); }).join(',') + ')'; }
+    /* Keyframes from one pose to another: the centre, the angle (the short way round) and the
+       visual size each eased, sampled so the matrices between samples interpolate cleanly. */
+    function poseFrames(a, b, toMatrix, extra) {
+        var dAng = ((b.angle - a.angle + 540) % 360) - 180, frames = [], N = 24;
+        var aw = a.w * a.sx, ah = a.h * a.sy, bw = b.w * b.sx, bh = b.h * b.sy;
+        for (var i = 0; i <= N; i++) {
+            var t = i / N, e = easeOut(t);
+            var f = { offset: t, easing: 'linear', transform: matrixCss(toMatrix(a.cx + (b.cx - a.cx) * e, a.cy + (b.cy - a.cy) * e, a.angle + dAng * e, aw + (bw - aw) * e, ah + (bh - ah) * e)) };
+            if (extra) extra(f, t);
+            frames.push(f);
+        }
+        return frames;
+    }
+    function autoAnimate(from, to) {
+        var duration = parseFloat(to.getAttribute('data-auto-animate-duration') || from.getAttribute('data-auto-animate-duration')) || 0.8;
+        var ms = duration * 1000, ease = MORPH_EASE;
+        // Both slides are measured with their transitions and entrance animations held off: the
+        // old one put back in its shown state for a moment (its reveals are already on their way
+        // out), the new one shown now (the deck would a frame later), so what is measured is where
+        // things are at rest, not a frame of a reveal on its way there. The morph is the entrance
+        // of what is matched, the fade below the entrance of the rest.
+        var hold = document.createElement('style');
+        hold.textContent = '.deck-morph-measure, .deck-morph-measure * { transition: none !important; animation: none !important; }';
+        document.head.appendChild(hold);
+        var fromShown = from.classList.contains('visible');
+        from.classList.add('deck-morph-measure'); from.classList.add('visible');
+        void from.offsetWidth;
+        var old = {};
+        morphCandidates(from).forEach(function (el) { var k = matchKey(el); if (k && !old[k]) { var r = rectOf(el); old[k] = { el: el, r: r, pose: poseOf(el, r), look: lookOf(el, GHOST_PROPS) }; } });
+        if (!fromShown) from.classList.remove('visible');
+        from.classList.remove('deck-morph-measure');
+        to.classList.add('deck-morph-measure');
+        to.classList.add('visible');
+        void to.offsetWidth;
+        var matched = [];
+        morphCandidates(to).forEach(function (el) {
+            var k = matchKey(el);
+            if (!k || !old[k] || matched.some(function (m) { return m.contains(el) || el.contains(m); })) return;
+            var was = old[k], a = was.r, b = rectOf(el);
+            if (!b.w || !b.h) return;
+            delete old[k];
+            matched.push(el);
+            // 1. The pose: the new element travels, turns and resizes from where the old one was.
+            //    Its own transforms stay as they are; what is added underneath is what takes the
+            //    element from its own pose to the tweened one (inverse of its matrix, then the pose).
+            var pa = was.pose, pb = poseOf(el, b), inv = pb.m.inverse(), c0x = pb.cx - pb.m.e, c0y = pb.cy - pb.m.f;
+            el.style.transition = 'none';
+            var anim = el.animate(poseFrames(pa, pb, function (cx, cy, ang, vw, vh) { return inv.multiply(placed(c0x, c0y, pb.w, pb.h, cx, cy, ang, vw, vh)); }, function (f) { f.opacity = 1; }),
+                { duration: ms, fill: 'backwards', composite: 'add' });
+            anim.onfinish = function () { el.style.transition = ''; if (!el.getAttribute('style')) el.removeAttribute('style'); };
+            // 2. The look: colours, corners, rotation and shadow tween from the old values.
+            var now = lookOf(el, TWEEN_PROPS), f0 = {}, f1 = {}, tween = false;
+            TWEEN_PROPS.forEach(function (p) {
+                var name = p.replace(/-([a-z])/g, function (m, c) { return c.toUpperCase(); });   // keyframes take the IDL names
+                if (was.look[p] && now[p] && was.look[p] !== now[p] && p !== 'opacity') { f0[name] = was.look[p]; f1[name] = now[p]; tween = true; }
+            });
+            if (tween) { try { el.animate([f0, f1], { duration: ms, easing: ease, fill: 'backwards' }); } catch (err) { /* a value the browser cannot tween: the change is instant */ } }
+            // 3. The shape: two single-path drawings morph outline to outline; two elements that
+            //    do not look alike cross-fade, a ghost of the old one fading out over the new.
+            var sa = singlePath(was.el), sb = singlePath(el);
+            var alike = was.el.tagName === el.tagName && (was.el.textContent || '').trim() === (el.textContent || '').trim() &&
+                        (was.el.getAttribute('src') || '') === (el.getAttribute('src') || '');
+            if (sa && sb && morphPath(sa, was.el, sb, el, ms)) {
+                var fa = getComputedStyle(sa), fb = getComputedStyle(sb);
+                if (fa.fill !== fb.fill || fa.stroke !== fb.stroke) sb.animate([{ fill: fa.fill, stroke: fa.stroke }, { fill: fb.fill, stroke: fb.stroke }], { duration: ms, easing: ease, fill: 'backwards' });
+            } else if (!alike) {
+                var g = ghostOf(was.el, pa, was.look);
+                to.appendChild(g);
+                var ga = g.animate(poseFrames(pa, pb, function (cx, cy, ang, vw, vh) { return placed(pa.cx, pa.cy, pa.w, pa.h, cx, cy, ang, vw, vh); }, function (f, t) { f.opacity = 1 - easeOut(t); }),
+                    { duration: ms, fill: 'forwards' });
+                ga.onfinish = function () { g.remove(); };
+                el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, easing: ease, fill: 'backwards' });
+            }
+        });
+        // Everything else on the new slide fades in a little later.
+        Array.prototype.forEach.call(to.querySelectorAll('*'), function (el) {
+            if (el.classList.contains('deck-morph-ghost') || el.closest('.deck-morph-ghost')) return;
+            if (matched.some(function (m) { return m === el || m.contains(el) || el.contains(m); })) return;
+            if (el.children.length && !el.matches('img, svg')) return;      // leaves only, so containers do not double-fade
+            if (el.closest('[data-fig]') && el.closest('[data-fig]') !== el) return;
+            el.animate([{ opacity: 0 }, { opacity: 0, offset: 0.4 }, { opacity: 1 }], { duration: ms, easing: 'ease-out' });
+        });
+        to.classList.remove('deck-morph-measure');
+        hold.remove();
+    }
+
+    /* ============================================================
+       OVERVIEW (O)
+       ============================================================ */
+    var overview = null, ovIndex = 0;
+    function openOverview() {
+        if (overview) return;
+        var all = slides(), cur = current();
+        overview = document.createElement('div');
+        overview.className = 'deck-overview';
+        var head = document.createElement('div');
+        head.className = 'ov-head';
+        var title = document.createElement('b'); title.textContent = (document.title || 'Deck').trim() + ' · ' + all.length + (all.length === 1 ? ' slide' : ' slides');
+        var hint = document.createElement('span'); hint.innerHTML = 'Click or <kbd>Enter</kbd> opens a slide, arrows move, <kbd>Esc</kbd> closes';
+        head.appendChild(title); head.appendChild(hint);
+        overview.appendChild(head);
+        all.forEach(function (slide, i) {
+            if (slide.getAttribute('data-section')) {
+                var label = document.createElement('div');
+                label.className = 'ov-section';
+                label.textContent = slide.getAttribute('data-section');
+                overview.appendChild(label);
+            }
+            var tile = document.createElement('div');
+            tile.className = 'ov-tile' + (i === cur ? ' current' : '');
+            var frame = document.createElement('div');
+            frame.className = 'ov-frame';
+            var inner = document.createElement('div');
+            inner.className = 'ov-inner';
+            var clone = slide.cloneNode(true);
+            clone.classList.add('active', 'visible');
+            clone.removeAttribute('id');
+            Array.prototype.forEach.call(clone.querySelectorAll('[id]'), function (n) { n.removeAttribute('id'); });
+            Array.prototype.forEach.call(clone.querySelectorAll('[data-fragment]'), function (n) { n.classList.add('visible'); });
+            Array.prototype.forEach.call(clone.querySelectorAll('aside.notes, .notes'), function (n) { n.remove(); });
+            inner.appendChild(clone);
+            frame.appendChild(inner);
+            tile.appendChild(frame);
+            var cap = document.createElement('div'); cap.className = 'ov-cap';
+            var num = document.createElement('span'); num.className = 'ov-n'; num.textContent = i + 1; cap.appendChild(num);
+            var name = labelOf(slide);
+            if (name) { var t = document.createElement('span'); t.className = 'ov-t'; t.textContent = name; cap.appendChild(t); }
+            tile.appendChild(cap);
+            tile.addEventListener('click', function () { closeOverview(); goTo(i); });
+            overview.appendChild(tile);
+        });
+        document.body.appendChild(overview);
+        ovIndex = cur;
+        scaleOverview();
+        window.addEventListener('resize', scaleOverview);
+        var c = overview.querySelector('.ov-tile.current');   // centred, unless it is in view from the top with the header
+        if (c && c.offsetTop + c.offsetHeight > overview.clientHeight) c.scrollIntoView({ block: 'center' });
+    }
+    /* Arrow keys move the highlight through the grid (up/down by a row); Enter opens it. */
+    function moveOverview(dx, dy) {
+        var tiles = overview.querySelectorAll('.ov-tile');
+        if (!tiles.length) return;
+        var n = tiles.length, i = ovIndex, cols = 1;
+        if (dy) {
+            var top = tiles[0].offsetTop;
+            while (cols < n && tiles[cols].offsetTop === top) cols++;
+        }
+        i += dx + dy * cols;
+        if (i < 0 || i >= n) { if (dx) i = (i + n) % n; else return; }
+        if (i === ovIndex) return;
+        tiles[ovIndex].classList.remove('current');
+        tiles[i].classList.add('current');
+        ovIndex = i;
+        tiles[i].scrollIntoView({ block: 'nearest' });
+    }
+    function scaleOverview() {
+        if (!overview) return;
+        // The tiles are scaled copies of the stage, whatever size the deck's CSS gives it.
+        var sw = stage.offsetWidth || 1920, sh = stage.offsetHeight || 1080;
+        overview.style.setProperty('--deck-w', sw + 'px'); overview.style.setProperty('--deck-h', sh + 'px'); overview.style.setProperty('--deck-ar', sw + '/' + sh);
+        Array.prototype.forEach.call(overview.querySelectorAll('.ov-tile'), function (tile) {
+            var k = tile.clientWidth / sw;
+            tile.querySelector('.ov-inner').style.transform = 'scale(' + k + ')';
+        });
+    }
+    function closeOverview() {
+        if (!overview) return;
+        window.removeEventListener('resize', scaleOverview);
+        overview.remove();
+        overview = null;
+    }
+
+    /* ============================================================
+       PRESENTER WINDOW (P)
+       ============================================================ */
+    var popup = null, ui = null, started = 0;
+    var CSS = [
+        ':root{--bg:#131417;--panel:#1d1f24;--line:#2c2f36;--ink:#f2f2f4;--ink-2:#b6b8c0;--ink-3:#7d808a}',
+        '*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 "Segoe UI",-apple-system,BlinkMacSystemFont,Inter,Roboto,"Helvetica Neue",Arial,sans-serif;overflow:hidden}',
+        '#app{display:grid;grid-template-columns:1fr 380px;grid-template-rows:1fr auto;height:100%;gap:14px;padding:14px}',
+        '.stage{position:relative;background:#000;border-radius:8px;overflow:hidden}.stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;pointer-events:none}',
+        '.tag{position:absolute;left:10px;top:8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);background:rgba(0,0,0,.55);padding:2px 6px;border-radius:4px;z-index:1}',
+        '.side{display:flex;flex-direction:column;gap:12px;min-height:0}.side .stage{aspect-ratio:16/9;flex:none}',
+        '.notes{flex:1;min-height:0;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;font-size:20px;line-height:1.5;white-space:pre-wrap}',
+        '.notes:empty::before{content:"No notes for this slide";color:var(--ink-3);font-size:15px}.sizes{display:flex;gap:4px;justify-content:flex-end}',
+        '.bar{grid-column:1/-1;display:flex;align-items:center;gap:18px;padding:8px 4px 0;border-top:1px solid var(--line)}',
+        '.time{font-variant-numeric:tabular-nums;font-size:30px;font-weight:600;min-width:130px;cursor:pointer}.clock{font-variant-numeric:tabular-nums;font-size:18px;color:var(--ink-2)}',
+        '.count{font-size:18px;color:var(--ink-2)}.count b{color:var(--ink);font-size:24px}.grow{flex:1}.hint{font-size:12px;color:var(--ink-3)}',
+        '.slidetime{font-variant-numeric:tabular-nums;font-size:18px;color:var(--ink-2);min-width:64px}.slidetime.over{color:#ff8b6a}',
+        'button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}button:hover{border-color:var(--ink-3)}button.big{font-size:20px;padding:6px 18px}',
+        '.end{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);background:var(--bg)}'
+    ].join('');
+    var HTML = '<div id="app">'
+        + '<div class="stage"><span class="tag">Current</span><iframe id="cur"></iframe></div>'
+        + '<div class="side"><div class="stage"><span class="tag">Next</span><iframe id="next"></iframe><div class="end" id="end" hidden>End of the deck</div></div>'
+        + '<div class="sizes"><button data-size="-1">A-</button><button data-size="1">A+</button></div><div class="notes" id="notes"></div></div>'
+        + '<div class="bar"><div class="time" id="time" title="Click to reset">00:00</div><div class="slidetime" id="slidetime" title="On this slide">00:00</div><button id="reset">Reset</button><div class="clock" id="clock"></div><div class="grow"></div>'
+        + '<div class="count"><b id="now">-</b> / <span id="total">-</span> <span class="hint" id="frag"></span> <span class="hint" id="name"></span></div>'
+        + '<button class="big" id="prev">&larr;</button><button class="big" id="next-btn">&rarr;</button></div></div>';
+
+    var slideStarted = Date.now(), notifiedIndex = -1;
+    function deckUrl() { return location.href.replace(/#.*$/, ''); }
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+    function openPresenter() {
+        if (popup && !popup.closed) { popup.focus(); notify(); return; }
+        popup = window.open('', 'deck-presenter', 'width=1280,height=760');
+        if (!popup) { alert('The browser blocked the presenter window. Allow pop-ups for this page and press P again.'); return; }
+        var d = popup.document;
+        d.open();
+        d.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Presenter</title><style>' + CSS + '</style></head><body>' + HTML + '</body></html>');
+        d.close();
+        ui = {};
+        ['cur', 'next', 'end', 'notes', 'time', 'slidetime', 'reset', 'clock', 'now', 'total', 'frag', 'name', 'prev', 'next-btn'].forEach(function (id) { ui[id] = d.getElementById(id); });
+        var base = deckUrl();
+        ui.cur.src = base + '#' + (current() + 1);
+        ui.next.src = base + '#' + (current() + 2);
+        ui.prev.onclick = prev;
+        ui['next-btn'].onclick = next;
+        ui.reset.onclick = function () { started = Date.now(); slideStarted = Date.now(); tick(); };
+        ui.time.onclick = ui.reset.onclick;
+        d.addEventListener('keydown', function (e) {
+            switch (e.key) {
+                case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': e.preventDefault(); next(); break;
+                case 'ArrowLeft': case 'ArrowUp': case 'PageUp': e.preventDefault(); prev(); break;
+                case 'Home': e.preventDefault(); goTo(0); break;
+                case 'End': e.preventDefault(); goTo(slides().length - 1); break;
+            }
+        });
+        d.querySelector('.sizes').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-size]'); if (!b) return;
+            var size = parseFloat(ui.notes.style.fontSize) || 20;
+            ui.notes.style.fontSize = Math.max(12, Math.min(48, size + 2 * parseInt(b.getAttribute('data-size'), 10))) + 'px';
+        });
+        started = Date.now();
+        tick();
+        notify();
+    }
+    /* Frames follow the deck by hash only, so this works even when the frames are a different origin (file://). */
+    function steer(frame, index) {
+        var want = deckUrl() + '#' + (index + 1);
+        try { if (frame.contentWindow.location.href !== want) frame.contentWindow.location.replace(want); }
+        catch (e) { if (frame.src !== want) frame.src = want; }
+    }
+    function notify() {
+        if (!popup || popup.closed || !ui) return;
+        var all = slides(), i = current();
+        if (i !== notifiedIndex) { notifiedIndex = i; slideStarted = Date.now(); }
+        steer(ui.cur, i);
+        ui.end.hidden = i + 1 < all.length;
+        if (i + 1 < all.length) steer(ui.next, i + 1);
+        var fs = fragmentState(all[i]);
+        ui.now.textContent = i + 1;
+        ui.total.textContent = all.length;
+        ui.frag.textContent = fs.total ? '(step ' + fs.shown + '/' + fs.total + ')' : '';
+        ui.name.textContent = labelOf(all[i]);
+        ui.notes.textContent = notesOf(all[i]);
+        popup.document.title = 'Presenter ' + (i + 1) + '/' + all.length;
+        // Mirror the fragment state in the current frame (same origin only).
+        try {
+            var doc = ui.cur.contentDocument, cs = doc && doc.querySelectorAll('.deck-stage .slide')[i];
+            if (cs) { var shown = 0; fragmentsOf(cs).forEach(function (g) { var on = shown++ < fs.shown; g.els.forEach(function (el) { el.classList.toggle('visible', on); }); }); }
+        } catch (e) { /* cross-origin frame */ }
+    }
+    function clock(s) { return (s >= 3600 ? pad(Math.floor(s / 3600)) + ':' : '') + pad(Math.floor(s / 60) % 60) + ':' + pad(s % 60); }
+    function tick() {
+        if (!popup || popup.closed || !ui) return;
+        var s = Math.floor((Date.now() - started) / 1000);
+        ui.time.textContent = clock(s);
+        // Time on this slide, and how it compares with the slide's own data-auto-advance.
+        var on = Math.floor((Date.now() - slideStarted) / 1000), want = autoSeconds(slides()[current()]);
+        ui.slidetime.textContent = clock(on) + (want ? ' / ' + clock(Math.round(want)) : '');
+        ui.slidetime.classList.toggle('over', !!want && on > want);
+        var d = new Date();
+        ui.clock.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+    setInterval(tick, 500);
+
+    /* ============================================================
+       LASER POINTER (L): the cursor becomes a bright dot with a glow.
+       ============================================================ */
+    var laser = null;
+    function setLaser(on) {
+        if (on && !laser) {
+            laser = document.createElement('div');
+            laser.className = 'deck-laser';
+            document.body.appendChild(laser);
+            document.documentElement.classList.add('deck-laser-on');
+            window.addEventListener('pointermove', moveLaser);
+        } else if (!on && laser) {
+            window.removeEventListener('pointermove', moveLaser);
+            laser.remove(); laser = null;
+            document.documentElement.classList.remove('deck-laser-on');
+        }
+    }
+    function moveLaser(e) { if (laser) { laser.style.left = e.clientX + 'px'; laser.style.top = e.clientY + 'px'; laser.style.opacity = '1'; } }
+
+    /* ============================================================
+       DRAWING (D): a canvas layer over the stage. Strokes are kept in
+       stage coordinates (so they follow a resize), per slide, for as
+       long as the page is open. Nothing is written into the deck.
+       ============================================================ */
+    var COLOURS = ['#ff2d55', '#ffcc00', '#2f6fed', '#22c55e', '#ffffff'];
+    var draw = null;                                          // { canvas, ctx, bar, colour, width, strokes: {slideIndex: [stroke]}, live }
+    function setDrawing(on) {
+        if (on && !draw) {
+            var canvas = document.createElement('canvas');
+            canvas.className = 'deck-draw';
+            var bar = document.createElement('div');
+            bar.className = 'deck-draw-bar';
+            bar.innerHTML = COLOURS.map(function (c, i) { return '<button data-colour="' + i + '" title="Colour ' + (i + 1) + ' (key ' + (i + 1) + ')" style="background:' + c + '"></button>'; }).join('')
+                + '<span class="sep"></span><button data-w="-1" title="Thinner ([)">&minus;</button><button data-w="1" title="Thicker (])">+</button>'
+                + '<span class="sep"></span><button data-act="undo" title="Undo last stroke (Ctrl+Z)">&#8630;</button><button data-act="clear" title="Clear this slide (C)">Clear</button><button data-act="close" title="Stop drawing (D or Esc)">Done</button>';
+            document.body.appendChild(canvas);
+            document.body.appendChild(bar);
+            draw = { canvas: canvas, ctx: canvas.getContext('2d'), bar: bar, colour: lastColour, width: lastWidth, live: null };
+            document.documentElement.classList.add('deck-drawing');
+            canvas.addEventListener('pointerdown', drawStart);
+            canvas.addEventListener('pointermove', drawMove);
+            canvas.addEventListener('pointerup', drawEnd);
+            canvas.addEventListener('pointercancel', drawEnd);
+            bar.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+            bar.addEventListener('click', function (e) {
+                var b = e.target.closest('button'); if (!b) return;
+                if (b.dataset.colour != null) setColour(+b.dataset.colour);
+                else if (b.dataset.w) setWidth(draw.width + 2 * +b.dataset.w);
+                else if (b.dataset.act === 'undo') undoStroke();
+                else if (b.dataset.act === 'clear') clearStrokes();
+                else if (b.dataset.act === 'close') setDrawing(false);
+            });
+            window.addEventListener('resize', sizeCanvas);
+            sizeCanvas();
+            setColour(draw.colour);
+        } else if (!on && draw) {
+            window.removeEventListener('resize', sizeCanvas);
+            draw.canvas.remove(); draw.bar.remove();
+            document.documentElement.classList.remove('deck-drawing');
+            draw = null;
+        }
+    }
+    var drawStore = {};                                       // slide index -> strokes, survives toggling the mode
+    var lastColour = 0, lastWidth = 8;                        // stroke width in stage pixels
+    function currentStrokes() { var i = current(); return drawStore[i] || (drawStore[i] = []); }
+    function setColour(i) {
+        draw.colour = lastColour = i;
+        Array.prototype.forEach.call(draw.bar.querySelectorAll('[data-colour]'), function (b) { b.classList.toggle('on', +b.dataset.colour === i); });
+    }
+    function setWidth(w) { draw.width = lastWidth = Math.max(2, Math.min(40, w)); }
+    function sizeCanvas() {
+        if (!draw) return;
+        var dpr = window.devicePixelRatio || 1;
+        draw.canvas.width = Math.round(innerWidth * dpr); draw.canvas.height = Math.round(innerHeight * dpr);
+        draw.canvas.style.width = innerWidth + 'px'; draw.canvas.style.height = innerHeight + 'px';
+        draw.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        redraw();
+    }
+    function toStage(x, y) { var s = stage.getBoundingClientRect(), k = stageScale(); return { x: (x - s.left) / k, y: (y - s.top) / k }; }
+    function fromStage(p) { var s = stage.getBoundingClientRect(), k = stageScale(); return { x: s.left + p.x * k, y: s.top + p.y * k }; }
+    function drawStart(e) {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        draw.canvas.setPointerCapture(e.pointerId);
+        var p = toStage(e.clientX, e.clientY);
+        draw.live = { colour: COLOURS[draw.colour], width: draw.width * (e.pressure && e.pointerType === 'pen' ? 0.5 + e.pressure : 1), points: [p] };
+        currentStrokes().push(draw.live);
+        redraw();
+    }
+    function drawMove(e) {
+        if (!draw.live) return;
+        var events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+        events.forEach(function (ev) { draw.live.points.push(toStage(ev.clientX, ev.clientY)); });
+        redraw();
+    }
+    function drawEnd() { if (draw) draw.live = null; }
+    function undoStroke() { currentStrokes().pop(); redraw(); }
+    function clearStrokes() { drawStore[current()] = []; redraw(); }
+    function redraw() {
+        if (!draw) return;
+        var ctx = draw.ctx, k = stageScale();
+        ctx.clearRect(0, 0, innerWidth, innerHeight);
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        currentStrokes().forEach(function (st) {
+            var pts = st.points.map(fromStage);
+            if (!pts.length) return;
+            ctx.strokeStyle = st.colour; ctx.lineWidth = st.width * k;
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            if (pts.length === 1) ctx.lineTo(pts[0].x + 0.1, pts[0].y);
+            for (var i = 1; i < pts.length - 1; i++) {
+                var mx = (pts[i].x + pts[i + 1].x) / 2, my = (pts[i].y + pts[i + 1].y) / 2;
+                ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+            }
+            if (pts.length > 1) ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+            ctx.stroke();
+        });
+    }
+    document.addEventListener('deck:slide', redraw);
+    window.addEventListener('hashchange', redraw);
+
+    /* ============================================================
+       RUN BY ITSELF (A, or data-auto-advance in the deck)
+       Each slide waits its own seconds - data-auto-advance on the slide, else on the
+       stage - then steps: a fragment if the slide has one left, otherwise the next
+       slide; at the end it stops, or starts again with data-loop on the stage. Any key
+       or click stops it, so nobody is fighting the deck.
+       ============================================================ */
+    var autoTimer = null, autoOn = false;
+    function autoSeconds(slide) {
+        var v = parseFloat((slide && slide.getAttribute('data-auto-advance')) || stage.getAttribute('data-auto-advance'));
+        return isFinite(v) && v > 0 ? v : 0;
+    }
+    function autoStep() {
+        autoTimer = null;
+        if (!autoOn) return;
+        var all = slides(), i = current();
+        if (!nextFragment()) {
+            if (i + 1 < all.length) goTo(i + 1);
+            else if (stage.hasAttribute('data-loop')) goTo(0);
+            else { setAuto(false); return; }
+        }
+        autoSchedule();
+    }
+    function autoSchedule() {
+        if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+        if (!autoOn) return;
+        var s = autoSeconds(slides()[current()]);
+        autoTimer = setTimeout(autoStep, (s || 5) * 1000);
+    }
+    function setAuto(on) {
+        autoOn = !!on;
+        document.documentElement.classList.toggle('deck-auto', autoOn);
+        if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+        if (autoOn) autoSchedule(); else notify();
+        if (autoOn) notify();
+    }
+    /* A deck that says so starts by itself once it is shown on its own. */
+    if (!editing() && autoSeconds(slides()[current()])) setTimeout(function () { if (!editing()) setAuto(true); }, 300);
+
+    /* ============================================================
+       KEYS. Captured on the window so fragments are handled before the
+       deck's own navigation sees the key; nothing runs inside the editor.
+       ============================================================ */
+    document.addEventListener('pointerdown', function () { if (autoOn) setAuto(false); }, true);
+    /* Links on elements: data-href opens on click (not while editing). */
+    document.addEventListener('click', function (e) {
+        if (editing() || overview) return;
+        var el = e.target && e.target.closest ? e.target.closest('[data-href]') : null;
+        if (!el || !stage.contains(el)) return;
+        var url = el.getAttribute('data-href');
+        if (!url) return;
+        e.preventDefault();
+        if (el.getAttribute('data-href-target') === '_self') location.href = url; else window.open(url, '_blank', 'noopener');
+    }, true);
+
+    window.addEventListener('keydown', function (e) {
+        if (editing()) return;
+        var t = e.target;
+        if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
+        if ((e.ctrlKey || e.metaKey) && draw && (e.key === 'z' || e.key === 'Z')) { undoStroke(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        var consumed = true;
+        if (autoOn && e.key !== 'a' && e.key !== 'A') setAuto(false);        // a key takes the deck back
+        switch (e.key) {
+            case 'p': case 'P': openPresenter(); break;
+            case 'F5': if (e.shiftKey) openPresenter(); else consumed = false; break;
+            case 'o': case 'O': overview ? closeOverview() : openOverview(); break;
+            case 'a': case 'A': setAuto(!autoOn); break;
+            case 'l': case 'L': setLaser(!laser); break;
+            case 'd': case 'D': setDrawing(!draw); break;
+            case 'Escape': if (overview) closeOverview(); else if (draw) setDrawing(false); else if (laser) setLaser(false); else consumed = false; break;
+            case 'c': case 'C': if (draw) clearStrokes(); else consumed = false; break;
+            case '[': if (draw) setWidth(draw.width - 2); else consumed = false; break;
+            case ']': if (draw) setWidth(draw.width + 2); else consumed = false; break;
+            case '1': case '2': case '3': case '4': case '5': if (draw) setColour(+e.key - 1); else consumed = false; break;
+            case 'Enter': if (overview) { var pick = ovIndex; closeOverview(); goTo(pick); } else consumed = false; break;
+            case 'ArrowRight': if (overview) moveOverview(1, 0); else next(); break;
+            case 'ArrowLeft': if (overview) moveOverview(-1, 0); else prev(); break;
+            case 'ArrowDown': if (overview) moveOverview(0, 1); else next(); break;
+            case 'ArrowUp': if (overview) moveOverview(0, -1); else prev(); break;
+            case ' ': case 'PageDown': if (overview) { consumed = false; break; } next(); break;
+            case 'PageUp': if (overview) { consumed = false; break; } prev(); break;
+            default: consumed = false;
+        }
+        if (consumed) { e.preventDefault(); e.stopImmediatePropagation(); }
+    }, true);
+    // Mouse wheel and touch swipes in the deck also step through fragments first.
+    window.addEventListener('wheel', function (e) {
+        if (editing() || overview || Math.abs(e.deltaY) < 30) return;
+        var slide = slides()[current()];
+        if (!slide || !fragmentsOf(slide).length) return;
+        if (e.deltaY > 0 ? nextFragment() : prevFragment()) e.stopImmediatePropagation();
+    }, { capture: true, passive: true });
+
+    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, version: 10 };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en" data-look="ink">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diapo</title>
+<!-- The mark for the tab; the 256 px PNG and the manifest's icons for the app window and the taskbar,
+     where Chrome would otherwise scale up a favicon-sized bitmap. -->
+<link rel="icon" type="image/svg+xml" href="brand/mark.svg">
+<link rel="icon" type="image/png" sizes="256x256" href="brand/icon-256.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="editor.css">
+<!-- The editor's look (status bar > Look): Ink unless the browser remembers another; applied before the first paint so the chrome never flashes. -->
+<script src="look.js"></script>
+</head>
+<body>
+
+<!-- ======================================================
+     Top bar: file, history, zoom, mode, save
+     ====================================================== -->
+<header id="topbar">
+  <div class="tb-group">
+    <!-- The mark: a slide mount, cream card and dark window. Below 48px the logo carries no word (see brand/). -->
+    <div class="brand" title="Diapo">
+      <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true"><rect x="2" y="2" width="96" height="96" rx="9" fill="#EAE3D0"/><rect x="14" y="26" width="72" height="48" rx="2" fill="#141418"/></svg>
+      <span class="brand-name">Diapo</span>
+    </div>
+    <span class="tb-sep"></span>
+    <button class="tb-btn" id="btnFiles" title="Decks in this workspace (Ctrl+O)">
+      <svg viewBox="0 0 20 20"><path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4l2 2h7A1.5 1.5 0 0 1 18 7.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 15.5z"/></svg>
+      <span>Decks</span>
+    </button>
+    <div class="tb-file">
+      <span id="fileName" class="tb-filename">No deck open</span>
+      <span id="dirtyDot" class="dirty-dot" title="Unsaved changes" hidden></span>
+    </div>
+  </div>
+
+  <div class="tb-group tb-center">
+    <div class="tb-menu" id="insertMenu">
+      <button class="tb-btn" id="btnInsert" data-needs-deck disabled title="Insert an element on this slide">
+        <svg viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Insert</span>
+      </button>
+      <div class="tb-dropdown insert-menu" hidden>
+        <div class="insert-cols">
+          <div>
+            <div class="tb-dropdown-label">Text</div>
+            <button data-insert="text">Text box</button>
+            <button data-insert="list">Bullet list</button>
+            <button data-insert="olist">Numbered list</button>
+            <button data-insert="table">Table</button>
+            <button data-insert="chart" title="A column, bar, line, area or pie chart; its table is edited in the properties panel">Chart</button>
+            <button data-insert="code">Code block</button>
+            <button data-insert="equation" title="An equation typed in LaTeX (rac, \sqrt, \ce{} for reactions), drawn on the slide">Equation</button>
+            <button data-insert="structure" title="A chemical structure from its SMILES (ChemDraw: Copy As SMILES), drawn on the slide">Chemical structure</button>
+            <button data-insert="master-footer" title="A footer and page number that every slide shows (the master layer)">Footer on every slide</button>
+          </div>
+          <div>
+            <div class="tb-dropdown-label">Media</div>
+            <button data-insert="image">Image from file...</button>
+            <button data-insert="image-url">Image from URL...</button>
+            <button data-insert="placeholder">Image placeholder</button>
+            <button data-insert="video">Video from file...</button>
+            <button data-insert="video-url">Video from URL...</button>
+            <button data-insert="embed">Embed web page...</button>
+          </div>
+          <div>
+            <div class="tb-dropdown-label">Shapes</div>
+            <button data-insert="rect">Rectangle</button>
+            <button data-insert="rounded">Rounded rectangle</button>
+            <button data-insert="ellipse">Ellipse</button>
+            <button data-insert="shape:triangle">Triangle</button>
+            <button data-insert="shape:diamond">Diamond</button>
+            <button data-insert="shape:hexagon">Hexagon</button>
+            <button data-insert="shape:star">Star</button>
+            <button data-insert="shape:block-arrow">Block arrow</button>
+            <button data-insert="shape:chevron">Chevron</button>
+            <button data-insert="shape:bubble">Speech bubble</button>
+            <button data-insert="line">Line</button>
+            <button data-insert="arrow">Arrow</button>
+          </div>
+        </div>
+        <hr>
+        <div class="tb-dropdown-label">Icons</div>
+        <div class="tb-icons" id="insertIcons"></div>
+        <button data-insert="fa" title="About 2000 Font Awesome Free icons, searchable">Font Awesome icons...</button>
+      </div>
+      <input type="file" id="insertFile" accept="image/*,.svg" multiple hidden>
+      <input type="file" id="insertVideo" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" hidden>
+    </div>
+    <button class="tb-btn" id="btnTheme" data-needs-deck disabled title="Theme: the deck's colours, fonts and base styles (Ctrl+T)">
+      <svg viewBox="0 0 20 20"><path d="M10 2.5a7.5 7.5 0 1 0 0 15c1.2 0 1.8-.7 1.8-1.5 0-.5-.3-.9-.6-1.2-.3-.3-.4-.6-.4-1 0-.8.6-1.3 1.4-1.3h1.6a3.7 3.7 0 0 0 3.7-3.7C17.5 5.5 14.1 2.5 10 2.5z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="6.5" cy="9" r="1.2"/><circle cx="9.5" cy="6" r="1.2"/><circle cx="13.5" cy="6.5" r="1.2"/></svg>
+      <span>Theme</span>
+    </button>
+    <span class="tb-sep"></span>
+    <button class="tb-btn icon" id="btnUndo" title="Undo (Ctrl+Z)" disabled>
+      <svg viewBox="0 0 20 20"><path d="M7 5 3 9l4 4M3 9h8a5 5 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="tb-btn icon" id="btnRedo" title="Redo (Ctrl+Y)" disabled>
+      <svg viewBox="0 0 20 20"><path d="m13 5 4 4-4 4M17 9H9a5 5 0 0 0 0 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <span class="tb-sep"></span>
+    <button class="tb-btn icon" id="btnZoomOut" data-needs-deck disabled title="Zoom out (Ctrl+-)">&minus;</button>
+    <button class="tb-btn" id="btnZoomFit" data-needs-deck disabled title="Zoom to fit (Ctrl+0)"><span id="zoomLabel">100%</span></button>
+    <button class="tb-btn icon" id="btnZoomIn" data-needs-deck disabled title="Zoom in (Ctrl++)">+</button>
+  </div>
+
+  <div class="tb-group tb-right">
+    <button class="tb-btn" id="btnHelp" title="Keyboard shortcuts (?)">?</button>
+    <button class="tb-btn" id="btnPreview" data-needs-deck disabled title="Preview the deck (F5)">Preview</button>
+    <div class="tb-menu" id="presenterMenu">
+      <button class="tb-btn" id="btnPresenter" data-needs-deck disabled title="Presenter view (Shift+F5)">Presenter</button>
+      <div class="tb-dropdown" hidden>
+        <button data-p="open">Open presenter view <span class="hint">P</span></button>
+        <button data-p="rehearse" title="Go through the deck in Preview while the time on each slide is taken; Esc stops and keeps the times as the slides' Runs on seconds.">Rehearse the timings...</button>
+        <button data-p="add" id="btnAddPresenter">Add presentation features to this deck</button>
+        <div class="insp-hint" id="presenterHint" style="padding:4px 10px 6px;max-width:260px"></div>
+      </div>
+    </div>
+    <div class="tb-menu" id="exportMenu">
+      <button class="tb-btn" id="btnExport" data-needs-deck disabled title="Export the deck as PowerPoint, a PDF or a single HTML file">Export</button>
+      <div class="tb-dropdown" hidden>
+        <button data-x="saveas">Save as... <span class="hint">Ctrl+Shift+S</span></button>
+        <button data-x="versions">Previous versions...</button>
+        <hr>
+        <button data-x="pdf">PDF... <span class="hint">Ctrl+P</span></button>
+        <button data-x="handout">PDF with notes (handout)...</button>
+        <button data-x="html">Single HTML file...</button>
+        <button data-x="pptx" title="An editable PowerPoint file: text boxes, tables, charts and notes stay editable">PowerPoint (.pptx)...</button>
+        <div class="insp-hint" id="exportHint" style="padding:4px 10px 6px;max-width:280px"></div>
+      </div>
+    </div>
+    <button class="tb-btn primary" id="btnSave" title="Save (Ctrl+S)" disabled>Save</button>
+  </div>
+</header>
+
+<!-- ======================================================
+     Workspace: slide strip | canvas | inspector
+     ====================================================== -->
+<div id="workspace">
+  <aside id="strip" aria-label="Slides">
+    <div class="splitter" data-side="strip" title="Drag to resize; double-click to reset"></div>
+    <div class="strip-head">
+      <span>Slides</span>
+      <button class="mini-btn" id="btnAddSlide" title="Add a slide after the current one (Ctrl+M)">+</button>
+    </div>
+    <div id="stripList" class="strip-list"></div>
+  </aside>
+
+  <main id="canvas">
+    <div id="canvasInner">
+      <div id="stageWrap">
+        <iframe id="deckFrame" title="Deck"></iframe>
+        <!-- Editor overlay: selection, handles and guides are drawn here, in the
+             editor's own document, so the deck's CSS never touches them. -->
+        <div id="overlay"></div>
+      </div>
+    </div>
+    <div id="canvasEmpty" class="canvas-empty">
+      <div>
+        <!-- The logo: the word reversed out of the mount's window, the margin print and the date stamp (set to this month by editor.js). -->
+        <h1 class="mount" aria-label="Diapo">
+          <span class="mount-print a">36 × 24</span><span class="mount-print b">N° 001</span>
+          <span class="mount-win"><span>DIAPO</span></span>
+          <span class="mount-print c">DIAPOSITIVE</span><span class="mount-stamp" id="brandStamp">SEP 26</span>
+          <i class="mount-notch"></i>
+        </h1>
+        <p>Open a deck, start a new one, or take the tour.</p>
+        <div class="canvas-empty-actions">
+          <button class="tb-btn primary" id="btnEmptyOpen">Open a deck</button>
+          <button class="tb-btn" id="btnEmptyNew">New deck</button>
+          <button class="tb-btn" id="btnEmptySample">Try the sample deck</button>
+        </div>
+        <p class="insp-hint">Or import a Markdown or PowerPoint file from the Decks drawer.</p>
+      </div>
+    </div>
+    <!-- While a deck opens (body.opening): the loader, filled in by editor.js. -->
+    <div id="canvasLoading" class="canvas-loading"></div>
+  </main>
+
+  <aside id="inspector" aria-label="Properties">
+    <div class="splitter" data-side="inspector" title="Drag to resize; double-click to reset"></div>
+    <div id="inspectorBody" class="inspector-body">
+      <div class="insp-empty">Select something on the slide to edit it.</div>
+    </div>
+    <div id="themeBody" class="inspector-body theme-body" hidden></div>
+  </aside>
+</div>
+
+<footer id="statusbar">
+  <button class="panel-toggle" id="btnToggleStrip" title="Show or hide the slide strip (Ctrl+\ hides or shows both panels)">&#9664; Slides</button>
+  <span id="statusWorkspace" class="status-path" title="Workspace folder"></span>
+  <span id="statusBusy" class="status-busy" hidden></span>
+  <span id="statusMsg"></span>
+  <button class="problems-badge" id="problemsBadge" title="Missing files and script errors in this deck" hidden></button>
+  <div class="tb-menu look-menu" id="lookMenu">
+    <button class="panel-toggle" id="btnLook" title="How the editor looks; the deck is not affected">Look</button>
+    <div class="tb-dropdown look-dropdown" hidden>
+      <div class="tb-dropdown-label">Editor look</div>
+      <button data-look="ink">Ink <span class="hint">dark bars, indigo</span></button>
+      <button data-look="dark">Dark <span class="hint">all dark</span></button>
+      <button data-look="clean">Clean <span class="hint">light</span></button>
+      <button data-look="slate">Slate <span class="hint">slate, teal, orange</span></button>
+      <hr>
+      <div class="tb-dropdown-label">Panels</div>
+      <button data-opt="hints" id="btnHints" title="The one-line notes under the fields in the properties and theme panels. What a field does is on its tooltip either way.">Hints under the fields <span class="hint" id="btnHintsState"></span></button>
+      <button data-opt="rulers" id="btnRulers" title="Rulers along the canvas, and the guides a deck keeps: drag one out of a ruler, drag it back to remove it. Moving and resizing snap to them. Saved with the deck.">Rulers and guides <span class="hint" id="btnRulersState"></span></button>
+    </div>
+  </div>
+  <button class="panel-toggle" id="btnTogglePanel" title="Show or hide the properties panel (Ctrl+\ hides or shows both panels)">Panel &#9654;</button>
+</footer>
+
+<!-- ======================================================
+     File drawer: decks in the workspace
+     ====================================================== -->
+<div id="drawer" class="drawer" role="dialog" aria-modal="true" aria-label="Decks" hidden>
+  <div class="drawer-panel">
+    <div class="drawer-head">
+      <b>Decks</b>
+      <div class="drawer-actions">
+        <button class="mini-btn" id="btnCloseDrawer" title="Close (Esc)">&times;</button>
+      </div>
+    </div>
+    <div class="drawer-body">
+    <div class="drawer-open">
+      <button class="tb-btn primary" id="btnPickFile" title="Choose a deck file anywhere on this computer">Open deck&hellip;</button>
+      <button class="tb-btn" id="btnPickFolder" title="Choose the folder that holds your decks">Browse folder&hellip;</button>
+      <button class="tb-btn" id="btnNewDeck" title="New deck from the blank template">New</button>
+      <button class="tb-btn" id="btnImport" title="Make a deck from a Markdown (.md) or PowerPoint (.pptx) file">Import&hellip;</button>
+    </div>
+    <div id="drawerNew" class="drawer-new" hidden>
+      <label for="newDeckName">New deck name</label>
+      <div class="drawer-new-row">
+        <input id="newDeckName" type="text" placeholder="my-talk" spellcheck="false" autocomplete="off">
+        <button class="mini-btn" id="btnNewCreate">Create</button>
+        <button class="mini-btn" id="btnNewCancel">Cancel</button>
+      </div>
+      <label style="margin-top:10px;display:block">Template</label>
+      <div class="tpl-grid" id="newDeckTemplates" role="radiogroup"></div>
+      <div class="insp-hint">Created as a folder with index.html inside <span id="newDeckWhere"></span></div>
+    </div>
+    <div id="drawerRecent" class="drawer-recent"></div>
+    <div class="drawer-ws">
+      <label for="drawerWs">Folder</label>
+      <input id="drawerWs" type="text" spellcheck="false" placeholder="Paste a folder path and press Enter">
+      <button class="mini-btn" id="btnRefresh" title="Reload the list">&#8635;</button>
+    </div>
+    <input id="drawerFilter" class="drawer-filter" type="search" placeholder="Filter decks in this folder" autocomplete="off">
+    <div id="drawerList" class="drawer-list"></div>
+    </div>
+  </div>
+  <div class="drawer-backdrop"></div>
+</div>
+
+<!-- Draft restore bar, help overlay and toast are created by editor.js -->
+
+<script type="module" src="editor.js"></script>
+</body>
+</html>

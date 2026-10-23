@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pitch</title>
+<!-- Pitch: the startup deck structure (problem, solution, market, traction, model, competition, team, ask) on warm
+     neutrals with one coral accent. Bricolage Grotesque headlines, Albert Sans body. Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&family=Bricolage+Grotesque:wght@500;700;800&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #1d1b19;   /* headings, key text        */
+    --ink-2:    #45413c;   /* body text                 */
+    --ink-3:    #8a847c;   /* captions, secondary       */
+    --rule:     #e3ddd3;   /* hairlines, borders        */
+    --paper:    #f8f5ef;   /* warm slide background     */
+    --paper-2:  #ffffff;   /* cards                     */
+    --accent:   #e8562a;   /* coral                     */
+    --accent-2: #0f4c5c;   /* deep teal                 */
+    --accent-3: #f2b134;   /* mustard, third series     */
+
+    --stage-bg: #171512;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #f8f5ef;
+    --font: 'Albert Sans', 'Helvetica Neue', Arial, sans-serif;
+    --font-display: 'Bricolage Grotesque', 'Albert Sans', Arial, sans-serif;
+
+    --pad-x: 110px;        /* layout rhythm at 1920x1080 */
+    --pad-top: 88px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* motion: the reveal's curve   */
+    --dur: 0.6s;                                 /* ... its duration             */
+    --stagger: 0.09s;                            /* ... the step between --i's   */
+    --reveal-y: 24px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-display); font-size: 120px; font-weight: 800; line-height: 1.0; letter-spacing: -0.035em; color: var(--ink); }
+h2 { font-family: var(--font-display); font-size: 76px; font-weight: 700; line-height: 1.05; letter-spacing: -0.03em; color: var(--ink); }
+h3 { font-family: var(--font-display); font-size: 36px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; color: var(--ink); }
+p  { font-size: 30px; line-height: 1.5; color: var(--ink-2); }
+ul, ol { font-size: 30px; line-height: 1.5; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 14px; }
+blockquote { font-family: var(--font-display); font-size: 64px; font-weight: 500; line-height: 1.2; letter-spacing: -0.02em; color: var(--ink); }
+.eyebrow { font-size: 20px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); margin-bottom: 24px; }
+.sub { font-size: 38px; line-height: 1.35; color: var(--ink-3); margin-top: 28px; }
+.caption { font-size: 22px; line-height: 1.4; color: var(--ink-3); }
+h1 mark, h2 mark { background: none; color: var(--accent); }
+
+/* ===========================================
+   LAYOUT
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: var(--pad-top); }
+.card { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 20px; padding: 40px 40px 44px; }
+.card h3 { margin-bottom: 12px; }
+.card p { font-size: 25px; }
+.card .n { font-family: var(--font-display); font-size: 48px; font-weight: 800; color: var(--accent); margin-bottom: 24px; }
+.logo { display: inline-flex; align-items: center; gap: 14px; font-family: var(--font-display); font-size: 30px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; }
+.logo i { width: 34px; height: 34px; border-radius: 10px 10px 10px 2px; background: var(--accent); }
+
+/* Cover */
+.cover .content { display: flex; flex-direction: column; justify-content: center; }
+.cover h1 { max-width: 1300px; margin-top: 40px; }
+.cover .meta { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: baseline; padding-top: 28px; border-top: 1px solid var(--rule); }
+
+/* Problem: three pain cards */
+.problem .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 56px; }
+.problem .card { border-top: 6px solid var(--accent); }
+
+/* Solution: statement and product frame */
+.solution .text { position: absolute; left: 0; top: 60px; width: 700px; }
+.solution .frame { position: absolute; left: 820px; top: 0; width: 880px; height: 904px; border-radius: 24px; background: var(--paper-2); border: 1px solid var(--rule); box-shadow: 0 30px 60px rgba(29,27,25,0.08); }
+.solution .frame .bar { height: 48px; border-bottom: 1px solid var(--rule); display: flex; align-items: center; gap: 8px; padding: 0 20px; }
+.solution .frame .bar i { width: 12px; height: 12px; border-radius: 50%; background: var(--rule); }
+
+/* Steps */
+.how .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 56px; }
+
+/* Market: nested circles */
+.market .circles { position: absolute; left: 0; top: 140px; width: 800px; height: 800px; }
+.market .circle { position: absolute; border-radius: 50%; display: flex; align-items: flex-start; justify-content: center; padding-top: 28px; font-family: var(--font-display); font-weight: 700; }
+.market .c1 { left: 0; top: 0; width: 800px; height: 800px; background: rgba(15,76,92,0.10); color: var(--accent-2); }
+.market .c2 { left: 120px; top: 240px; width: 560px; height: 560px; background: rgba(15,76,92,0.22); color: var(--accent-2); }
+.market .c3 { left: 240px; top: 480px; width: 320px; height: 320px; background: var(--accent); color: #fff; }
+.market .circle b { display: block; font-size: 22px; letter-spacing: 0.14em; text-transform: uppercase; }
+.market .circle span { font-size: 56px; letter-spacing: -0.02em; }
+.market .circle span { display: block; text-align: center; }
+.market .legend { position: absolute; left: 920px; top: 160px; width: 780px; }
+.market .legend .row { display: grid; grid-template-columns: 200px 1fr; gap: 24px; padding: 28px 0; border-bottom: 1px solid var(--rule); }
+.market .legend .row b { font-family: var(--font-display); font-size: 44px; font-weight: 800; color: var(--accent-2); }
+.market .legend .row.hot b { color: var(--accent); }
+.market .legend .row p { font-size: 25px; }
+
+/* Traction: stat tiles and a bar chart */
+.traction .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 44px; }
+.traction .tile { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 20px; padding: 32px 36px; }
+.traction .tile .value { font-family: var(--font-display); font-size: 84px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; color: var(--ink); }
+.traction .tile .label { font-size: 22px; color: var(--ink-3); margin-top: 12px; }
+.traction .tile .value mark { background: none; color: var(--accent); }
+.traction .plot { position: relative; height: 330px; margin-top: 44px; border-bottom: 2px solid var(--ink); display: flex; align-items: flex-end; gap: 28px; padding: 0 20px; }
+.traction .plot .col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+.traction .plot .col .b { width: 100%; background: var(--accent-2); border-radius: 8px 8px 0 0; }
+.traction .plot .col.hi .b { background: var(--accent); }
+.traction .plot .col .x { position: absolute; bottom: -40px; font-size: 20px; color: var(--ink-3); }
+.traction .plot .col { position: relative; }
+.traction .plot .col .v { font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+
+/* Business model table */
+.model table { width: 100%; border-collapse: collapse; font-size: 27px; margin-top: 44px; }
+.model th { text-align: left; font-size: 20px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); padding: 0 24px 18px; border-bottom: 2px solid var(--ink); }
+.model td { padding: 24px; border-bottom: 1px solid var(--rule); color: var(--ink-2); vertical-align: top; }
+.model td:first-child { font-family: var(--font-display); font-weight: 700; font-size: 30px; color: var(--ink); }
+.model td.price { font-family: var(--font-display); font-weight: 800; font-size: 36px; color: var(--accent); }
+
+/* Competition 2x2 */
+.compete .matrix { position: absolute; left: 200px; top: 220px; width: 900px; height: 640px; border-left: 2px solid var(--ink); border-bottom: 2px solid var(--ink); }
+.compete .matrix .mid-v { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--rule); }
+.compete .matrix .mid-h { position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--rule); }
+.compete .axis { position: absolute; font-size: 20px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+.compete .dot { position: absolute; display: flex; align-items: center; gap: 12px; font-size: 24px; font-weight: 600; color: var(--ink-2); }
+.compete .dot i { width: 28px; height: 28px; border-radius: 50%; background: var(--ink-3); }
+.compete .dot.us { font-family: var(--font-display); font-size: 30px; font-weight: 800; color: var(--accent); }
+.compete .dot.us i { width: 44px; height: 44px; background: var(--accent); box-shadow: 0 0 0 10px rgba(232,86,42,0.18); }
+.compete .side { position: absolute; left: 1220px; top: 220px; width: 480px; }
+.compete .side p { font-size: 26px; margin-bottom: 20px; }
+
+/* Team */
+.team .people { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 56px; }
+.team .person .avatar { width: 180px; height: 180px; border-radius: 50%; background: var(--accent-2); margin-bottom: 28px; }
+.team .person:nth-child(2) .avatar { background: var(--accent); } .team .person:nth-child(3) .avatar { background: var(--accent-3); } .team .person:nth-child(4) .avatar { background: var(--ink-3); }
+.team .person h3 { margin-bottom: 8px; }
+.team .person .role { font-size: 22px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+.team .person p { font-size: 23px; }
+
+/* The ask */
+.ask .content { display: flex; flex-direction: column; justify-content: center; }
+.ask .big { font-family: var(--font-display); font-size: 240px; font-weight: 800; letter-spacing: -0.05em; line-height: 0.95; color: var(--accent); }
+.ask .use { position: absolute; left: 1000px; top: 120px; width: 700px; }
+.ask .use .row { margin-bottom: 26px; }
+.ask .use .row .lbl { display: flex; justify-content: space-between; font-size: 24px; font-weight: 600; color: var(--ink); margin-bottom: 10px; }
+.ask .use .row .bar { height: 22px; background: var(--rule); border-radius: 11px; position: relative; }
+.ask .use .row .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 11px; background: var(--accent-2); }
+.ask .use .row:nth-child(2) .bar i { background: var(--accent); } .ask .use .row:nth-child(3) .bar i { background: var(--accent-3); }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; }
+.closing .lines { display: flex; gap: 60px; margin-top: 56px; }
+.closing .lines p { font-size: 26px; font-weight: 600; color: var(--ink); }
+
+/* ===========================================
+   MASTER LAYER - the running footer (a stage child outside the slides)
+   =========================================== */
+.deck-footer {
+    position: absolute; left: var(--pad-x); right: var(--pad-x); bottom: 36px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font); font-size: 19px; font-weight: 600; color: var(--ink-3);
+}
+.deck-footer .logo { font-size: 22px; }
+.deck-footer .logo i { width: 22px; height: 22px; border-radius: 7px 7px 7px 2px; }
+.deck-footer .num { font-variant-numeric: tabular-nums; }
+.deck-footer b { font-weight: 700; color: var(--ink); }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="content">
+        <div class="logo reveal" style="--i:0"><i></i><span data-edit>Lumen</span></div>
+        <h1 class="reveal" style="--i:1" data-edit>Energy bills that <mark>explain themselves</mark></h1>
+        <p class="sub reveal" style="--i:2; max-width:1000px" data-edit>Lumen turns a household's meter data into one plain sentence a week, and a switch that saves money.</p>
+        <div class="meta reveal" style="--i:3">
+            <span class="caption" data-edit>Seed round · September 2026</span>
+            <span class="caption" data-edit>Your Name, CEO · you@lumen.example</span>
+        </div>
+    </div>
+    <aside class="notes" hidden>One sentence: who we are, what we do, why now. Then the problem.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Problem
+     ====================================================== -->
+<section class="slide problem" data-name="problem" data-section="Problem">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Problem</div>
+        <h2 class="reveal" style="--i:1" data-edit>Nobody understands their energy bill</h2>
+        <div class="cards">
+            <div class="card reveal" style="--i:2"><div class="n">73%</div><h3 data-edit>Cannot say what they pay per kWh</h3><p data-edit>Bills list tariffs, standing charges and estimates. People see a total.</p></div>
+            <div class="card reveal" style="--i:3"><div class="n">€310</div><h3 data-edit>Left on the table each year</h3><p data-edit>The average household could save this by switching plan or shifting usage. Most never do.</p></div>
+            <div class="card reveal" style="--i:4"><div class="n">0</div><h3 data-edit>Tools that talk to people</h3><p data-edit>Comparison sites talk to the already-informed. Meters talk to the utility.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Solution
+     ====================================================== -->
+<section class="slide solution" data-name="solution" data-section="Solution">
+    <div class="content">
+        <div class="text">
+            <div class="eyebrow reveal" style="--i:0" data-edit>Solution</div>
+            <h2 class="reveal" style="--i:1" data-edit>One sentence a week, one tap to act</h2>
+            <p class="reveal" style="--i:2; margin-top:32px" data-edit>Lumen reads the smart meter, works out what changed and why, and sends a message a person can act on. When a better plan exists, it switches for them.</p>
+            <p class="caption reveal" style="--i:3; margin-top:28px" data-edit>The frame on the right takes a product screenshot.</p>
+        </div>
+        <div class="frame reveal-img" style="--i:1"><div class="bar"><i></i><i></i><i></i></div></div>
+        <div data-placeholder="image" style="display:none; position:absolute; left:820px; top:49px; width:880px; height:855px; border-radius:0 0 24px 24px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:28px; text-align:center">Double-click to choose a screenshot</div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - How it works
+     ====================================================== -->
+<section class="slide how" data-name="how">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>How it works</div>
+        <h2 class="reveal" style="--i:1" data-edit>Three steps, no hardware</h2>
+        <div class="steps">
+            <div class="card reveal" style="--i:2"><div class="n">1</div><h3 data-edit>Connect</h3><p data-edit>The household links its utility account. Meter data arrives daily through the open data standard.</p></div>
+            <div class="card reveal" style="--i:3"><div class="n">2</div><h3 data-edit>Understand</h3><p data-edit>Our model separates heating, hot water, appliances and always-on load from a single meter feed.</p></div>
+            <div class="card reveal" style="--i:4"><div class="n">3</div><h3 data-edit>Act</h3><p data-edit>A weekly sentence, a plan comparison, and a switch the household approves with one tap.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Market
+     ====================================================== -->
+<section class="slide market" data-name="market" data-section="Market">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Market</div>
+        <h2 class="reveal" style="--i:1" data-edit>Every smart meter is a customer</h2>
+        <div class="circles">
+            <div class="circle c1 reveal-img" style="--i:2"><span><b>TAM</b>€9.4B</span></div>
+            <div class="circle c2 reveal-img" style="--i:3"><span><b>SAM</b>€2.1B</span></div>
+            <div class="circle c3 reveal-img" style="--i:4"><span><b>SOM</b>€180M</span></div>
+        </div>
+        <div class="legend">
+            <div class="row reveal" style="--i:2"><b data-edit>€9.4B</b><p data-edit>Households with smart meters in the EU, at €40 a year each.</p></div>
+            <div class="row reveal" style="--i:3"><b data-edit>€2.1B</b><p data-edit>The six markets with open meter data today.</p></div>
+            <div class="row hot reveal" style="--i:4"><b data-edit>€180M</b><p data-edit>What we can reach with two partner utilities in three years.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Traction
+     ====================================================== -->
+<section class="slide traction" data-name="traction" data-section="Traction">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Traction</div>
+        <h2 class="reveal" style="--i:1" data-edit>12,400 households, growing 22% a month</h2>
+        <div class="tiles">
+            <div class="tile reveal" style="--i:2"><div class="value" data-edit>12.4k</div><div class="label" data-edit>Active households</div></div>
+            <div class="tile reveal" style="--i:3"><div class="value" data-edit>€41</div><div class="label" data-edit>Average saving in the first month</div></div>
+            <div class="tile reveal" style="--i:4"><div class="value" data-edit>68<mark>%</mark></div><div class="label" data-edit>Open rate on the weekly sentence</div></div>
+        </div>
+        <div class="plot reveal-img" style="--i:5" data-group>
+            <div class="col"><div class="v">2.1k</div><div class="b" style="height:17%"></div><div class="x">Mar</div></div>
+            <div class="col"><div class="v">3.0k</div><div class="b" style="height:24%"></div><div class="x">Apr</div></div>
+            <div class="col"><div class="v">4.4k</div><div class="b" style="height:35%"></div><div class="x">May</div></div>
+            <div class="col"><div class="v">6.1k</div><div class="b" style="height:49%"></div><div class="x">Jun</div></div>
+            <div class="col"><div class="v">8.3k</div><div class="b" style="height:67%"></div><div class="x">Jul</div></div>
+            <div class="col"><div class="v">10.2k</div><div class="b" style="height:82%"></div><div class="x">Aug</div></div>
+            <div class="col hi"><div class="v">12.4k</div><div class="b" style="height:100%"></div><div class="x">Sep</div></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Business model
+     ====================================================== -->
+<section class="slide model" data-name="model" data-section="Model">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Business model</div>
+        <h2 class="reveal" style="--i:1" data-edit>Paid by the switch, not the household</h2>
+        <table class="reveal" style="--i:2" data-group>
+            <thead><tr><th>Stream</th><th>Who pays</th><th>Price</th><th>Share of revenue today</th></tr></thead>
+            <tbody>
+                <tr><td>Switching commission</td><td>The new supplier</td><td class="price">€45</td><td>71%</td></tr>
+                <tr><td>Lumen Plus</td><td>The household, optional</td><td class="price">€3 / month</td><td>18%</td></tr>
+                <tr><td>Utility licence</td><td>Utilities embedding the sentence in their app</td><td class="price">€0.60 / meter / year</td><td>11%</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Competition
+     ====================================================== -->
+<section class="slide compete" data-name="competition">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Competition</div>
+        <h2 class="reveal" style="--i:1" data-edit>Plain language and action, together</h2>
+        <div class="matrix reveal-img" style="--i:2">
+            <div class="mid-v"></div><div class="mid-h"></div>
+            <div class="axis" style="left:-2px; top:-40px" data-edit>Acts for you ↑</div>
+            <div class="axis" style="right:0; bottom:-44px" data-edit>Plain language →</div>
+            <div class="dot" style="left:60px; top:80px"><i></i><span data-edit>Comparison sites</span></div>
+            <div class="dot" style="left:120px; top:460px"><i></i><span data-edit>Utility apps</span></div>
+            <div class="dot" style="left:520px; top:520px"><i></i><span data-edit>Budget apps</span></div>
+            <div class="dot us" style="left:600px; top:110px"><i></i><span data-edit>Lumen</span></div>
+        </div>
+        <div class="side">
+            <p class="reveal" style="--i:3" data-edit>Comparison sites act, but only for people who already understand tariffs.</p>
+            <p class="reveal" style="--i:4" data-edit>Budget apps explain, but cannot switch a plan.</p>
+            <p class="reveal" style="--i:5" data-edit>Lumen is the only product in the top-right quadrant, and the meter data moat grows with every household.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Team
+     ====================================================== -->
+<section class="slide team" data-name="team" data-section="Team">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Team</div>
+        <h2 class="reveal" style="--i:1" data-edit>Energy, data and consumer products</h2>
+        <div class="people">
+            <div class="person reveal" style="--i:2"><div class="avatar"></div><h3 data-edit>Your Name</h3><div class="role" data-edit>CEO</div><p data-edit>Ten years in utility pricing; built the tariff engine at a national supplier.</p></div>
+            <div class="person reveal" style="--i:3"><div class="avatar"></div><h3 data-edit>A. Cofounder</h3><div class="role" data-edit>CTO</div><p data-edit>Led the meter-data platform at a smart-home company to two million devices.</p></div>
+            <div class="person reveal" style="--i:4"><div class="avatar"></div><h3 data-edit>B. Cofounder</h3><div class="role" data-edit>Product</div><p data-edit>Consumer fintech; shipped a savings product used by 800k people.</p></div>
+            <div class="person reveal" style="--i:5"><div class="avatar"></div><h3 data-edit>C. Advisor</h3><div class="role" data-edit>Advisor</div><p data-edit>Former regulator; open meter-data standard author.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 10 - The ask
+     ====================================================== -->
+<section class="slide ask" data-name="ask" data-section="The ask">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>The ask</div>
+        <div class="big reveal" style="--i:1" data-edit>€2.5M</div>
+        <p class="sub reveal" style="--i:2; max-width:800px" data-edit>Seed round to reach 100,000 households and two utility partnerships in 18 months.</p>
+        <div class="use">
+            <div class="row reveal" style="--i:3"><div class="lbl"><span data-edit>Engineering and data</span><span>45%</span></div><div class="bar"><i style="width:45%"></i></div></div>
+            <div class="row reveal" style="--i:4"><div class="lbl"><span data-edit>Growth and partnerships</span><span>35%</span></div><div class="bar"><i style="width:35%"></i></div></div>
+            <div class="row reveal" style="--i:5"><div class="lbl"><span data-edit>Operations and compliance</span><span>20%</span></div><div class="bar"><i style="width:20%"></i></div></div>
+        </div>
+    </div>
+    <aside class="notes" hidden>Say the number, what it buys, and when the next milestone is. Then stop and let them ask.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 11 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing" data-no-master>
+    <div class="content">
+        <div class="logo reveal" style="--i:0"><i></i><span data-edit>Lumen</span></div>
+        <h1 class="reveal" style="--i:1; margin-top:40px" data-edit>Let's talk</h1>
+        <div class="lines">
+            <p class="reveal" style="--i:2" data-edit>you@lumen.example</p>
+            <p class="reveal" style="--i:3" data-edit>lumen.example</p>
+            <p class="reveal" style="--i:4" data-edit>+00 000 000 000</p>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: shown on every slide, edited once in the editor -->
+<div class="deck-footer">
+    <span class="logo"><i></i><span data-edit>Lumen</span></span>
+    <span data-edit>Confidential · Seed round 2026</span>
+    <span class="num"><b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

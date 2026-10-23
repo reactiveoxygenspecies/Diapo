@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clean Dark</title>
+<!-- Clean Dark: a product-keynote look on charcoal. Soft bordered panels, one ice-blue accent, quiet glows,
+     Sora headlines and Figtree body. Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #f5f6f8;   /* headings, key text        */
+    --ink-2:    #b9bec9;   /* body text                 */
+    --ink-3:    #737a87;   /* captions, secondary       */
+    --rule:     #2a2d34;   /* borders                   */
+    --paper:    #121316;   /* charcoal slide background */
+    --paper-2:  #1b1d22;   /* panels                    */
+    --accent:   #9ec5ff;   /* ice blue                  */
+    --accent-2: #7ee0c3;   /* mint, second series       */
+
+    --stage-bg: #08090b;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #121316;
+    --font: 'Figtree', 'Helvetica Neue', Arial, sans-serif;
+    --font-display: 'Sora', 'Figtree', Arial, sans-serif;
+
+    --pad-x: 120px;        /* layout rhythm at 1920x1080 */
+    --pad-top: 96px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* motion: the reveal's curve   */
+    --dur: 0.8s;                                 /* ... its duration             */
+    --stagger: 0.1s;                             /* ... the step between --i's   */
+    --reveal-y: 24px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-display); font-size: 116px; font-weight: 700; line-height: 1.04; letter-spacing: -0.035em; color: var(--ink); }
+h2 { font-family: var(--font-display); font-size: 72px; font-weight: 600; line-height: 1.1; letter-spacing: -0.03em; color: var(--ink); }
+h3 { font-family: var(--font-display); font-size: 34px; font-weight: 600; line-height: 1.25; letter-spacing: -0.015em; color: var(--ink); }
+p  { font-size: 30px; line-height: 1.5; color: var(--ink-2); }
+ul, ol { font-size: 30px; line-height: 1.5; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 14px; }
+blockquote { font-family: var(--font-display); font-size: 60px; font-weight: 400; line-height: 1.25; letter-spacing: -0.02em; color: var(--ink); }
+.eyebrow { display: inline-flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 28px; align-self: flex-start; }
+.eyebrow::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 16px var(--accent); }
+.sub { font-size: 36px; line-height: 1.4; color: var(--ink-3); margin-top: 28px; }
+.caption { font-size: 21px; line-height: 1.45; color: var(--ink-3); }
+h1 mark, h2 mark { background: none; color: var(--accent); }
+
+/* ===========================================
+   LAYOUT
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: var(--pad-top); }
+.panel { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 24px; padding: 44px 44px 48px; }
+.panel h3 { margin-bottom: 14px; }
+.panel p { font-size: 25px; }
+.pill { display: inline-block; font-size: 20px; font-weight: 600; padding: 8px 18px; border-radius: 999px; background: rgba(158,197,255,0.12); color: var(--accent); }
+
+/* Cover */
+.cover .content { display: flex; flex-direction: column; justify-content: center; }
+.cover h1 { max-width: 1250px; }
+.cover .meta { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: center; padding-top: 28px; border-top: 1px solid var(--rule); }
+
+/* Agenda */
+.agenda .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; margin-top: 56px; }
+.agenda .panel .n { font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--accent); margin-bottom: 40px; }
+
+/* Section */
+.section .content { display: flex; flex-direction: column; justify-content: center; }
+.section .n { font-family: var(--font-display); font-size: 28px; font-weight: 600; letter-spacing: 0.1em; color: var(--ink-3); margin-bottom: 28px; }
+.section h2 { font-size: 128px; max-width: 1400px; }
+
+/* Feature grid */
+.features .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 48px; }
+.features .panel { display: grid; grid-template-columns: 96px 1fr; gap: 28px; align-items: start; }
+.features .icon { width: 72px; height: 72px; border-radius: 20px; background: rgba(158,197,255,0.12); border: 1px solid rgba(158,197,255,0.3); position: relative; }
+.features .icon::after { content: ''; position: absolute; inset: 24px; border-radius: 6px; background: var(--accent); }
+.features .panel.alt .icon { background: rgba(126,224,195,0.12); border-color: rgba(126,224,195,0.3); }
+.features .panel.alt .icon::after { background: var(--accent-2); border-radius: 50%; }
+
+/* Picture */
+.picture .frame { position: absolute; left: 0; top: 0; width: 1000px; height: 888px; border-radius: 28px; background: var(--paper-2); border: 1px solid var(--rule); }
+.picture .text { position: absolute; left: 1100px; top: 60px; width: 580px; }
+.picture .text p { margin-top: 32px; }
+
+/* Big number */
+.number .content { display: flex; flex-direction: column; justify-content: center; }
+.number .big { font-family: var(--font-display); font-size: 320px; font-weight: 700; line-height: 0.95; letter-spacing: -0.06em; color: var(--ink); }
+.number .big mark { background: none; color: var(--accent); }
+.number h2 { margin-top: 24px; font-size: 60px; }
+.number p { margin-top: 20px; max-width: 1200px; }
+
+/* Quote */
+.quote .content { display: flex; flex-direction: column; justify-content: center; }
+.quote .panel { max-width: 1500px; padding: 64px 72px; }
+.quote .who { display: flex; align-items: center; gap: 20px; margin-top: 36px; }
+.quote .who .avatar { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+
+/* Timeline */
+.timeline .track { position: relative; margin-top: 90px; height: 2px; background: var(--rule); }
+.timeline .track i { position: absolute; left: 0; top: 0; height: 2px; width: 52%; background: var(--accent); box-shadow: 0 0 18px var(--accent); }
+.timeline .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 36px; }
+.timeline .step .dot { width: 16px; height: 16px; border-radius: 50%; background: var(--rule); margin: -45px 0 24px; border: 3px solid var(--paper); }
+.timeline .step.done .dot { background: var(--accent); box-shadow: 0 0 14px var(--accent); }
+.timeline .step h3 { margin-bottom: 10px; }
+.timeline .step p { font-size: 24px; }
+
+/* Table */
+.data table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 27px; margin-top: 48px; border: 1px solid var(--rule); border-radius: 20px; overflow: hidden; }
+.data th { text-align: left; font-size: 19px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); padding: 22px 32px; background: var(--paper-2); border-bottom: 1px solid var(--rule); }
+.data td { padding: 24px 32px; border-bottom: 1px solid var(--rule); color: var(--ink-2); }
+.data tr:last-child td { border-bottom: 0; }
+.data td:first-child { color: var(--ink); font-weight: 500; }
+.data th.pick, .data td.pick { background: rgba(158,197,255,0.07); }
+.data th.pick { color: var(--accent); }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.closing .lines { display: flex; gap: 20px; margin-top: 56px; }
+.closing .eyebrow { align-self: center; }
+
+/* ===========================================
+   DECOR - glows, never in the way of a click
+   =========================================== */
+.glow { position: absolute; width: 1200px; height: 1200px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(closest-side, rgba(158,197,255,0.16), rgba(158,197,255,0)); }
+.glow.mint { background: radial-gradient(closest-side, rgba(126,224,195,0.12), rgba(126,224,195,0)); }
+.hairline { position: absolute; left: 0; right: 0; top: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(158,197,255,0.5), transparent); pointer-events: none; }
+
+/* ===========================================
+   MASTER LAYER - the running footer (a stage child outside the slides)
+   =========================================== */
+.deck-footer {
+    position: absolute; left: var(--pad-x); right: var(--pad-x); bottom: 40px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font); font-size: 19px; font-weight: 500; color: var(--ink-3);
+}
+.deck-footer .brand { display: flex; align-items: center; gap: 12px; }
+.deck-footer .brand i { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.deck-footer .num { font-variant-numeric: tabular-nums; }
+.deck-footer b { font-weight: 600; color: var(--ink); }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="hairline"></div>
+    <div class="glow" style="left:900px; top:-500px"></div>
+    <div class="glow mint" style="left:-500px; top:500px"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Product update · Autumn 2026</div>
+        <h1 class="reveal" style="--i:1" data-edit>Faster, quieter, <mark>built to last</mark></h1>
+        <p class="sub reveal" style="--i:2; max-width:1000px" data-edit>What shipped this quarter, what we learned, and what is next</p>
+        <div class="meta reveal" style="--i:3">
+            <span class="caption" data-edit>Your Name · Product</span>
+            <span class="pill" data-edit>v3.2</span>
+        </div>
+    </div>
+    <aside class="notes" hidden>One line on the theme of the quarter, then straight into the agenda.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Agenda
+     ====================================================== -->
+<section class="slide agenda" data-name="agenda">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Agenda</div>
+        <h2 class="reveal" style="--i:1" data-edit>Four things in twenty minutes</h2>
+        <div class="cards">
+            <div class="panel reveal" style="--i:2"><div class="n">01</div><h3 data-edit>What shipped</h3><p data-edit>The releases, and the one that mattered most.</p></div>
+            <div class="panel reveal" style="--i:3"><div class="n">02</div><h3 data-edit>What we measured</h3><p data-edit>Speed, reliability and the number we watch.</p></div>
+            <div class="panel reveal" style="--i:4"><div class="n">03</div><h3 data-edit>What we heard</h3><p data-edit>Customers, support and the sales floor.</p></div>
+            <div class="panel reveal" style="--i:5"><div class="n">04</div><h3 data-edit>What is next</h3><p data-edit>The roadmap to the end of the year.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Section
+     ====================================================== -->
+<section class="slide section" data-name="section" data-section="What shipped">
+    <div class="glow" style="left:1100px; top:100px"></div>
+    <div class="content">
+        <div class="n reveal" style="--i:0" data-edit>01</div>
+        <h2 class="reveal" style="--i:1" data-edit>What <mark>shipped</mark></h2>
+        <p class="sub reveal" style="--i:2; max-width:900px" data-edit>Six releases, one rewrite, zero rollbacks.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Feature grid
+     ====================================================== -->
+<section class="slide features" data-name="features">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Highlights</div>
+        <h2 class="reveal" style="--i:1" data-edit>Four features people asked for</h2>
+        <div class="grid">
+            <div class="panel reveal" style="--i:2"><div class="icon"></div><div><h3 data-edit>Instant search</h3><p data-edit>Results as you type, across every workspace, under 50 ms.</p></div></div>
+            <div class="panel alt reveal" style="--i:3"><div class="icon"></div><div><h3 data-edit>Offline mode</h3><p data-edit>Keep working on a plane; changes merge when you land.</p></div></div>
+            <div class="panel alt reveal" style="--i:4"><div class="icon"></div><div><h3 data-edit>Shared views</h3><p data-edit>One link, the same filters and sort for everyone.</p></div></div>
+            <div class="panel reveal" style="--i:5"><div class="icon"></div><div><h3 data-edit>Audit log</h3><p data-edit>Every change, who made it, and a one-click undo.</p></div></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Picture
+     ====================================================== -->
+<section class="slide picture" data-name="picture">
+    <div class="glow mint" style="left:-400px; top:300px"></div>
+    <div class="content">
+        <div class="frame reveal-img" style="--i:0"></div>
+        <div data-placeholder="image" style="display:none; position:absolute; left:0; top:0; width:1000px; height:888px; border-radius:28px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:28px; text-align:center">Double-click to choose an image</div>
+        <div class="text">
+            <div class="eyebrow reveal" style="--i:1" data-edit>Instant search</div>
+            <h2 class="reveal" style="--i:2" data-edit>A screenshot goes here</h2>
+            <p class="reveal" style="--i:3" data-edit>The frame takes a screenshot or a photograph: double-click it in the editor to choose one. Dark UI screenshots sit best on this background.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Big number
+     ====================================================== -->
+<section class="slide number" data-name="number" data-section="What we measured">
+    <div class="glow" style="left:1000px; top:-200px"></div>
+    <div class="content">
+        <div class="big reveal" style="--i:0" data-edit>48<mark>ms</mark></div>
+        <h2 class="reveal" style="--i:1" data-edit>median search, down from 410</h2>
+        <p class="reveal" style="--i:2" data-edit>Measured on real queries across the largest thousand workspaces, before and after the index rewrite.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Table
+     ====================================================== -->
+<section class="slide data" data-name="table">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>The numbers</div>
+        <h2 class="reveal" style="--i:1" data-edit>Quarter over quarter</h2>
+        <table class="reveal" style="--i:2" data-group>
+            <thead><tr><th>Metric</th><th>Q2</th><th class="pick">Q3</th><th>Change</th></tr></thead>
+            <tbody>
+                <tr><td>Median search</td><td>410 ms</td><td class="pick">48 ms</td><td>-88%</td></tr>
+                <tr><td>Uptime</td><td>99.91%</td><td class="pick">99.98%</td><td>+0.07 pts</td></tr>
+                <tr><td>Weekly active workspaces</td><td>8,400</td><td class="pick">9,650</td><td>+15%</td></tr>
+                <tr><td>Support tickets per 1k users</td><td>6.2</td><td class="pick">3.9</td><td>-37%</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Quote
+     ====================================================== -->
+<section class="slide quote" data-name="quote" data-section="What we heard">
+    <div class="glow mint" style="left:1100px; top:400px"></div>
+    <div class="content">
+        <div class="panel reveal" style="--i:0">
+            <blockquote data-edit>"Search used to be the thing I avoided. Now it is the first thing I reach for."</blockquote>
+            <div class="who">
+                <div class="avatar"></div>
+                <p class="caption" data-edit>Operations lead, enterprise customer</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Timeline
+     ====================================================== -->
+<section class="slide timeline" data-name="roadmap" data-section="What is next">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Roadmap</div>
+        <h2 class="reveal" style="--i:1" data-edit>To the end of the year</h2>
+        <div class="track reveal" style="--i:2"><i></i></div>
+        <div class="steps">
+            <div class="step done reveal" style="--i:2"><div class="dot"></div><h3 data-edit>October</h3><p data-edit>Shared views to everyone.</p></div>
+            <div class="step done reveal" style="--i:3"><div class="dot"></div><h3 data-edit>November</h3><p data-edit>Offline mode on mobile.</p></div>
+            <div class="step reveal" style="--i:4"><div class="dot"></div><h3 data-edit>December</h3><p data-edit>Audit log export and retention.</p></div>
+            <div class="step reveal" style="--i:5" data-fragment><div class="dot"></div><h3 data-edit>January</h3><p data-edit>The next big thing. Ask us after.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 10 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing" data-no-master>
+    <div class="hairline"></div>
+    <div class="glow" style="left:360px; top:-300px"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Thank you</div>
+        <h1 class="reveal" style="--i:1" data-edit>Questions?</h1>
+        <div class="lines">
+            <span class="pill reveal" style="--i:2" data-edit>hello@example.com</span>
+            <span class="pill reveal" style="--i:3" data-edit>changelog.example.com</span>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: shown on every slide, edited once in the editor -->
+<div class="deck-footer">
+    <span class="brand"><i></i><span data-edit>Product update · Autumn 2026</span></span>
+    <span class="num"><b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

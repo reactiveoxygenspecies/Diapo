@@ -1,0 +1,2100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neo-Grid Bold</title>
+<!-- Neo-Grid Bold: adapted from beautiful-html-templates (github.com/zarazhangrui/beautiful-html-templates, MIT)
+     for the deck editor's fixed 1920x1080 stage. Twelve-column card grid on grey with neon-yellow accents, black ink panels and mono tags. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these; the properties panel offers the
+   colours as swatches. The template's own variables follow below.
+   =========================================== */
+:root {
+    --ink: #0A0A0A;
+    --ink-2: #0A0A0A;
+    --ink-3: #8A8A85;
+    --rule: #0A0A0A;
+    --paper: #ECECE8;
+    --paper-2: #F5F4EF;
+    --accent: #E6FF3D;
+    --accent-2: #0A0A0A;
+    --stage-bg: #1a1a1a;
+    --slide-bg: #ECECE8;
+    --font: "Space Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-display: "Space Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+    --pad-x: 96px;
+    --pad-top: 72px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur: 0.7s;
+    --stagger: 0.12s;
+    --reveal-y: 28px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ===========================================
+   FIXED STAGE - MANDATORY BASE STYLES
+   Include this ENTIRE file, unchanged, in every deck's <style> block,
+   right after the :root theme variables and the * reset.
+
+   Slides are authored at 1920x1080 and the whole stage is scaled to the
+   window by the controller (deck-controller.js). The deck editor relies on
+   exactly these selectors and classes:
+     .deck-viewport > .deck-stage > .slide     the structure it opens
+     .slide.active / .slide.visible            how a slide is shown
+     .reveal / .reveal-img / .reveal-right     entrances it can keep when
+                                               an element is moved (--dx/--dy)
+     --i                                       the stagger index it shows
+                                               in the Animation panel
+   Taken from the editor's own template (deck-editor/app/templates/blank.html),
+   with fallbacks for the variables a deck may leave out.
+   Part of the Diapo Format. Copyright (c) 2026 Daniele Rossetto. MIT licence (SPDX-License-Identifier: MIT);
+   free to keep in any deck.
+   =========================================== */
+
+/* 1. Lock the browser viewport */
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--stage-bg, #000); }
+
+/* 2. Full-window deck viewport */
+.deck-viewport { position: fixed; inset: 0; overflow: hidden; background: var(--stage-bg, #000); }
+
+/* 3. Fixed design canvas. The controller sets transform: translate() scale().
+   For another slide size, override width/height here AND on .slide below
+   (the controller reads the stage's laid-out size, the editor does too). */
+.deck-stage {
+    position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;
+    overflow: hidden; transform-origin: 0 0; background: var(--slide-bg, #fff);
+}
+
+/* 4. Slides stack inside the stage. Visibility is switched with classes,
+   NEVER with display:none (a later `display:flex` rule would show every
+   slide at once, and the editor's thumbnails and PDF need the box). */
+.slide {
+    position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: hidden;
+    display: block; visibility: hidden; opacity: 0; pointer-events: none;
+    background: var(--slide-bg, #fff);
+    font-family: var(--font); color: var(--ink-2, var(--ink, #222));
+}
+.slide.active, .slide.visible { visibility: visible; opacity: 1; pointer-events: auto; z-index: 1; }
+
+/* 5. Keep media inside authored slide bounds */
+img, video, canvas, svg { max-width: 100%; max-height: 100%; }
+
+/* 6. Speaker notes never render on the slide (the presenter view reads them) */
+.notes { display: none; }
+
+/* 7. Presentation chrome outside the stage (the controller's prev/next and page number).
+   Thin CSS chevrons in white blended by difference, so they read as dark ink on a light
+   slide and light on a dark one; faint until hovered. The controller adds
+   deck-controls-idle to <html> after 2 s without mouse movement (removed on the next
+   move) and toggles deck-controls-off with the H key. Keep the markup: two buttons
+   around the .page span, the chevrons are drawn on button:first-child / :last-child. */
+.deck-controls { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: 14px; color: #fff; mix-blend-mode: difference; transition: opacity 0.4s; }
+.deck-controls button { width: 24px; height: 24px; padding: 0; border: 0; background: none; color: inherit; font-size: 0; cursor: pointer; opacity: 0.4; transition: opacity 0.15s; }
+.deck-controls button:hover { opacity: 1; }
+.deck-controls button::before { content: ""; display: block; width: 8px; height: 8px; margin: auto; border: solid currentColor; border-width: 0 0 1.6px 1.6px; transform: translateX(2px) rotate(45deg); }
+.deck-controls button:last-child::before { transform: translateX(-2px) rotate(-135deg); }
+.deck-controls .page { font: 500 11px var(--font, system-ui, sans-serif); letter-spacing: 0.06em; opacity: 0.5; font-variant-numeric: tabular-nums; }
+html.deck-controls-idle .deck-controls { opacity: 0; pointer-events: none; }
+html.deck-controls-off .deck-controls { display: none; }
+
+/* 8. Print: one fixed-size slide per page (the editor's PDF export builds on this) */
+@media print {
+    html, body { width: 1920px; height: auto; overflow: visible; background: #fff; }
+    .deck-viewport { position: static; overflow: visible; background: #fff; }
+    .deck-stage { position: static; width: auto; height: auto; transform: none !important; background: none; }
+    .slide { position: relative; display: block !important; visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; width: 1920px; height: 1080px; break-after: page; page-break-after: always; }
+    .slide:last-child { break-after: auto; page-break-after: auto; }
+    .slide .reveal, .slide .reveal-img, .slide .reveal-right { opacity: 1 !important; transform: translate(var(--dx, 0px), var(--dy, 0px)) !important; }
+    .deck-controls { display: none !important; }
+}
+
+/* 9. Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; }
+}
+
+/* 10. Superscript and subscript at a typographic size: about two thirds of the text
+   (word processors use 65%, TeX 70%), raised or lowered by the browser as usual, without
+   changing the line height. The editor's text bar writes plain <sup> and <sub>. */
+sup, sub { font-size: 65%; line-height: 0; }
+
+/* ===========================================
+   REVEAL ANIMATIONS (the deck's own entrances)
+   Elements with .reveal / .reveal-img / .reveal-right animate in when
+   the slide becomes .visible. The visible state MUST end in
+   translate(var(--dx, 0px), var(--dy, 0px)): the editor writes --dx/--dy
+   when the user drags such an element, so it stays where they put it and
+   still animates. --i staggers the delay (style="--i:2").
+   Change the durations, distances and easing to suit the style; keep
+   the selectors, the custom properties and the visible transform.
+   =========================================== */
+.reveal, .reveal-img, .reveal-right {
+    opacity: 0;
+    transition: opacity var(--dur, 0.7s) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+                transform var(--dur, 0.7s) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: calc(var(--i, 0) * var(--stagger, 0.12s));
+}
+.reveal { transform: translateY(var(--reveal-y, 28px)); }
+.reveal-img { transform: translateY(calc(var(--reveal-y, 28px) * 0.65)) scale(0.985); }
+.reveal-right { transform: translateX(calc(var(--reveal-y, 28px) * 1.4)); }
+.slide.visible .reveal, .slide.visible .reveal-img, .slide.visible .reveal-right {
+    opacity: 1; transform: translate(var(--dx, 0px), var(--dy, 0px));
+}
+
+/* ===========================================
+   TYPE - base styles for slides added in the editor ("New slide" keeps its tags)
+   =========================================== */
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; line-height: 0.95; letter-spacing: -0.03em; color: var(--ink); }
+h1 { font-size: 150px; } h2 { font-size: 96px; } h3 { font-size: 52px; }
+p { font-size: 28px; line-height: 1.45; } ul, ol { font-size: 28px; line-height: 1.5; padding-left: 40px; } li { margin-bottom: 10px; }
+.eyebrow { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 20px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 20px; }
+
+/* ===========================================
+   NEO-GRID BOLD - the template's own design system
+   =========================================== */
+:root {
+    --bg: #ECECE8;
+    --ink: #0A0A0A;
+    --paper: #F5F4EF;
+    --accent: #E6FF3D;        /* signature neon yellow */
+    --line: #0A0A0A;
+    --muted: #8A8A85;
+  }
+/* --- shared slide chrome ------------------------------------------ */
+  section.slide {
+    background: var(--bg);
+    color: var(--ink);
+    overflow: hidden;
+  }
+.frame {
+    position: absolute; inset: 40px;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    gap: 12px;
+  }
+.card {
+    background: var(--paper);
+    position: relative;
+    overflow: hidden;
+  }
+.card.ink   { background: var(--ink);   color: var(--paper); }
+.card.lemon { background: var(--accent); color: var(--ink); }
+.card.photo { background: #111; color: #fff; }
+/* slide number tag, bottom-left of every slide */
+  .pagenum {
+    position: absolute;
+    left: 0; bottom: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 24px;
+    padding: 14px 22px;
+    letter-spacing: 0.04em;
+  }
+.pagenum.invert { background: var(--ink); color: var(--paper); }
+.pagenum.lemon  { background: var(--accent); color: var(--ink); }
+.corner-mark {
+    position: absolute;
+    top: 22px; right: 22px;
+    width: 36px; height: 36px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 4px;
+  }
+.corner-mark span { background: currentColor; }
+.corner-mark span:nth-child(2) { background: transparent; }
+.copyright {
+    position: absolute;
+    left: 22px; bottom: 22px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 16px;
+    line-height: 1.4;
+    color: var(--ink);
+    opacity: 0.85;
+  }
+.arrow {
+    width: 64px; height: 64px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+.arrow svg { width: 100%; height: 100%; }
+/* --- typography utilities ---------------------------------------- */
+  h1, h2, h3, p { margin: 0; }
+.display {
+    font-weight: 700;
+    font-size: 132px;
+    line-height: 0.92;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+.title {
+    font-weight: 700;
+    font-size: 88px;
+    line-height: 0.95;
+    letter-spacing: -0.015em;
+    text-transform: uppercase;
+  }
+.subtitle {
+    font-weight: 700;
+    font-size: 56px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+  }
+.body {
+    font-size: 28px;
+    line-height: 1.35;
+    font-weight: 400;
+  }
+.label {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 24px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink);
+    opacity: 0.7;
+  }
+.stat-num {
+    font-weight: 700;
+    font-size: 156px;
+    line-height: 0.9;
+    letter-spacing: -0.03em;
+  }
+.stat-num.sm { font-size: 96px; }
+/* --- slide 1: COVER ---------------------------------------------- */
+  .s-cover .panel-photo-l { grid-column: 1 / span 3; grid-row: 1 / span 8; background: #0a0a0a; position: relative; overflow: hidden; }
+.s-cover .panel-photo-l .ph { position: absolute; inset: 0;
+    background:
+      radial-gradient(120% 80% at 30% 30%, #2a2a2a 0%, #0a0a0a 70%),
+      repeating-linear-gradient(135deg, rgba(255,255,255,.04) 0 2px, transparent 2px 8px);
+  }
+.s-cover .panel-photo-l::after {
+    content: "PORTRAIT / B&W";
+    position: absolute; left: 16px; bottom: 56px;
+    font-family: "JetBrains Mono", monospace; font-size: 13px;
+    color: rgba(255,255,255,.55); letter-spacing: .12em;
+  }
+.s-cover .panel-mid  { grid-column: 4 / span 5; grid-row: 1 / span 5; background: var(--accent); position: relative; }
+.s-cover .panel-titletile { grid-column: 4 / span 5; grid-row: 6 / span 3; background: var(--accent); position: relative; }
+.s-cover .panel-photo-r { grid-column: 9 / span 4; grid-row: 1 / span 5; background:#111; position: relative; overflow: hidden; }
+.s-cover .panel-photo-r .ph { position: absolute; inset: 0;
+    background:
+      radial-gradient(80% 60% at 60% 40%, #1f1f1f 0%, #0b0b0b 80%),
+      repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 2px, transparent 2px 8px);
+  }
+.s-cover .panel-photo-r::after {
+    content: "PORTRAIT / B&W";
+    position: absolute; left: 16px; bottom: 16px;
+    font-family: "JetBrains Mono", monospace; font-size: 13px;
+    color: rgba(255,255,255,.55); letter-spacing: .12em;
+  }
+.s-cover .panel-cap   { grid-column: 9 / span 4; grid-row: 6 / span 3; background: var(--paper); position: relative; }
+.s-cover .qr {
+    position: absolute; top: 28px; left: 28px;
+    width: 90px; height: 90px; background: var(--ink);
+    display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr); gap: 0;
+  }
+.s-cover .qr i { background: var(--ink); }
+.s-cover .qr i.k { background: var(--accent); }
+.s-cover .title-block {
+    position: absolute; left: 40px; right: 40px; bottom: 40px;
+  }
+.s-cover .meta-l {
+    position: absolute; left: 40px; bottom: 40px;
+    font-family: "JetBrains Mono", monospace; font-size: 24px; line-height: 1.4;
+    letter-spacing: .04em;
+  }
+.s-cover .blockmark {
+    position: absolute; right: 40px; bottom: 40px;
+    width: 56px; height: 56px;
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 4px;
+  }
+.s-cover .blockmark span:nth-child(1) { background: var(--ink); }
+.s-cover .blockmark span:nth-child(2) { background: transparent; }
+.s-cover .blockmark span:nth-child(3) { background: transparent; }
+.s-cover .blockmark span:nth-child(4) { background: var(--ink); }
+/* --- slide 2: CONTENTS ------------------------------------------- */
+  /* Contents (TOC) — head takes the top 2 grid rows, then 6 cards in a
+     3×2 grid where each card explicitly spans 3 grid rows. The 8-row
+     frame is fully used: head (2) + cards row 1 (3) + cards row 2 (3) = 8. */
+  .s-toc .frame   { gap: 18px; }
+.s-toc .head    { grid-column: 1 / span 12; grid-row: 1 / span 2; padding: 36px 44px; display: flex; align-items: center; justify-content: space-between; }
+.s-toc .head h1 { font-size: 92px; font-weight: 700; text-transform: uppercase; letter-spacing: -.015em; line-height: .95; }
+.s-toc .row     { grid-column: span 4; grid-row: span 3; padding: 40px 44px; display: flex; flex-direction: column; justify-content: center; gap: 22px; min-height: 0; }
+.s-toc .row .num{ font-family: "JetBrains Mono", monospace; font-size: 22px; letter-spacing: .08em; }
+.s-toc .row h3  { font-size: 36px; font-weight: 700; text-transform: uppercase; letter-spacing: -.01em; line-height: 1.05; }
+.s-toc .row p   { font-size: 20px; line-height: 1.5; opacity: .82; }
+.s-toc .row[data-om-validate-skip] { display: none; }
+/* --- slide 3: DIGITS IN NUMBERS ---------------------------------- */
+  .s-stats .accent-l    { grid-column: 1 / span 2; grid-row: 1 / span 8; background: var(--accent); position: relative; }
+.s-stats .accent-l .plus { position: absolute; top: 28px; left: 28px; font-weight: 700; font-size: 48px; }
+.s-stats .accent-l .lab  { position: absolute; bottom: 24px; left: 28px; font-family: "JetBrains Mono", monospace; font-size: 24px; letter-spacing: .08em; text-transform: uppercase; }
+.s-stats .copy        { grid-column: 3 / span 4; grid-row: 1 / span 8; padding: 36px 32px; background: var(--paper); position: relative; display: flex; flex-direction: column; }
+.s-stats .copy h2     { font-size: 76px; font-weight: 700; text-transform: uppercase; letter-spacing: -.015em; line-height: .95; }
+.s-stats .copy h2 mark{ background: var(--accent); color: var(--ink); padding: 0 6px; }
+.s-stats .copy p      { font-size: 24px; line-height: 1.45; margin-top: 24px; max-width: 36ch; }
+.s-stats .stat-a      { grid-column: 7 / span 3; grid-row: 1 / span 2; background: var(--paper); padding: 24px 28px; }
+.s-stats .stat-b      { grid-column: 10 / span 3; grid-row: 1 / span 2; background: var(--paper); padding: 24px 28px; }
+.s-stats .stat-c      { grid-column: 7 / span 3; grid-row: 3 / span 2; background: var(--paper); padding: 24px 28px; }
+.s-stats .stat-big    { grid-column: 7 / span 6; grid-row: 5 / span 4; background: var(--accent); padding: 28px 36px; position: relative; display: flex; flex-direction: column; justify-content: space-between; }
+.s-stats .stat-big .v { font-size: 240px; font-weight: 700; line-height: .85; letter-spacing: -.04em; }
+.s-stats .stat-big .arrow-out { position: absolute; right: 28px; bottom: 28px; }
+/* --- slide 4: KEY FEATURES --------------------------------------- */
+  .s-features .head { grid-column: 1 / span 12; grid-row: 1 / span 2; padding: 28px 32px; display: flex; align-items: center; justify-content: space-between; background: var(--paper); }
+.s-features .head h2 { font-size: 88px; font-weight: 700; text-transform: uppercase; letter-spacing: -.015em; }
+.s-features .feat { grid-column: span 4; grid-row: span 6; background: var(--paper); padding: 28px; display: flex; flex-direction: column; gap: 18px; position: relative; }
+.s-features .feat .pic { aspect-ratio: 16 / 10; background:#111; position: relative; overflow: hidden; }
+.s-features .feat .pic .ph { position: absolute; inset: 0;
+    background:
+      radial-gradient(80% 60% at 50% 50%, #1f1f1f 0%, #0a0a0a 80%),
+      repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 2px, transparent 2px 8px);
+  }
+.s-features .feat .pic .tag { position: absolute; left: 8px; top: 8px; background: var(--accent); color: var(--ink); font-family: "JetBrains Mono", monospace; font-size: 24px; padding: 4px 10px; letter-spacing: .08em; }
+.s-features .feat h3 { font-size: 30px; font-weight: 700; text-transform: uppercase; letter-spacing: -.005em; }
+.s-features .feat p  { font-size: 24px; line-height: 1.4; }
+/* --- slide 5: MARKET PENETRATION (chart) ------------------------- */
+  .s-chart .pane-l { grid-column: 1 / span 5; grid-row: 1 / span 8; background: var(--ink); color: var(--paper); padding: 36px 32px; position: relative; display: flex; flex-direction: column; justify-content: space-between; }
+.s-chart .pane-l h2 { font-size: 84px; font-weight: 700; text-transform: uppercase; letter-spacing: -.015em; line-height: .95; }
+.s-chart .pane-l h2 em { font-style: normal; color: var(--accent); }
+.s-chart .pane-l p  { font-size: 22px; line-height: 1.45; max-width: 32ch; opacity: .9; }
+.s-chart .pane-l .yearlabel { font-family: "JetBrains Mono", monospace; font-size: 16px; letter-spacing: .08em; opacity: .7; }
+.s-chart .pane-r { grid-column: 6 / span 7; grid-row: 1 / span 8; background: var(--paper); padding: 36px 32px; position: relative; display: flex; flex-direction: column; }
+.s-chart .legend { display: flex; gap: 28px; margin-bottom: 18px; }
+.s-chart .legend .li { display: flex; align-items: center; gap: 8px; font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
+.s-chart .legend .li i { width: 18px; height: 12px; background: var(--ink); display: inline-block; }
+.s-chart .legend .li.b i { background: var(--accent); border: 1.5px solid var(--ink); }
+.s-chart .bars { flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 18px; align-items: end; padding: 16px 0 28px 0; border-bottom: 2px solid var(--ink); }
+.s-chart .bar  { display: flex; flex-direction: column; gap: 4px; align-items: stretch; height: 100%; justify-content: flex-end; }
+.s-chart .bar .a { background: var(--ink); }
+.s-chart .bar .b { background: var(--accent); border: 1.5px solid var(--ink); }
+.s-chart .xaxis{ display: grid; grid-template-columns: repeat(6, 1fr); gap: 18px; padding-top: 8px; }
+.s-chart .xaxis span { font-family: "JetBrains Mono", monospace; font-size: 14px; text-align: center; letter-spacing: .08em; }
+/* --- slide 6: SECTION DIVIDER ------------------------------------ */
+  .s-section { background: var(--ink); color: var(--paper); }
+.s-section .frame { gap: 12px; }
+.s-section .pane-num { grid-column: 1 / span 4; grid-row: 1 / span 8; background: var(--accent); color: var(--ink); padding: 36px 32px; position: relative; display: flex; flex-direction: column; justify-content: space-between; }
+.s-section .pane-num .n { font-size: 320px; font-weight: 700; line-height: .85; letter-spacing: -.05em; }
+.s-section .pane-num .lab { font-family: "JetBrains Mono", monospace; font-size: 18px; letter-spacing: .12em; text-transform: uppercase; }
+.s-section .pane-title { grid-column: 5 / span 8; grid-row: 1 / span 8; background: var(--ink); color: var(--paper); padding: 36px 32px; position: relative; display: flex; flex-direction: column; justify-content: space-between; }
+.s-section .pane-title h2 { font-size: 132px; font-weight: 700; text-transform: uppercase; letter-spacing: -.02em; line-height: .9; }
+.s-section .pane-title h2 mark { background: var(--accent); color: var(--ink); padding: 0 8px; }
+.s-section .pane-title p { font-size: 24px; line-height: 1.45; max-width: 48ch; opacity: .85; }
+/* --- slide 7: QUOTE ---------------------------------------------- */
+  .s-quote .photo { grid-column: 1 / span 5; grid-row: 1 / span 8; background:#111; position: relative; overflow: hidden; }
+.s-quote .photo .ph { position: absolute; inset: 0;
+    background:
+      radial-gradient(70% 80% at 50% 35%, #2a2a2a 0%, #0a0a0a 80%),
+      repeating-linear-gradient(135deg, rgba(255,255,255,.04) 0 2px, transparent 2px 8px);
+  }
+.s-quote .photo .tag { position: absolute; left: 16px; bottom: 16px; font-family: "JetBrains Mono", monospace; font-size: 13px; color: rgba(255,255,255,.55); letter-spacing: .12em; }
+/* Quote — more breathing room around the headline, smaller decorative
+     mark so the actual quote leads, looser line-height for legibility. */
+  .s-quote .copy  { grid-column: 6 / span 7; grid-row: 1 / span 5; background: var(--paper); padding: 48px 52px; display: flex; flex-direction: column; justify-content: center; gap: 28px; }
+.s-quote .copy .qmark { font-size: 96px; line-height: .8; font-weight: 700; color: var(--accent); -webkit-text-stroke: 2px var(--ink); }
+.s-quote .copy blockquote { font-size: 38px; font-weight: 500; line-height: 1.28; letter-spacing: -.01em; margin: 0; }
+.s-quote .attr  { grid-column: 6 / span 4; grid-row: 6 / span 3; background: var(--accent); padding: 36px 40px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+.s-quote .attr .who { font-size: 30px; font-weight: 700; text-transform: uppercase; letter-spacing: -.005em; }
+.s-quote .attr .role { font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
+.s-quote .mark  { grid-column: 10 / span 3; grid-row: 6 / span 3; background: var(--ink); color: var(--paper); padding: 28px 32px; display: flex; align-items: center; justify-content: center; }
+.s-quote .mark .blockmark { width: 96px; height: 96px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 6px; }
+.s-quote .mark .blockmark span { background: var(--accent); }
+.s-quote .mark .blockmark span:nth-child(2) { background: transparent; }
+.s-quote .mark .blockmark span:nth-child(3) { background: transparent; }
+/* --- slide 8: NEXT STEPS ----------------------------------------- */
+  .s-cta .head    { grid-column: 1 / span 8; grid-row: 1 / span 3; background: var(--accent); padding: 36px 32px; display: flex; flex-direction: column; justify-content: space-between; }
+.s-cta .head h2 { font-size: 124px; font-weight: 700; text-transform: uppercase; letter-spacing: -.02em; line-height: .9; }
+.s-cta .head .lab { font-family: "JetBrains Mono", monospace; font-size: 16px; letter-spacing: .08em; text-transform: uppercase; }
+.s-cta .qr      { grid-column: 9 / span 4; grid-row: 1 / span 3; background: var(--ink); display: flex; align-items: center; justify-content: center; }
+.s-cta .qr svg  { width: 60%; height: auto; }
+.s-cta .step    { padding: 28px 32px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; background: var(--paper); }
+.s-cta .step.a  { grid-column: 1 / span 4; grid-row: 4 / span 5; }
+.s-cta .step.b  { grid-column: 5 / span 4; grid-row: 4 / span 5; }
+.s-cta .step.c  { grid-column: 9 / span 4; grid-row: 4 / span 5; background: var(--ink); color: var(--paper); }
+.s-cta .step .num { font-family: "JetBrains Mono", monospace; font-size: 16px; letter-spacing: .08em; }
+.s-cta .step h3 { font-size: 44px; font-weight: 700; text-transform: uppercase; letter-spacing: -.01em; line-height: 1; }
+.s-cta .step p  { font-size: 20px; line-height: 1.45; }
+.s-cta .step.c .arrow svg path { stroke: var(--accent); }
+/* --- CONSULT (text-dense) ----------------------------------------- */
+  /* Findings · Detail (action-title + 3 cols) — content vertically
+     distributed across each column so the colored boxes feel populated.
+     Typography lifted a notch + an extra line per column for density. */
+  .s-consult .frame { gap: 16px; }
+.s-consult .head    { grid-column: 1 / span 12; grid-row: 1 / span 1; padding: 30px 36px; background: var(--ink); color: var(--paper); display: flex; align-items: center; gap: 32px; }
+.s-consult .head .tag { font-family: "JetBrains Mono", monospace; font-size: 16px; letter-spacing: .12em; text-transform: uppercase; opacity: .7; flex-shrink: 0; border-right: 1px solid rgba(245,244,239,.25); padding-right: 32px; }
+.s-consult .head h2 { font-weight: 700; font-size: 28px; line-height: 1.25; text-transform: uppercase; letter-spacing: -.005em; }
+.s-consult .head h2 mark { background: var(--accent); color: var(--ink); padding: 0 6px; }
+.s-consult .col     { grid-row: 2 / span 7; padding: 40px 40px; background: var(--paper); display: flex; flex-direction: column; gap: 24px; }
+.s-consult .col.a   { grid-column: 1 / span 4; }
+.s-consult .col.b   { grid-column: 5 / span 4; background: var(--accent); }
+.s-consult .col.c   { grid-column: 9 / span 4; }
+.s-consult .col h3  { font-size: 24px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border-bottom: 2px solid var(--ink); padding-bottom: 14px; margin-bottom: 0; flex-shrink: 0; }
+/* col-body: a flex-grow wrapper around the variable middle content.
+     justify-content: space-between distributes whatever is inside across
+     the full available height so paragraphs / lists / meta numbers
+     spread out instead of bunching at the top. */
+  .s-consult .col-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 24px; }
+.s-consult .col .meta { font-size: 32px; font-weight: 700; line-height: 1.1; letter-spacing: -.005em; }
+.s-consult .col p   { font-size: 21px; line-height: 1.55; }
+.s-consult .col ul  { margin: 0; padding-left: 22px; font-size: 21px; line-height: 1.55; display: flex; flex-direction: column; gap: 14px; }
+.s-consult .col ul li strong { font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+.s-consult .col .src { font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; opacity: .65; padding-top: 16px; border-top: 1px dashed rgba(10,10,10,.25); flex-shrink: 0; }
+/* --- CHART -------------------------------------------------------- */
+  .s-chart2 .pane-l { grid-column: 1 / span 5; grid-row: 1 / span 8; background: var(--accent); padding: 32px 28px; display: flex; flex-direction: column; justify-content: space-between; }
+.s-chart2 .pane-l .label { font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; }
+.s-chart2 .pane-l h2 { font-weight: 700; font-size: 76px; line-height: .95; text-transform: uppercase; letter-spacing: -.015em; }
+.s-chart2 .pane-l p { font-size: 20px; line-height: 1.45; max-width: 32ch; }
+.s-chart2 .pane-l .legend { display: flex; flex-direction: column; gap: 10px; }
+.s-chart2 .pane-l .legend .li { display: flex; align-items: center; gap: 12px; font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
+.s-chart2 .pane-l .legend .li i { width: 24px; height: 4px; background: var(--ink); }
+.s-chart2 .pane-r { grid-column: 6 / span 7; grid-row: 1 / span 8; background: var(--paper); padding: 32px 28px 28px 80px; position: relative; display: flex; flex-direction: column; overflow: hidden; }
+.s-chart2 .pane-r .yhead { font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; opacity: .7; margin-bottom: 8px; }
+.s-chart2 .plot { flex: 1; min-height: 0; position: relative; border-left: 2px solid var(--ink); border-bottom: 2px solid var(--ink); }
+.s-chart2 .plot .gline { position: absolute; left: 0; right: 0; border-top: 1px dashed rgba(10,10,10,.18); }
+.s-chart2 .plot .yticks { position: absolute; left: -56px; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: space-between; font-family: "JetBrains Mono", monospace; font-size: 14px; }
+.s-chart2 .plot svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+.s-chart2 .pane-r .xticks { display: flex; justify-content: space-between; padding-top: 10px; font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: .08em; }
+/* --- PROCESS DIAGRAM --------------------------------------------- */
+  /* Process — head h2 dropped from 76 to 56 so the headline sits beside the
+     supporting line cleanly. Each node centers its content vertically and
+     uses larger typography so the column feels populated edge-to-edge. */
+  .s-process2 .head { grid-column: 1 / span 12; grid-row: 1 / span 2; padding: 36px 40px; display: flex; align-items: flex-start; justify-content: space-between; gap: 48px; background: var(--paper); }
+.s-process2 .head h2 { font-weight: 700; font-size: 56px; line-height: 1; text-transform: uppercase; letter-spacing: -.015em; }
+.s-process2 .head .sub { font-family: "JetBrains Mono", monospace; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; max-width: 46ch; line-height: 1.55; opacity: .75; flex-shrink: 0; }
+.s-process2 .node { padding: 32px 26px; background: var(--paper); display: flex; flex-direction: column; justify-content: center; gap: 18px; position: relative; }
+.s-process2 .node.n1 { grid-column: 1 / span 2; grid-row: 3 / span 5; }
+.s-process2 .node.n2 { grid-column: 3 / span 2; grid-row: 3 / span 5; background: var(--accent); }
+.s-process2 .node.n3 { grid-column: 5 / span 2; grid-row: 3 / span 5; }
+.s-process2 .node.n4 { grid-column: 7 / span 2; grid-row: 3 / span 5; background: var(--accent); }
+.s-process2 .node.n5 { grid-column: 9 / span 2; grid-row: 3 / span 5; }
+.s-process2 .node.out{ grid-column: 11 / span 2; grid-row: 3 / span 5; background: var(--ink); color: var(--paper); }
+.s-process2 .node .n { font-family: "JetBrains Mono", monospace; font-size: 15px; letter-spacing: .12em; }
+.s-process2 .node h3 { font-weight: 700; font-size: 30px; line-height: 1.05; text-transform: uppercase; letter-spacing: -.005em; }
+.s-process2 .node p  { font-size: 17px; line-height: 1.55; }
+.s-process2 .node .arr { position: absolute; right: -10px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; z-index: 2; color: var(--ink); pointer-events: none; }
+.s-process2 .node.out .arr { display: none; }
+.s-process2 .timeline { grid-column: 1 / span 12; grid-row: 8 / span 1; background: var(--paper); padding: 16px 28px; display: grid; grid-template-columns: repeat(6, 1fr); align-items: center; font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: .1em; text-transform: uppercase; }
+.s-process2 .timeline span { border-right: 1px dashed rgba(10,10,10,.25); padding-right: 12px; }
+.s-process2 .timeline span:last-child { border-right: 0; }
+/* --- COMPARISON MATRIX ------------------------------------------ */
+  .s-matrix2 .head { grid-column: 1 / span 12; grid-row: 1 / span 2; padding: 26px 32px; background: var(--paper); display: flex; align-items: flex-start; justify-content: space-between; gap: 40px; }
+.s-matrix2 .footrow { grid-column: 1 / span 12; grid-row: 8 / span 1; }
+.s-matrix2 .head h2 { font-weight: 700; font-size: 76px; line-height: .95; text-transform: uppercase; letter-spacing: -.015em; }
+.s-matrix2 .head .sub { font-family: "JetBrains Mono", monospace; font-size: 16px; letter-spacing: .08em; text-transform: uppercase; max-width: 46ch; line-height: 1.5; opacity: .75; flex-shrink: 0; }
+.s-matrix2 .table { grid-column: 1 / span 12; grid-row: 3 / span 5; background: var(--paper); display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; grid-auto-rows: 1fr; }
+.s-matrix2 .table .cell { padding: 18px 22px; border-bottom: 1.5px solid var(--ink); border-right: 1.5px solid var(--ink); display: flex; align-items: center; font-size: 24px; line-height: 1.35; }
+.s-matrix2 .table .cell:nth-child(4n) { border-right: 0; }
+.s-matrix2 .table .last { border-bottom: 0; }
+.s-matrix2 .table .head-row { background: var(--ink); color: var(--paper); font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; }
+.s-matrix2 .table .row-label { font-weight: 700; font-size: 22px; text-transform: uppercase; letter-spacing: -.005em; }
+.s-matrix2 .pill { display: inline-block; padding: 6px 14px; font-family: "JetBrains Mono", monospace; font-size: 16px; letter-spacing: .08em; text-transform: uppercase; font-weight: 500; line-height: 1.3; }
+.s-matrix2 .pill.yes  { background: var(--accent); color: var(--ink); }
+.s-matrix2 .pill.part { background: var(--paper); color: var(--ink); border: 1.5px solid var(--ink); }
+.s-matrix2 .pill.no   { background: var(--ink); color: var(--paper); }
+.s-matrix2 .pill.note { background: transparent; color: var(--ink); opacity: .7; padding-left: 0; }
+/* Process slide compactness fixes */
+  .s-process2 .node h3 { font-weight: 700; font-size: 26px; line-height: 1; text-transform: uppercase; letter-spacing: -.005em; }
+.s-process2 .node p  { font-size: 17px; line-height: 1.4; }
+.s-process2 .timeline span { font-size: 14px; }
+/* end fix */
+  /* Consult body sizing */
+  .s-consult .col p   { font-size: 18px; line-height: 1.45; }
+.s-consult .col ul li { font-size: 18px; line-height: 1.5; margin-bottom: 6px; }
+.s-system { background: var(--paper); }
+.s-system .frame { gap: 16px; }
+.s-system .head { grid-column: 1 / span 12; grid-row: 1 / span 1; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; background: transparent; }
+.s-system .head h2 { font-size: 56px; font-weight: 700; text-transform: uppercase; letter-spacing: -.015em; }
+.s-system .head .meta { font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: .08em; }
+.s-system .panel { background: #fff; border: 1.5px solid var(--ink); padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; }
+.s-system .panel h4 { font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; opacity: .65; margin-bottom: 4px; }
+.s-system .panel p, .s-system .panel li { font-size: 16px; line-height: 1.5; }
+.s-system .panel ul { margin: 0; padding-left: 18px; }
+.s-system .pal { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.s-system .pal .sw { aspect-ratio: 1.4 / 1; border: 1.5px solid var(--ink); display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; font-family: "JetBrains Mono", monospace; font-size: 11px; }
+.s-system .pal .sw.b1 { background: var(--bg); }
+.s-system .pal .sw.b2 { background: var(--paper); }
+.s-system .pal .sw.b3 { background: var(--ink); color: var(--paper); }
+.s-system .pal .sw.b4 { background: var(--accent); }
+.s-system .type-row { display: flex; align-items: baseline; gap: 16px; padding: 6px 0; border-bottom: 1px dashed rgba(0,0,0,.15); }
+.s-system .type-row:last-child { border-bottom: 0; }
+.s-system .type-row .sample { font-weight: 700; text-transform: uppercase; letter-spacing: -.01em; }
+.s-system .type-row .lbl    { font-family: "JetBrains Mono", monospace; font-size: 12px; opacity: .65; margin-left: auto; }
+.s-system .p-pal   { grid-column: 1 / span 4; grid-row: 2 / span 4; }
+.s-system .p-type  { grid-column: 5 / span 5; grid-row: 2 / span 4; }
+.s-system .p-grid  { grid-column: 10 / span 3; grid-row: 2 / span 4; }
+.s-system .p-rules { grid-column: 1 / span 7; grid-row: 6 / span 3; }
+.s-system .p-dont  { grid-column: 8 / span 5; grid-row: 6 / span 3; }
+.s-system .gridviz { aspect-ratio: 1 / 1; border: 1.5px solid var(--ink); display: grid; grid-template-columns: repeat(12, 1fr); }
+.s-system .gridviz span { border-right: 1px dashed rgba(0,0,0,.18); }
+.s-system .gridviz span:last-child { border-right: 0; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ============== 1. COVER ================================== -->
+<section class="slide s-cover active" data-name="cover">
+    <div class="frame">
+      <div class="panel-photo-l">
+        <div class="ph"></div>
+      </div>
+      <div class="panel-mid">
+        <div class="qr" aria-hidden="true">
+          <i></i><i class="k"></i><i></i><i class="k"></i><i></i>
+          <i class="k"></i><i></i><i class="k"></i><i></i><i class="k"></i>
+          <i></i><i class="k"></i><i></i><i class="k"></i><i></i>
+          <i class="k"></i><i></i><i class="k"></i><i></i><i class="k"></i>
+          <i></i><i class="k"></i><i></i><i class="k"></i><i></i>
+        </div>
+      </div>
+      <div class="panel-titletile reveal" style="--i: 0;">
+        <div class="title-block">
+          <h1 class="title">The future of<br>data-driven<br>finance</h1>
+        </div>
+        <div class="blockmark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="panel-photo-r">
+        <div class="ph"></div>
+      </div>
+      <div class="panel-cap reveal" style="--i: 1;">
+        <div class="meta-l">
+          ©2025 DIGITS<br>All rights reserved.
+        </div>
+      </div>
+    </div>
+    <div class="pagenum"><span data-page-now="">1</span> / <span data-page-total="">12</span></div>
+  </section>
+
+<!-- ============== 2. CONTENTS =============================== -->
+<section class="slide s-toc" data-name="contents">
+    <div class="frame">
+      <div class="head card reveal" style="--i: 0;">
+        <h1>Contents</h1>
+        <div class="corner-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="row card reveal" style="--i: 1;">
+        <div class="num">01 / Introduction</div>
+        <div>
+          <h3>Digits in numbers</h3>
+          <p>Where we are and what the platform handles today.</p>
+        </div>
+      </div>
+      <div class="row card lemon reveal" style="--i: 2;">
+        <div class="num">02 / Product</div>
+        <div>
+          <h3>Key features</h3>
+          <p>Three primitives that power decision-making at scale.</p>
+        </div>
+      </div>
+      <div class="row card reveal" style="--i: 3;">
+        <div class="num">03 / Market</div>
+        <div>
+          <h3>Penetration &amp; growth</h3>
+          <p>Where we are gaining ground, and where we are next.</p>
+        </div>
+      </div>
+      <div class="row card reveal" style="--i: 4;">
+        <div class="num">04 / Vision</div>
+        <div>
+          <h3>What comes next</h3>
+          <p>The roadmap for the next four quarters.</p>
+        </div>
+      </div>
+      <div class="row card ink reveal" style="--i: 5;">
+        <div class="num" style="opacity:.75">05 / Voice</div>
+        <div>
+          <h3>From our partners</h3>
+          <p style="opacity:.85">Why teams are choosing the platform.</p>
+        </div>
+      </div>
+      <div class="row card lemon reveal" style="--i: 6;">
+        <div class="num">06 / Action</div>
+        <div>
+          <h3>Next steps</h3>
+          <p>Three things to take away from today.</p>
+        </div>
+      </div>
+    </div>
+    <div class="pagenum"><span data-page-now="">1</span> / <span data-page-total="">12</span></div>
+  </section>
+
+<!-- ============== 3. DIGITS IN NUMBERS ====================== -->
+<section class="slide s-stats" data-name="digits in numbers">
+    <div class="frame">
+      <div class="accent-l reveal" style="--i: 0;">
+        <div class="plus">+98.7%</div>
+        <div class="lab">Market penetration</div>
+        <div class="corner-mark" style="top:auto; bottom:22px; right:22px; color:var(--ink)" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="copy reveal" style="--i: 1;">
+        <h2>Digits<br>in <mark>numbers</mark></h2>
+        <p>Empowering businesses with data-driven financial insights. With over 10 million users and 75 million data points analyzed, the platform is reshaping real-time financial decision-making across markets.</p>
+        <div style="margin-top:auto" class="label">Snapshot · Q1 2026</div>
+      </div>
+      <div class="stat-a reveal" style="--i: 2;">
+        <div class="stat-num sm">12.8M</div>
+        <div class="label" style="margin-top:8px">Transactions processed</div>
+      </div>
+      <div class="stat-b reveal" style="--i: 3;">
+        <div class="stat-num sm">41M</div>
+        <div class="label" style="margin-top:8px">Total revenue impacted ($)</div>
+      </div>
+      <div class="stat-c reveal" style="--i: 4;">
+        <div class="stat-num sm">15.4M</div>
+        <div class="label" style="margin-top:8px">Users engaged</div>
+      </div>
+      <div class="stat-big reveal" style="--i: 5;">
+        <div class="label">Data points analyzed</div>
+        <div class="v">85.6M</div>
+        <div class="arrow-out arrow" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4"><path d="M8 32 H56 M40 16 L56 32 L40 48"></path></svg>
+        </div>
+      </div>
+    </div>
+    <div class="pagenum lemon"><span data-page-now="">1</span> / <span data-page-total="">12</span></div>
+  </section>
+
+<!-- ============== 4. KEY FEATURES =========================== -->
+<section class="slide s-features" data-name="key features">
+    <div class="frame">
+      <div class="head reveal" style="--i: 0;">
+        <h2>Key features</h2>
+        <div class="label">Three primitives</div>
+      </div>
+      <div class="feat reveal" style="--i: 1;">
+        <div class="pic"><div class="ph"></div><div class="tag">01</div></div>
+        <h3>Seamless transactions</h3>
+        <p>Effortless and secure digital payments with real-time processing, ensuring a smooth experience for every user across every channel.</p>
+      </div>
+      <div class="feat reveal" style="--i: 2;">
+        <div class="pic"><div class="ph"></div><div class="tag">02</div></div>
+        <h3>Data insights</h3>
+        <p>Leverage advanced analytics to uncover patterns, surface anomalies, and unlock new opportunities for the business.</p>
+      </div>
+      <div class="feat reveal" style="--i: 3;">
+        <div class="pic"><div class="ph"></div><div class="tag">03</div></div>
+        <h3>Risk modelling</h3>
+        <p>Predictive models tuned on billions of events score risk in milliseconds, so teams can act before exposure compounds.</p>
+      </div>
+    </div>
+    <div class="pagenum"><span data-page-now="">1</span> / <span data-page-total="">12</span></div>
+  </section>
+
+<!-- ============== 5. MARKET PENETRATION ===================== -->
+<section class="slide s-chart" data-name="market penetration">
+    <div class="frame">
+      <div class="pane-l reveal" style="--i: 0;">
+        <div>
+          <div class="label" style="opacity:.7; color:var(--paper); margin-bottom:24px">Section 03 / Market</div>
+          <h2>Market<br>penetration<br>doubled.</h2>
+        </div>
+        <p>Year-on-year reach across our six largest regions. The platform now touches roughly one in three small-business accounts in core markets.</p>
+        <div class="yearlabel">FY24 vs FY25 · Indexed (FY23 = 100)</div>
+      </div>
+      <div class="pane-r reveal" style="--i: 1;">
+        <div class="legend">
+          <div class="li"><i></i> FY24</div>
+          <div class="li b"><i></i> FY25</div>
+        </div>
+        <div class="bars">
+          <div class="bar"><div class="a" style="height:42%"></div><div class="b" style="height:78%"></div></div>
+          <div class="bar"><div class="a" style="height:55%"></div><div class="b" style="height:88%"></div></div>
+          <div class="bar"><div class="a" style="height:36%"></div><div class="b" style="height:62%"></div></div>
+          <div class="bar"><div class="a" style="height:64%"></div><div class="b" style="height:94%"></div></div>
+          <div class="bar"><div class="a" style="height:48%"></div><div class="b" style="height:72%"></div></div>
+          <div class="bar"><div class="a" style="height:30%"></div><div class="b" style="height:54%"></div></div>
+        </div>
+        <div class="xaxis">
+          <span>NA</span><span>EU</span><span>LATAM</span><span>APAC</span><span>MENA</span><span>SSA</span>
+        </div>
+      </div>
+    </div>
+    <div class="pagenum invert"><span data-page-now="">1</span> / <span data-page-total="">12</span></div>
+  </section>
+
+<!-- ============== 6. SECTION DIVIDER ======================== -->
+<section class="slide s-section" data-name="section · vision">
+    <div class="frame">
+      <div class="pane-num reveal" style="--i: 0;">
+        <div class="lab">Section · Vision</div>
+        <div class="n">02</div>
+        <div class="corner-mark" style="top:auto; bottom:22px; right:22px;" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="pane-title reveal" style="--i: 1;">
+        <div class="label" style="color:var(--paper); opacity:.7">What comes next</div>
+        <h2>Build the<br>engine of<br><mark>modern&nbsp;money.</mark></h2>
+        <p>We are betting that the next decade of finance is owned by platforms that can model the world in real time, then act on it without a human in the loop.</p>
+      </div>
+    </div>
+    <div class="pagenum lemon"><span data-page-now="">1</span> / <span data-page-total="">12</span></div>
+  </section>
+
+<!-- ============== 7. CLIENT VOICE / QUOTE =================== -->
+<section class="slide s-quote" data-name="client voice">
+    <div class="frame">
+      <div class="photo reveal" style="--i: 0;">
+        <div class="ph"></div>
+        <div class="tag">PORTRAIT / B&amp;W</div>
+      </div>
+      <div class="copy reveal" style="--i: 1;">
+        <div class="qmark">"</div>
+        <blockquote>The platform replaced four legacy systems and a quarterly committee. We now decide in minutes what used to take a month.</blockquote>
+      </div>
+      <div class="attr reveal" style="--i: 2;">
+        <div class="role">CFO · Mid-market retailer</div>
+        <div class="who">Marta Aguilar</div>
+      </div>
+      <div class="mark">
+        <div class="blockmark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      </div>
+    </div>
+    <div class="pagenum"><span data-page-now="">1</span> / <span data-page-total="">12</span></div>
+  </section>
+
+<!-- ============== 8. NEXT STEPS / CTA ======================= -->
+<section class="slide s-cta" data-name="next steps">
+    <div class="frame">
+      <div class="head reveal" style="--i: 0;">
+        <div class="lab">Take three things away</div>
+        <h2>Next<br>steps</h2>
+      </div>
+      <div class="qr">
+        <svg viewBox="0 0 9 9" shape-rendering="crispEdges" aria-hidden="true">
+          <rect width="9" height="9" fill="#0a0a0a"></rect>
+          <g fill="#E6FF3D">
+            <rect x="1" y="1" width="1" height="1"></rect><rect x="3" y="1" width="1" height="1"></rect><rect x="5" y="1" width="1" height="1"></rect><rect x="7" y="1" width="1" height="1"></rect>
+            <rect x="2" y="2" width="1" height="1"></rect><rect x="4" y="2" width="1" height="1"></rect><rect x="6" y="2" width="1" height="1"></rect>
+            <rect x="1" y="3" width="1" height="1"></rect><rect x="3" y="3" width="1" height="1"></rect><rect x="5" y="3" width="1" height="1"></rect><rect x="7" y="3" width="1" height="1"></rect>
+            <rect x="2" y="4" width="1" height="1"></rect><rect x="6" y="4" width="1" height="1"></rect>
+            <rect x="1" y="5" width="1" height="1"></rect><rect x="3" y="5" width="1" height="1"></rect><rect x="5" y="5" width="1" height="1"></rect><rect x="7" y="5" width="1" height="1"></rect>
+            <rect x="2" y="6" width="1" height="1"></rect><rect x="4" y="6" width="1" height="1"></rect><rect x="6" y="6" width="1" height="1"></rect>
+            <rect x="1" y="7" width="1" height="1"></rect><rect x="3" y="7" width="1" height="1"></rect><rect x="5" y="7" width="1" height="1"></rect><rect x="7" y="7" width="1" height="1"></rect>
+          </g>
+        </svg>
+      </div>
+      <div class="step a reveal" style="--i: 1;">
+        <div class="num">01 · Today</div>
+        <h3>Pilot one workflow</h3>
+        <p>Pick a single decision your team makes weekly. Wire it through the platform and benchmark against the current process.</p>
+        <div class="label">≈ 2 weeks</div>
+      </div>
+      <div class="step b reveal" style="--i: 2;">
+        <div class="num">02 · Next month</div>
+        <h3>Scale the wedge</h3>
+        <p>Expand the pilot to two adjacent workflows. Use the playbook the integrations team will share by Friday.</p>
+        <div class="label">≈ 6 weeks</div>
+      </div>
+      <div class="step c reveal" style="--i: 3;">
+        <div class="num" style="opacity:.7">03 · This quarter</div>
+        <h3>Make it the default</h3>
+        <p style="opacity:.85">Retire the legacy stack for that domain. Move the freed-up budget into the next bet.</p>
+        <div class="arrow" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none" stroke="#E6FF3D" stroke-width="4"><path d="M8 32 H56 M40 16 L56 32 L40 48"></path></svg>
+        </div>
+      </div>
+    </div>
+    <div class="pagenum"><span data-page-now="">1</span> / <span data-page-total="">12</span></div>
+  </section>
+
+<!-- ============== 9. CONSULT (text-dense action title) ====== -->
+<section class="slide s-consult" data-name="findings · detail">
+    <div class="frame">
+      <div class="head reveal" style="--i: 0;">
+        <div class="tag">Action title · 09</div>
+        <h2>The trust gap is built in the first 72 hours, not the first 7 days — and the cost compounds for the rest of the lifecycle.</h2>
+      </div>
+      <div class="col a reveal" style="--i: 1;">
+        <h3>What we found</h3>
+        <div class="col-body">
+          <p><strong>Three behavioural signals</strong> in the first 72 hours predict 18-month retention better than any feature-usage metric we tracked.</p>
+          <ul>
+            <li><strong>Email open #2</strong> — opening the second lifecycle email lifts D90 retention by 19 points.</li>
+            <li><strong>Personal salutation</strong> — accounts that received a written welcome retained 2.4× the cohort.</li>
+            <li><strong>Reply received</strong> — a single human reply within 24 hours is the single largest lever measured.</li>
+            <li><strong>Mobile-first session</strong> — a same-day mobile sign-in doubled the chance of a second-week return visit.</li>
+          </ul>
+        </div>
+        <div class="src">N = 14,200 · Q1 2026</div>
+      </div>
+      <div class="col b reveal" style="--i: 2;">
+        <h3>Why it matters</h3>
+        <div class="col-body">
+          <div class="meta">$4.1M projected retained ARR — current cohort.</div>
+          <p>The first three days are the only window where customers are both paying attention and willing to write back. Every interaction here does the work of roughly four interactions in week three.</p>
+          <p>The cost of getting this wrong is not refunds — it is the long, quiet churn of an account that never returns to the inbox, never opens another email, never sees the product again.</p>
+          <p>Replicated on three independent cohorts. The signal is the same in every segment we have tested.</p>
+        </div>
+        <div class="src">Modelled on FY24 cohort behaviour</div>
+      </div>
+      <div class="col c reveal" style="--i: 3;">
+        <h3>What to do</h3>
+        <div class="col-body">
+          <ul>
+            <li><strong>Rewrite emails 1–3</strong> in human voice; ship behind a 50/50 holdout. Owner: lifecycle. Due: May 17.</li>
+            <li><strong>Route every signup</strong> to a named human for one personal reply within 24h, capped at the top 200 accounts/day. Owner: success. Due: May 24.</li>
+            <li><strong>Instrument the 72-hour window</strong> as a first-class metric in the weekly review. Owner: analytics. Due: June 1.</li>
+            <li><strong>Run a quarterly teardown</strong> of the bottom decile — the cohorts that never made it to email #2 — to find the next lever. Owner: research. Due: June 30.</li>
+          </ul>
+        </div>
+        <div class="src">Pilot scope: top-decile signups</div>
+      </div>
+    </div>
+    <div class="pagenum"><span data-page-now="">1</span> / <span data-page-total="">12</span></div>
+  </section>
+
+<!-- ============== 10. CHART (retention curve) ================ -->
+<section class="slide s-chart2" data-name="retention curve">
+    <div class="frame">
+      <div class="pane-l reveal" style="--i: 0;">
+        <div>
+          <div class="label" style="margin-bottom:18px">Section · Evidence</div>
+          <h2>The curve<br>bends at<br>day three.</h2>
+        </div>
+        <p>Cohorts that received a written welcome and a human reply within 24 hours retain at roughly 2× the rate of the templated cohort, and the gap holds for ninety days.</p>
+        <div class="legend">
+          <div class="li"><i style="background:var(--ink); height:2px"></i> Templated welcome (control)</div>
+          <div class="li"><i style="background:var(--ink); height:5px"></i> Written welcome</div>
+          <div class="li"><i style="background:var(--ink); height:8px"></i> Written + human reply</div>
+        </div>
+      </div>
+      <div class="pane-r reveal" style="--i: 1;">
+        <div class="yhead">% of cohort active, by day</div>
+        <div class="plot">
+          <div class="yticks">
+            <span>100</span><span>75</span><span>50</span><span>25</span><span>0</span>
+          </div>
+          <div class="gline" style="top:0%"></div>
+          <div class="gline" style="top:25%"></div>
+          <div class="gline" style="top:50%"></div>
+          <div class="gline" style="top:75%"></div>
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <polyline fill="none" stroke="#0a0a0a" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2,1.5" points="0,4 16,30 32,50 48,64 64,76 80,84 100,90"></polyline>
+            <polyline fill="none" stroke="#0a0a0a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" points="0,4 16,18 32,28 48,38 64,46 80,52 100,56"></polyline>
+            <polyline fill="none" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" points="0,4 16,10 32,16 48,22 64,28 80,32 100,36"></polyline>
+            <circle cx="100" cy="36" r="2" fill="#E6FF3D" stroke="#0a0a0a" stroke-width="1"></circle>
+          </svg>
+        </div>
+        <div class="xticks">
+          <span>D0</span><span>D7</span><span>D14</span><span>D30</span><span>D45</span><span>D60</span><span>D90</span>
+        </div>
+      </div>
+    </div>
+    <div class="pagenum lemon"><span data-page-now="">1</span> / <span data-page-total="">12</span></div>
+  </section>
+
+<!-- ============== 11. PROCESS DIAGRAM ======================== -->
+<section class="slide s-process2" data-name="process">
+    <div class="frame">
+      <div class="head reveal" style="--i: 0;">
+        <h2>From insight<br>to default,<br>in five moves.</h2>
+        <div class="sub">A repeatable path each pilot follows end-to-end before it is allowed to graduate to the default experience for every customer.</div>
+      </div>
+      <div class="node n1">
+        <div class="n">01 · Frame</div>
+        <h3>Hypothesise</h3>
+        <p>Translate the insight into a single behavioural hypothesis we can falsify within a sprint.</p>
+        <svg class="arr" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 16 H26 M20 9 L26 16 L20 23"></path></svg>
+      </div>
+      <div class="node n2">
+        <div class="n">02 · Design</div>
+        <h3>Sketch</h3>
+        <p>Smallest end-to-end change that lets the hypothesis be tested cleanly.</p>
+        <svg class="arr" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 16 H26 M20 9 L26 16 L20 23"></path></svg>
+      </div>
+      <div class="node n3">
+        <div class="n">03 · Pilot</div>
+        <h3>Ship 50/50</h3>
+        <p>Holdout in one segment. Hold the line for two cycles before reading.</p>
+        <svg class="arr" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 16 H26 M20 9 L26 16 L20 23"></path></svg>
+      </div>
+      <div class="node n4">
+        <div class="n">04 · Read</div>
+        <h3>Decide</h3>
+        <p>Pre-registered metrics only. Kill, scale, or extend — not three of three.</p>
+        <svg class="arr" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 16 H26 M20 9 L26 16 L20 23"></path></svg>
+      </div>
+      <div class="node n5">
+        <div class="n">05 · Default</div>
+        <h3>Graduate</h3>
+        <p>Promote to the default surface and retire the legacy path inside the same release.</p>
+        <svg class="arr" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 16 H26 M20 9 L26 16 L20 23"></path></svg>
+      </div>
+      <div class="node out">
+        <div class="n" style="opacity:.7">Outcome</div>
+        <h3>New default</h3>
+        <p style="opacity:.85">A change every customer feels — backed by a result we can show.</p>
+      </div>
+      <div class="timeline reveal" style="--i: 1;">
+        <span>Week 1 · Frame</span>
+        <span>Week 2–3 · Design</span>
+        <span>Week 3–6 · Pilot</span>
+        <span>Week 7 · Read</span>
+        <span>Week 8 · Default</span>
+        <span style="border-right:0">Total · 8 weeks</span>
+      </div>
+    </div>
+    <div class="pagenum"><span data-page-now="">1</span> / <span data-page-total="">12</span></div>
+  </section>
+
+<!-- ============== 12. COMPARISON MATRIX ====================== -->
+<section class="slide s-matrix2" data-name="comparison">
+    <div class="frame">
+      <div class="head reveal" style="--i: 0;">
+        <h2>Where each<br>pilot earns<br>its keep.</h2>
+        <div class="sub">Scored against the four levers that matter most this cycle. We will only carry forward bets that win on at least two.</div>
+      </div>
+      <div class="table reveal" style="--i: 1;">
+        <div class="cell head-row">Lever</div>
+        <div class="cell head-row">Rewrite welcome</div>
+        <div class="cell head-row">Quiet upgrades</div>
+        <div class="cell head-row">Inbox-as-search</div>
+
+        <div class="cell row-label">Time-to-impact</div>
+        <div class="cell"><span class="pill yes">≤ 4 weeks</span></div>
+        <div class="cell"><span class="pill part">6–8 weeks</span></div>
+        <div class="cell"><span class="pill yes">≤ 4 weeks</span></div>
+
+        <div class="cell row-label">Build cost</div>
+        <div class="cell"><span class="pill yes">Low</span></div>
+        <div class="cell"><span class="pill part">Medium</span></div>
+        <div class="cell"><span class="pill yes">Low</span></div>
+
+        <div class="cell row-label">Retention lift (model)</div>
+        <div class="cell"><span class="pill yes">+19 pts D90</span></div>
+        <div class="cell"><span class="pill part">+7 pts D90</span></div>
+        <div class="cell"><span class="pill part">+5 pts D90</span></div>
+
+        <div class="cell row-label last">Risk to power users</div>
+        <div class="cell last"><span class="pill yes">None</span></div>
+        <div class="cell last"><span class="pill no">Material</span></div>
+        <div class="cell last"><span class="pill note">Soft, reversible</span></div>
+      </div>
+    </div>
+    <div class="pagenum lemon"><span data-page-now="">1</span> / <span data-page-total="">12</span></div>
+  </section>
+
+<!-- ============== 9. DESIGN SYSTEM ANNOTATIONS ============== -->
+
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">12</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   Scales the stage (1920x1080 unless the deck's CSS says otherwise)
+   into the window, navigates with the
+   keyboard, touch and wheel, and exposes the hooks the editor uses:
+   - reads --ed-panel on <html> (space reserved for a side panel)
+   - listens for deck:rescale
+   - dispatches deck:slide (detail = slide index)
+   - honours #n in the URL to show slide n
+   Part of the Diapo Format. Copyright (c) 2026 Daniele Rossetto. MIT licence (SPDX-License-Identifier: MIT);
+   free to keep in any deck.
+   =========================================== */
+class SlidePresentation {
+    constructor() {
+        this.stage = document.getElementById('deckStage');
+        this.current = 0;
+        this.setupStageScale();
+        this.setupKeyboardNav();
+        this.setupTouchNav();
+        this.setupWheelNav();
+        this.setupControls();
+        const fromHash = () => parseInt(location.hash.replace('#', ''), 10);
+        this.showSlide(Number.isFinite(fromHash()) ? fromHash() - 1 : 0, true);
+        window.addEventListener('hashchange', () => {
+            const n = fromHash();
+            if (Number.isFinite(n) && n - 1 !== this.current) this.showSlide(n - 1);
+        });
+    }
+
+    /* Slides are read live so the editor can add and remove them. */
+    get slides() { return Array.from(this.stage.querySelectorAll('.slide')); }
+
+    setupStageScale() {
+        const scale = () => {
+            const pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ed-panel')) || 0;
+            const vw = window.innerWidth - pad, vh = window.innerHeight;
+            const sw = this.stage.offsetWidth || 1920, sh = this.stage.offsetHeight || 1080;
+            const factor = Math.min(vw / sw, vh / sh);
+            const x = (vw - sw * factor) / 2, y = (vh - sh * factor) / 2;
+            this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
+        };
+        scale();
+        window.addEventListener('resize', scale);
+        document.addEventListener('deck:rescale', scale);
+    }
+
+    setupKeyboardNav() {
+        document.addEventListener('keydown', (e) => {
+            if (e.target.getAttribute && e.target.getAttribute('contenteditable') === 'true') return;
+            switch (e.key) {
+                case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': e.preventDefault(); this.next(); break;
+                case 'ArrowLeft': case 'ArrowUp': case 'PageUp': e.preventDefault(); this.prev(); break;
+                case 'Home': e.preventDefault(); this.showSlide(0); break;
+                case 'End': e.preventDefault(); this.showSlide(this.slides.length - 1); break;
+                case 'h': case 'H': if (!e.ctrlKey && !e.metaKey && !e.altKey) document.documentElement.classList.toggle('deck-controls-off'); break;
+            }
+        });
+    }
+
+    /* The on-screen controls: click to move, faded out after 2 s without mouse
+       movement (not while the mouse is over them) and back on the first move or
+       touch. H hides them altogether, for when the mouse is needed where they sit. */
+    setupControls() {
+        document.getElementById('btnPrev').addEventListener('click', () => this.prev());
+        document.getElementById('btnNext').addEventListener('click', () => this.next());
+        const root = document.documentElement, box = document.querySelector('.deck-controls');
+        let timer = null, over = false;
+        const idle = () => { if (!over) root.classList.add('deck-controls-idle'); };
+        const wake = () => { root.classList.remove('deck-controls-idle'); clearTimeout(timer); timer = setTimeout(idle, 2000); };
+        box.addEventListener('mouseenter', () => { over = true; });
+        box.addEventListener('mouseleave', () => { over = false; wake(); });
+        document.addEventListener('mousemove', wake, { passive: true });
+        document.addEventListener('touchstart', wake, { passive: true });
+        timer = setTimeout(idle, 2000);
+    }
+
+    setupTouchNav() {
+        let x0 = null, y0 = null;
+        document.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+        document.addEventListener('touchend', (e) => {
+            if (x0 === null) return;
+            const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) (dx < 0 ? this.next() : this.prev());
+            x0 = y0 = null;
+        }, { passive: true });
+    }
+
+    setupWheelNav() {
+        let lock = false;
+        document.addEventListener('wheel', (e) => {
+            if (lock || Math.abs(e.deltaY) < 30) return;
+            lock = true; setTimeout(() => lock = false, 700);
+            e.deltaY > 0 ? this.next() : this.prev();
+        }, { passive: true });
+    }
+
+    next() { this.showSlide(this.current + 1); }
+    prev() { this.showSlide(this.current - 1); }
+
+    showSlide(index, initial = false) {
+        const slides = this.slides;
+        this.current = Math.max(0, Math.min(index, slides.length - 1));
+        slides.forEach((s, i) => {
+            const on = i === this.current;
+            s.classList.toggle('active', on);
+            if (on) requestAnimationFrame(() => requestAnimationFrame(() => s.classList.add('visible')));
+            else s.classList.remove('visible');
+        });
+        document.querySelectorAll('#pageNow, [data-page-now]').forEach(e => { e.textContent = this.current + 1; });
+        document.querySelectorAll('#pageTotal, [data-page-total]').forEach(e => { e.textContent = slides.length; });
+        document.dispatchEvent(new CustomEvent('deck:slide', { detail: this.current }));
+        // A sandboxed preview (Teams, SharePoint, a srcdoc frame) cannot change its URL: keep the page going.
+        if (!initial || location.hash) { try { history.replaceState(null, '', '#' + (this.current + 1)); } catch (e) { /* URL stays as it is */ } }
+    }
+}
+
+new SlidePresentation();
+</script>
+
+<!-- Presentation features: P presenter, O overview, L laser, D draw, Space steps through fragments. Added by the deck editor; safe to delete. -->
+<script id="deck-runtime">
+/* ============================================================
+   DECK RUNTIME - presentation features for standalone HTML decks.
+   No dependencies. The deck editor puts this script at the end of the body
+   (Presenter menu > "Add presentation features to this deck"); it is
+   also part of new decks. Safe to delete: the deck then only has
+   its own navigation.
+
+   Keys in the deck
+     P, Shift+F5      presenter window (current + next slide, notes,
+                      timer, clock); arrows there move the deck too
+     O                overview: a grid of all slides; click or arrows +
+                      Enter to jump,
+                      O or Esc closes
+     A                run by itself: each slide (and each fragment) waits
+                      its data-auto-advance seconds, then moves on
+     L                laser pointer on / off
+     D                draw on the slide (a layer over it, never saved):
+                      1-5 colours, [ ] thinner / thicker, Ctrl+Z undo,
+                      C clear this slide, D or Esc done
+     Space / Right / Down / PgDn   next fragment, then next slide
+     Left / Up / PgUp              previous fragment, then previous slide
+
+   Markup it understands
+     [data-fragment]                    revealed one step at a time
+     [data-fragment-index="n"]          order (equal numbers together)
+     <section class="slide" data-auto-animate>
+                                        morph matching elements into the
+                                        next slide (matched by data-id,
+                                        else by tag + text / image src):
+                                        they travel and resize into place,
+                                        colours and corners tween, a shape
+                                        (an svg of one path) morphs outline
+                                        to outline into another, and two
+                                        that do not look alike cross-fade
+     data-transition="fade|slide|zoom|up|none"
+                                        how a slide comes in (cross-fade, push,
+                                        push up, cross-zoom), on the slide or
+                                        (as the default) on .deck-stage;
+                                        data-transition-duration="0.5" in seconds
+     data-text-effect="letters|words|typewriter"
+                                        the text appears piece by piece when its
+                                        slide shows (or when it is revealed as a
+                                        fragment); data-text-effect-speed="1"
+                                        scales the pace
+     data-section="Name"                the slide starts a section (shown in the
+                                        overview and the editor's slide strip)
+     data-auto-advance="8"              the deck moves on by itself after 8 seconds
+                                        (fragments first, a step at a time); on a slide,
+                                        or on .deck-stage for every slide.
+                                        data-loop on .deck-stage starts again at the end.
+                                        A key or a click stops it; A starts and stops it
+     data-href="https://..."            a click on the element (a picture, an icon,
+                                        a shape, a text box) opens the address in a
+                                        new tab; data-href-target="_self" in this one
+     <aside class="notes" hidden>       speaker notes
+
+   Requirements
+     The deck shows slide n for location.hash "#n" and dispatches
+     deck:slide (or updates the hash) when it navigates. The deck
+     editor's template does both.
+
+   Licence
+     Part of the Diapo Format. Copyright (c) 2026 Daniele Rossetto. MIT licence (SPDX-License-Identifier: MIT);
+     free to keep in any deck.
+   ============================================================ */
+(function () {
+    'use strict';
+    if (window.deckRuntime) return;
+
+    var editing = function () { return document.documentElement.classList.contains('deck-editing'); };
+    var stage = document.querySelector('.deck-stage');
+    if (!stage) return;
+
+    /* ---------- reading the deck ---------- */
+    function slides() { return Array.prototype.slice.call(stage.querySelectorAll('.slide')); }
+    function current() {
+        var all = slides();
+        for (var i = 0; i < all.length; i++) if (all[i].classList.contains('active')) return i;
+        var n = parseInt(location.hash.replace('#', ''), 10);
+        return isFinite(n) && n >= 1 ? Math.min(n, all.length) - 1 : 0;
+    }
+    function stageScale() {
+        var m = getComputedStyle(stage).transform;
+        if (!m || m === 'none') return 1;
+        var a = parseFloat(m.split('(')[1]);
+        return a || 1;
+    }
+    function notesOf(slide) {
+        if (!slide) return '';
+        var aside = slide.querySelector(':scope > aside.notes, :scope > .notes');
+        if (aside) {
+            var t = document.createElement('div');
+            t.innerHTML = aside.innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li)>/gi, '\n');
+            return t.textContent.replace(/[ \t]+\n/g, '\n').trim();
+        }
+        var n = slide.previousSibling;
+        while (n && n.nodeType === 3 && !n.textContent.trim()) n = n.previousSibling;
+        if (n && n.nodeType === 8) {
+            var text = n.textContent.split('\n').map(function (l) { return l.replace(/^[\s=\-*#]+|[\s=\-*#]+$/g, ''); }).filter(Boolean).join('\n').trim();
+            if (text && !/^slides?\s*\d+(\s*[-\u2013\u2014]\s*\d+)?\b/i.test(text)) return text;
+        }
+        return '';
+    }
+    function labelOf(slide) {
+        if (slide.getAttribute('data-name')) return slide.getAttribute('data-name');
+        var h = slide.querySelector('h1, h2, h3');
+        return h ? h.textContent.trim().replace(/\s+/g, ' ').slice(0, 40) : '';
+    }
+    function goTo(index) {
+        var n = Math.max(0, Math.min(index, slides().length - 1));
+        if (n === current()) return;
+        location.hash = '#' + (n + 1);                         // the deck's controller does the rest
+    }
+
+    /* ---------- base styles for fragments and the overview ---------- */
+    var style = document.createElement('style');
+    style.id = 'deck-runtime-style';
+    style.textContent = [
+        '.deck-stage [data-href]{cursor:pointer}',
+        '.deck-stage [data-fragment]:not(.visible){opacity:0;pointer-events:none}',
+        '.deck-stage [data-fragment].visible{opacity:1}',
+        '.deck-stage [data-fragment]:not([data-anim]){transition:opacity .4s ease}',
+        'html.deck-editing .deck-stage [data-fragment]{opacity:1!important;pointer-events:auto!important}',
+        // The overview: a grid of framed tiles with a numbered caption under each, sections as
+        // headed rows. grid-auto-rows:max-content is what keeps the rows as tall as the tiles:
+        // with auto rows Chrome sizes the track from the aspect-ratio box's minimum contribution
+        // and the rows overlap.
+        '.deck-overview{position:fixed;inset:0;z-index:100000;background:#0f1013;overflow:auto;padding:24px 40px 56px;display:grid;gap:30px 28px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));grid-auto-rows:max-content;align-content:start;font:12px/1.3 system-ui,sans-serif;color:#9a9da6}',
+        '.deck-overview .ov-head{grid-column:1/-1;display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:-6px}',
+        '.deck-overview .ov-head b{color:#e8e9ec;font-weight:600;font-size:13px}',
+        '.deck-overview .ov-head kbd{font:inherit;color:#c8cad1;border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:1px 5px}',
+        '.deck-overview .ov-tile{position:relative;cursor:pointer;outline:none}',
+        '.deck-overview .ov-frame{position:relative;aspect-ratio:var(--deck-ar,16/9);background:#000;border-radius:6px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.14),0 6px 18px rgba(0,0,0,.45);transition:transform .15s ease,box-shadow .15s ease}',
+        '.deck-overview .ov-tile:hover .ov-frame{transform:translateY(-2px);box-shadow:0 0 0 2px #9ab8ff,0 10px 24px rgba(0,0,0,.5)}',
+        '.deck-overview .ov-tile.current .ov-frame{box-shadow:0 0 0 3px #4d8dff,0 6px 18px rgba(0,0,0,.45)}',
+        '.deck-overview .ov-cap{display:flex;align-items:baseline;gap:8px;margin-top:9px;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+        '.deck-overview .ov-tile.current .ov-cap{color:#c8cad1}',
+        '.deck-overview .ov-n{flex:none;font-weight:700;color:#e8e9ec;font-variant-numeric:tabular-nums}',
+        '.deck-overview .ov-t{overflow:hidden;text-overflow:ellipsis}',
+        '.deck-overview .ov-section{grid-column:1/-1;color:#c8cad1;font:600 13px/1.2 system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;padding:14px 2px 0;margin-bottom:-8px;border-top:1px solid rgba(255,255,255,.12)}',
+        '.deck-overview .ov-inner{position:absolute;left:0;top:0;width:var(--deck-w,1920px);height:var(--deck-h,1080px);transform-origin:0 0;background:#fff;pointer-events:none}',
+        '.deck-overview .ov-inner *{transition:none!important;animation:none!important}',
+        '.deck-overview .ov-inner [data-fragment]{opacity:1!important}',
+        'html.deck-laser-on, html.deck-laser-on *{cursor:none!important}',
+        '.deck-laser{position:fixed;left:-100px;top:-100px;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:radial-gradient(circle,#fff 0 18%,#ff2d2d 30%,rgba(255,45,45,.85) 55%,rgba(255,45,45,0) 75%);box-shadow:0 0 18px 6px rgba(255,45,45,.55);pointer-events:none;z-index:100001;opacity:0}',
+        '.deck-draw{position:fixed;inset:0;z-index:99999;cursor:crosshair;touch-action:none}',
+        'html.deck-drawing .deck-controls{display:none!important}',
+        '.deck-draw-bar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:100000;display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:12px;background:rgba(20,21,26,.92);box-shadow:0 8px 24px rgba(0,0,0,.35);font:12px system-ui,sans-serif}',
+        '.deck-draw-bar button{height:28px;min-width:28px;padding:0 8px;border:2px solid transparent;border-radius:8px;background:#2a2d35;color:#fff;font:inherit;cursor:pointer}',
+        '.deck-draw-bar button[data-colour]{width:28px;padding:0}.deck-draw-bar button.on{border-color:#fff}.deck-draw-bar button:hover{filter:brightness(1.15)}',
+        '.deck-draw-bar .sep{width:1px;height:20px;background:#3a3d46;margin:0 2px}',
+    ].join('\n');
+    document.head.appendChild(style);
+
+    /* ============================================================
+       FRAGMENTS
+       ============================================================ */
+    function fragmentsOf(slide) {
+        var els = Array.prototype.slice.call(slide.querySelectorAll('[data-fragment]'));
+        var items = els.map(function (el, i) {
+            var explicit = parseInt(el.getAttribute('data-fragment-index'), 10);
+            return { el: el, order: isFinite(explicit) ? explicit : i, pos: i };
+        });
+        items.sort(function (a, b) { return a.order - b.order || a.pos - b.pos; });
+        // Groups: equal order numbers reveal together.
+        var groups = [];
+        items.forEach(function (it) {
+            var last = groups[groups.length - 1];
+            if (last && last.order === it.order) last.els.push(it.el); else groups.push({ order: it.order, els: [it.el] });
+        });
+        return groups;
+    }
+    function nextFragment() {
+        var slide = slides()[current()]; if (!slide) return false;
+        var groups = fragmentsOf(slide);
+        for (var i = 0; i < groups.length; i++) {
+            if (!groups[i].els[0].classList.contains('visible')) {
+                groups[i].els.forEach(function (el) { el.classList.add('visible'); if (el.hasAttribute('data-text-effect')) playTextEffect(el); });
+                notify();
+                return true;
+            }
+        }
+        return false;
+    }
+    function prevFragment() {
+        var slide = slides()[current()]; if (!slide) return false;
+        var groups = fragmentsOf(slide);
+        for (var i = groups.length - 1; i >= 0; i--) {
+            if (groups[i].els[0].classList.contains('visible')) {
+                groups[i].els.forEach(function (el) { el.classList.remove('visible'); });
+                notify();
+                return true;
+            }
+        }
+        return false;
+    }
+    function setFragments(slide, visible) {
+        if (!slide) return;
+        Array.prototype.forEach.call(slide.querySelectorAll('[data-fragment]'), function (el) { el.classList.toggle('visible', visible); });
+    }
+    function fragmentState(slide) {
+        var groups = fragmentsOf(slide || slides()[current()]);
+        var shown = 0;
+        groups.forEach(function (g) { if (g.els[0].classList.contains('visible')) shown++; });
+        return { total: groups.length, shown: shown };
+    }
+
+    function next() { if (editing()) return; if (!nextFragment()) goTo(current() + 1); }
+    function prev() { if (editing()) return; if (!prevFragment()) goTo(current() - 1); }
+
+    /* When a slide is entered going forward its fragments start hidden; going back
+       they are all shown, so the audience sees what they saw before. */
+    var lastIndex = current();
+    /* A page counter in the master layer (Insert > Footer on every slide writes data-page-now /
+       data-page-total; the template's own script handles its #pageNow). */
+    function syncCounter() {
+        var all = slides(), i = current();
+        Array.prototype.forEach.call(document.querySelectorAll('.deck-stage [data-page-now]'), function (e) { e.textContent = String(i + 1); });
+        Array.prototype.forEach.call(document.querySelectorAll('.deck-stage [data-page-total]'), function (e) { e.textContent = String(all.length); });
+    }
+    function onSlideChange() {
+        var i = current();
+        if (autoOn) autoSchedule();
+        syncCounter();
+        if (i === lastIndex) return;
+        var forward = i > lastIndex;
+        var from = slides()[lastIndex], to = slides()[i];
+        lastIndex = i;
+        if (!editing()) {
+            setFragments(to, !forward);
+            var morphing = forward && from && to && from.hasAttribute('data-auto-animate');
+            if (morphing) autoAnimate(from, to);
+            else playTransition(to, forward, from);
+            textEffects(to);
+        }
+        notify();
+    }
+
+    /* ============================================================
+       SLIDE TRANSITIONS, with the Web Animations API so the deck's own
+       CSS needs nothing. Both slides take part: the deck's CSS hides
+       the outgoing slide at once, so it is kept visible (a keyframe
+       with visibility: visible wins over the stylesheet) while it
+       fades or moves out under the incoming one, which sits on top.
+       ============================================================ */
+    var SHOWN = { visibility: 'visible', opacity: 1 };     // the deck's CSS hides an inactive slide; these keyframes win
+    var TRANSITIONS = {
+        // cross-fade: the new slide fades in over the old one, which stays put
+        fade: function () { return { in: [{ opacity: 0 }, { opacity: 1 }], out: [SHOWN, SHOWN], ease: 'ease-in-out' }; },
+        // push sideways: both slides move together, one width
+        slide: function (fwd) {
+            var d = fwd ? 1 : -1;
+            return { in: [{ transform: 'translateX(' + (100 * d) + '%)' }, { transform: 'none' }], out: [{ visibility: 'visible', opacity: 1, transform: 'none' }, { visibility: 'visible', opacity: 1, transform: 'translateX(' + (-100 * d) + '%)' }] };
+        },
+        // push upwards (downwards going back)
+        up: function (fwd) {
+            var d = fwd ? 1 : -1;
+            return { in: [{ transform: 'translateY(' + (100 * d) + '%)' }, { transform: 'none' }], out: [{ visibility: 'visible', opacity: 1, transform: 'none' }, { visibility: 'visible', opacity: 1, transform: 'translateY(' + (-100 * d) + '%)' }] };
+        },
+        // the old slide grows and fades away while the new one settles in from slightly small
+        zoom: function (fwd) {
+            return { in: [{ opacity: 0, transform: 'scale(' + (fwd ? 0.92 : 1.08) + ')' }, { opacity: 1, transform: 'none' }], out: [{ visibility: 'visible', opacity: 1, transform: 'none' }, { visibility: 'visible', opacity: 0, transform: 'scale(' + (fwd ? 1.08 : 0.92) + ')' }] };
+        }
+    };
+    var MOVE_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+    function transitionOf(slide) {
+        var own = slide && slide.getAttribute('data-transition');
+        return own || stage.getAttribute('data-transition') || 'none';
+    }
+    function playTransition(to, forward, from) {
+        if (!to || !to.animate) return;
+        var make = TRANSITIONS[transitionOf(to)];
+        if (!make) return;
+        var t = make(forward !== false);
+        var dur = (parseFloat(to.getAttribute('data-transition-duration') || stage.getAttribute('data-transition-duration')) || 0.5) * 1000;
+        var opts = { duration: dur, easing: t.ease || MOVE_EASE };
+        // A transition still running on either slide (fast clicking) is cut short.
+        [to, from].forEach(function (s) { if (s && s.getAnimations) s.getAnimations().forEach(function (a) { if (a.__transition) a.cancel(); }); });
+        var a = to.animate(t.in, opts);
+        a.__transition = true;
+        if (from && from !== to && from.animate) {
+            var b = from.animate(t.out, opts);
+            b.__transition = true;
+        }
+    }
+
+    /* ============================================================
+       TEXT EFFECTS: letters, words or a typewriter. The text nodes are
+       wrapped in spans for the duration of the animation and unwrapped
+       afterwards, so the document (and a saved file) never carries them.
+       ============================================================ */
+    var FX = {
+        letters: { split: 'chars', stagger: 28, duration: 420, kf: [{ opacity: 0, transform: 'translateY(0.35em)' }, { opacity: 1, transform: 'none' }], block: true },
+        words: { split: 'words', stagger: 90, duration: 520, kf: [{ opacity: 0, transform: 'translateY(0.3em)' }, { opacity: 1, transform: 'none' }], block: true },
+        typewriter: { split: 'chars', stagger: 45, duration: 1, kf: [{ opacity: 0 }, { opacity: 1 }], block: false }
+    };
+    function textEffects(slide) {
+        if (!slide) return;
+        Array.prototype.forEach.call(slide.querySelectorAll('[data-text-effect]'), function (el) {
+            if (el.hasAttribute('data-fragment') && !el.classList.contains('visible')) return;
+            playTextEffect(el);
+        });
+    }
+    function unwrapTextEffect(el) {
+        if (!el.__fx) return;
+        el.__fx.animations.forEach(function (a) { try { a.cancel(); } catch (e) { /* done */ } });
+        el.__fx.spans.forEach(function (s) { if (s.parentNode) s.parentNode.replaceChild(document.createTextNode(s.textContent), s); });
+        el.normalize();
+        el.__fx = null;
+    }
+    function playTextEffect(el) {
+        var fx = FX[el.getAttribute('data-text-effect')];
+        if (!fx || !el.animate) return;
+        unwrapTextEffect(el);
+        var speed = parseFloat(el.getAttribute('data-text-effect-speed')) || 1;
+        var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        var spans = [];
+        nodes.forEach(function (node) {
+            if (!node.textContent.trim()) return;
+            var parts = fx.split === 'words' ? node.textContent.split(/(\s+)/) : Array.from(node.textContent);
+            var frag = document.createDocumentFragment();
+            parts.forEach(function (p) {
+                if (!p) return;
+                if (fx.split === 'words' && /^\s+$/.test(p)) { frag.appendChild(document.createTextNode(p)); return; }
+                var s = document.createElement('span');
+                s.className = 'de-fx';
+                s.textContent = p;
+                if (fx.block) { s.style.display = 'inline-block'; s.style.whiteSpace = 'pre'; }
+                frag.appendChild(s);
+                spans.push(s);
+            });
+            node.parentNode.replaceChild(frag, node);
+        });
+        if (!spans.length) return;
+        var animations = spans.map(function (s, i) {
+            return s.animate(fx.kf, { duration: fx.duration / speed, delay: i * fx.stagger / speed, fill: 'backwards', easing: fx.duration > 1 ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'steps(1, end)' });
+        });
+        el.__fx = { spans: spans, animations: animations };
+        var last = animations[animations.length - 1];
+        var done = function () { if (el.__fx && el.__fx.animations === animations) unwrapTextEffect(el); };
+        if (last.finished) last.finished.then(done, done); else last.onfinish = done;
+    }
+    document.addEventListener('deck:slide', onSlideChange);
+    window.addEventListener('hashchange', onSlideChange);
+    if (window.MutationObserver) {
+        var pending = 0;
+        new MutationObserver(function () { clearTimeout(pending); pending = setTimeout(onSlideChange, 30); })
+            .observe(stage, { attributes: true, attributeFilter: ['class'], subtree: true });
+    }
+
+    /* ============================================================
+       AUTO-ANIMATE: morph matching elements from one slide into the next
+       ============================================================ */
+    function matchKey(el) {
+        if (el.getAttribute('data-id')) return 'id:' + el.getAttribute('data-id');
+        var tag = el.tagName.toLowerCase();
+        if (tag === 'img') return 'img:' + el.getAttribute('src');
+        var text = (el.textContent || '').trim().replace(/\s+/g, ' ');
+        return text ? tag + ':' + text.slice(0, 120) : null;
+    }
+    function morphCandidates(slide) {
+        // Elements with a data-id, plus text blocks and images that are direct layout units.
+        var sel = '[data-id], h1, h2, h3, h4, p, li, img, [data-edit]';
+        return Array.prototype.filter.call(slide.querySelectorAll(sel), function (el) { return !el.closest('[data-fig]') && el.closest('.slide') === slide; });
+    }
+    function rectOf(el) {
+        var r = el.getBoundingClientRect(), s = stage.getBoundingClientRect(), k = stageScale();
+        return { x: (r.left - s.left) / k, y: (r.top - s.top) / k, w: r.width / k, h: r.height / k };
+    }
+    /* The look of an element, for the morph: what tweens between two linked elements, and what
+       a ghost of the old one needs to look the same on the new slide. */
+    var TWEEN_PROPS = ['background-color', 'color', 'border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius', 'border-color', 'opacity', 'box-shadow'];
+    var GHOST_PROPS = TWEEN_PROPS.concat(['background-image', 'background-size', 'background-position', 'border-width', 'border-style', 'padding', 'font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing', 'text-transform', 'text-align', 'white-space', 'display', 'align-items', 'justify-content', 'flex-direction', 'gap', 'object-fit', 'fill', 'stroke', 'stroke-width']);
+    function lookOf(el, props) {
+        var cs = getComputedStyle(el), out = {};
+        props.forEach(function (p) { out[p] = cs.getPropertyValue(p); });
+        return out;
+    }
+    /* A shape the polygon morph can take: an <svg> drawing one <path> of one subpath. */
+    function singlePath(el) {
+        if (!el || el.tagName.toLowerCase() !== 'svg') return null;
+        var shapes = el.querySelectorAll('path, rect, circle, ellipse, polygon, polyline, line');
+        if (shapes.length !== 1 || shapes[0].tagName.toLowerCase() !== 'path') return null;
+        var d = shapes[0].getAttribute('d') || '';
+        if ((d.match(/[Mm]/g) || []).length !== 1) return null;
+        return shapes[0];
+    }
+    function viewBoxOf(svg) {
+        var vb = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(parseFloat);
+        return vb.length === 4 && vb.every(isFinite) ? { x: vb[0], y: vb[1], w: vb[2] || 1, h: vb[3] || 1 } : null;
+    }
+    /* n points along the path, in its own user units. */
+    function samplePath(path, n) {
+        var L = path.getTotalLength(), pts = [];
+        if (!L) return null;
+        for (var i = 0; i < n; i++) { var p = path.getPointAtLength(L * i / n); pts.push([p.x, p.y]); }
+        return pts;
+    }
+    /* The old polygon, in the new svg's coordinates, started and wound so its points travel least. */
+    function alignPolygon(from, to) {
+        var n = to.length, best = null, bestCost = Infinity;
+        [from, from.slice().reverse()].forEach(function (cand) {
+            for (var k = 0; k < n; k++) {
+                var cost = 0;
+                for (var i = 0; i < n; i++) { var a = cand[(i + k) % n], b = to[i]; cost += (a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]); if (cost >= bestCost) break; }
+                if (cost < bestCost) { bestCost = cost; best = cand.slice(k).concat(cand.slice(0, k)); }
+            }
+        });
+        return best;
+    }
+    function polygonD(pts, closed) {
+        return pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(2) + ' ' + p[1].toFixed(2); }).join('') + (closed ? 'Z' : '');
+    }
+    /* The morph's easing: a gentle in-out (a start you can see, a soft landing), so a move
+       reads as a move and a turn as a turn. MORPH_EASE is the CSS form, easeOut the same curve
+       for the frames drawn by hand. */
+    var MORPH_BEZIER = [0.45, 0.05, 0.25, 1], MORPH_EASE = 'cubic-bezier(' + MORPH_BEZIER.join(', ') + ')';
+    function easeOut(u) {
+        var x1 = MORPH_BEZIER[0], y1 = MORPH_BEZIER[1], x2 = MORPH_BEZIER[2], y2 = MORPH_BEZIER[3], lo = 0, hi = 1, t;
+        for (var i = 0; i < 16; i++) { t = (lo + hi) / 2; var x = 3 * (1 - t) * (1 - t) * t * x1 + 3 * (1 - t) * t * t * x2 + t * t * t; if (x < u) lo = t; else hi = t; }
+        return 3 * (1 - t) * (1 - t) * t * y1 + 3 * (1 - t) * t * t * y2 + t * t * t;
+    }
+    /* Tween one shape into another: both sampled into polygons with the same number of points,
+       drawn frame by frame from the old shape to the new one, the real path put back at the end. */
+    function morphPath(oldPath, oldSvg, newPath, newSvg, ms) {
+        var n = 96, a = samplePath(oldPath, n), b = samplePath(newPath, n);
+        if (!a || !b) return false;
+        var va = viewBoxOf(oldSvg), vb = viewBoxOf(newSvg);
+        if (va && vb) a = a.map(function (p) { return [(p[0] - va.x) / va.w * vb.w + vb.x, (p[1] - va.y) / va.h * vb.h + vb.y]; });
+        a = alignPolygon(a, b);
+        var closed = /[zZ]\s*$/.test(newPath.getAttribute('d') || '');
+        var d0 = newPath.getAttribute('d'), t0 = null;
+        function frame(now) {
+            if (t0 === null) t0 = now;
+            var u = Math.min(1, (now - t0) / ms), e = easeOut(u);
+            var pts = b.map(function (p, i) { return [a[i][0] + (p[0] - a[i][0]) * e, a[i][1] + (p[1] - a[i][1]) * e]; });
+            if (u < 1) { newPath.setAttribute('d', polygonD(pts, closed)); requestAnimationFrame(frame); }
+            else newPath.setAttribute('d', d0);
+        }
+        requestAnimationFrame(frame);
+        return true;
+    }
+    /* A copy of the old element, laid over the new slide where the old one was, to fade out
+       while the new one fades in: the morph for two elements that do not look alike. */
+    function ghostOf(el, pose, look) {
+        var g = el.cloneNode(true);
+        g.removeAttribute('id'); g.removeAttribute('data-id');
+        Array.prototype.forEach.call(g.querySelectorAll('[id]'), function (n) { n.removeAttribute('id'); });
+        g.classList.add('deck-morph-ghost');
+        var st = '';
+        for (var p in look) if (look[p]) st += p + ':' + look[p] + ';';
+        // Its box is the old element's own (unrotated) box at the old centre; the old rotation and
+        // scale are one matrix about that centre, so the keyframes can replace it.
+        var m = pose.m;
+        st += 'position:absolute;left:' + (pose.cx - pose.w / 2) + 'px;top:' + (pose.cy - pose.h / 2) + 'px;width:' + pose.w + 'px;height:' + pose.h + 'px;margin:0;max-width:none;max-height:none;box-sizing:border-box;';
+        st += 'transform:matrix(' + [m.a, m.b, m.c, m.d, 0, 0].join(',') + ');transform-origin:center;translate:none;rotate:none;scale:none;pointer-events:none;z-index:2147483000;transition:none;animation:none;visibility:visible';
+        g.style.cssText = st;
+        return g;
+    }
+    /* Where an element is and how it is turned: its centre on the stage, its own (unrotated,
+       unscaled) box, and the matrix of all its transforms (translate, rotate, scale, transform,
+       in the order CSS applies them, about the centre of the box). A rotated element's bounding
+       box is not its box: the morph works with the pose, so a turn tweens as a turn. */
+    function matrixOf(el) {
+        var cs = getComputedStyle(el), m = new DOMMatrix(), v, p;
+        v = cs.translate; if (v && v !== 'none') { p = v.split(/\s+/).map(parseFloat); m = m.translate(p[0] || 0, p[1] || 0); }
+        v = cs.rotate; if (v && v !== 'none') { p = v.split(/\s+/); m = m.rotate(parseFloat(p[p.length - 1]) || 0); }
+        v = cs.scale; if (v && v !== 'none') { p = v.split(/\s+/).map(parseFloat); m = m.scale(p[0] || 1, p.length > 1 ? p[1] : (p[0] || 1)); }
+        v = cs.transform; if (v && v !== 'none') m = m.multiply(new DOMMatrix(v));
+        return m;
+    }
+    function poseOf(el, r) {
+        var m = matrixOf(el);
+        var w = el.offsetWidth !== undefined ? el.offsetWidth : el.clientWidth, h = el.offsetHeight !== undefined ? el.offsetHeight : el.clientHeight;
+        return { cx: r.x + r.w / 2, cy: r.y + r.h / 2, w: w || r.w, h: h || r.h, m: m,
+                 angle: Math.atan2(m.b, m.a) * 180 / Math.PI, sx: Math.hypot(m.a, m.b) || 1, sy: Math.hypot(m.c, m.d) || 1 };
+    }
+    /* The matrix that puts a box of size w x h, centred at c0 before any transform, at centre c,
+       turned by ang, scaled to the visual size vw x vh. */
+    function placed(c0x, c0y, w, h, cx, cy, ang, vw, vh) {
+        return new DOMMatrix().translate(cx - c0x, cy - c0y).rotate(ang).scale(vw / w, vh / h);
+    }
+    function matrixCss(m) { return 'matrix(' + [m.a, m.b, m.c, m.d, m.e, m.f].map(function (v) { return +v.toFixed(4); }).join(',') + ')'; }
+    /* Keyframes from one pose to another: the centre, the angle (the short way round) and the
+       visual size each eased, sampled so the matrices between samples interpolate cleanly. */
+    function poseFrames(a, b, toMatrix, extra) {
+        var dAng = ((b.angle - a.angle + 540) % 360) - 180, frames = [], N = 24;
+        var aw = a.w * a.sx, ah = a.h * a.sy, bw = b.w * b.sx, bh = b.h * b.sy;
+        for (var i = 0; i <= N; i++) {
+            var t = i / N, e = easeOut(t);
+            var f = { offset: t, easing: 'linear', transform: matrixCss(toMatrix(a.cx + (b.cx - a.cx) * e, a.cy + (b.cy - a.cy) * e, a.angle + dAng * e, aw + (bw - aw) * e, ah + (bh - ah) * e)) };
+            if (extra) extra(f, t);
+            frames.push(f);
+        }
+        return frames;
+    }
+    function autoAnimate(from, to) {
+        var duration = parseFloat(to.getAttribute('data-auto-animate-duration') || from.getAttribute('data-auto-animate-duration')) || 0.8;
+        var ms = duration * 1000, ease = MORPH_EASE;
+        // Both slides are measured with their transitions and entrance animations held off: the
+        // old one put back in its shown state for a moment (its reveals are already on their way
+        // out), the new one shown now (the deck would a frame later), so what is measured is where
+        // things are at rest, not a frame of a reveal on its way there. The morph is the entrance
+        // of what is matched, the fade below the entrance of the rest.
+        var hold = document.createElement('style');
+        hold.textContent = '.deck-morph-measure, .deck-morph-measure * { transition: none !important; animation: none !important; }';
+        document.head.appendChild(hold);
+        var fromShown = from.classList.contains('visible');
+        from.classList.add('deck-morph-measure'); from.classList.add('visible');
+        void from.offsetWidth;
+        var old = {};
+        morphCandidates(from).forEach(function (el) { var k = matchKey(el); if (k && !old[k]) { var r = rectOf(el); old[k] = { el: el, r: r, pose: poseOf(el, r), look: lookOf(el, GHOST_PROPS) }; } });
+        if (!fromShown) from.classList.remove('visible');
+        from.classList.remove('deck-morph-measure');
+        to.classList.add('deck-morph-measure');
+        to.classList.add('visible');
+        void to.offsetWidth;
+        var matched = [];
+        morphCandidates(to).forEach(function (el) {
+            var k = matchKey(el);
+            if (!k || !old[k] || matched.some(function (m) { return m.contains(el) || el.contains(m); })) return;
+            var was = old[k], a = was.r, b = rectOf(el);
+            if (!b.w || !b.h) return;
+            delete old[k];
+            matched.push(el);
+            // 1. The pose: the new element travels, turns and resizes from where the old one was.
+            //    Its own transforms stay as they are; what is added underneath is what takes the
+            //    element from its own pose to the tweened one (inverse of its matrix, then the pose).
+            var pa = was.pose, pb = poseOf(el, b), inv = pb.m.inverse(), c0x = pb.cx - pb.m.e, c0y = pb.cy - pb.m.f;
+            el.style.transition = 'none';
+            var anim = el.animate(poseFrames(pa, pb, function (cx, cy, ang, vw, vh) { return inv.multiply(placed(c0x, c0y, pb.w, pb.h, cx, cy, ang, vw, vh)); }, function (f) { f.opacity = 1; }),
+                { duration: ms, fill: 'backwards', composite: 'add' });
+            anim.onfinish = function () { el.style.transition = ''; if (!el.getAttribute('style')) el.removeAttribute('style'); };
+            // 2. The look: colours, corners, rotation and shadow tween from the old values.
+            var now = lookOf(el, TWEEN_PROPS), f0 = {}, f1 = {}, tween = false;
+            TWEEN_PROPS.forEach(function (p) {
+                var name = p.replace(/-([a-z])/g, function (m, c) { return c.toUpperCase(); });   // keyframes take the IDL names
+                if (was.look[p] && now[p] && was.look[p] !== now[p] && p !== 'opacity') { f0[name] = was.look[p]; f1[name] = now[p]; tween = true; }
+            });
+            if (tween) { try { el.animate([f0, f1], { duration: ms, easing: ease, fill: 'backwards' }); } catch (err) { /* a value the browser cannot tween: the change is instant */ } }
+            // 3. The shape: two single-path drawings morph outline to outline; two elements that
+            //    do not look alike cross-fade, a ghost of the old one fading out over the new.
+            var sa = singlePath(was.el), sb = singlePath(el);
+            var alike = was.el.tagName === el.tagName && (was.el.textContent || '').trim() === (el.textContent || '').trim() &&
+                        (was.el.getAttribute('src') || '') === (el.getAttribute('src') || '');
+            if (sa && sb && morphPath(sa, was.el, sb, el, ms)) {
+                var fa = getComputedStyle(sa), fb = getComputedStyle(sb);
+                if (fa.fill !== fb.fill || fa.stroke !== fb.stroke) sb.animate([{ fill: fa.fill, stroke: fa.stroke }, { fill: fb.fill, stroke: fb.stroke }], { duration: ms, easing: ease, fill: 'backwards' });
+            } else if (!alike) {
+                var g = ghostOf(was.el, pa, was.look);
+                to.appendChild(g);
+                var ga = g.animate(poseFrames(pa, pb, function (cx, cy, ang, vw, vh) { return placed(pa.cx, pa.cy, pa.w, pa.h, cx, cy, ang, vw, vh); }, function (f, t) { f.opacity = 1 - easeOut(t); }),
+                    { duration: ms, fill: 'forwards' });
+                ga.onfinish = function () { g.remove(); };
+                el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, easing: ease, fill: 'backwards' });
+            }
+        });
+        // Everything else on the new slide fades in a little later.
+        Array.prototype.forEach.call(to.querySelectorAll('*'), function (el) {
+            if (el.classList.contains('deck-morph-ghost') || el.closest('.deck-morph-ghost')) return;
+            if (matched.some(function (m) { return m === el || m.contains(el) || el.contains(m); })) return;
+            if (el.children.length && !el.matches('img, svg')) return;      // leaves only, so containers do not double-fade
+            if (el.closest('[data-fig]') && el.closest('[data-fig]') !== el) return;
+            el.animate([{ opacity: 0 }, { opacity: 0, offset: 0.4 }, { opacity: 1 }], { duration: ms, easing: 'ease-out' });
+        });
+        to.classList.remove('deck-morph-measure');
+        hold.remove();
+    }
+
+    /* ============================================================
+       OVERVIEW (O)
+       ============================================================ */
+    var overview = null, ovIndex = 0;
+    function openOverview() {
+        if (overview) return;
+        var all = slides(), cur = current();
+        overview = document.createElement('div');
+        overview.className = 'deck-overview';
+        var head = document.createElement('div');
+        head.className = 'ov-head';
+        var title = document.createElement('b'); title.textContent = (document.title || 'Deck').trim() + ' · ' + all.length + (all.length === 1 ? ' slide' : ' slides');
+        var hint = document.createElement('span'); hint.innerHTML = 'Click or <kbd>Enter</kbd> opens a slide, arrows move, <kbd>Esc</kbd> closes';
+        head.appendChild(title); head.appendChild(hint);
+        overview.appendChild(head);
+        all.forEach(function (slide, i) {
+            if (slide.getAttribute('data-section')) {
+                var label = document.createElement('div');
+                label.className = 'ov-section';
+                label.textContent = slide.getAttribute('data-section');
+                overview.appendChild(label);
+            }
+            var tile = document.createElement('div');
+            tile.className = 'ov-tile' + (i === cur ? ' current' : '');
+            var frame = document.createElement('div');
+            frame.className = 'ov-frame';
+            var inner = document.createElement('div');
+            inner.className = 'ov-inner';
+            var clone = slide.cloneNode(true);
+            clone.classList.add('active', 'visible');
+            clone.removeAttribute('id');
+            Array.prototype.forEach.call(clone.querySelectorAll('[id]'), function (n) { n.removeAttribute('id'); });
+            Array.prototype.forEach.call(clone.querySelectorAll('[data-fragment]'), function (n) { n.classList.add('visible'); });
+            Array.prototype.forEach.call(clone.querySelectorAll('aside.notes, .notes'), function (n) { n.remove(); });
+            inner.appendChild(clone);
+            frame.appendChild(inner);
+            tile.appendChild(frame);
+            var cap = document.createElement('div'); cap.className = 'ov-cap';
+            var num = document.createElement('span'); num.className = 'ov-n'; num.textContent = i + 1; cap.appendChild(num);
+            var name = labelOf(slide);
+            if (name) { var t = document.createElement('span'); t.className = 'ov-t'; t.textContent = name; cap.appendChild(t); }
+            tile.appendChild(cap);
+            tile.addEventListener('click', function () { closeOverview(); goTo(i); });
+            overview.appendChild(tile);
+        });
+        document.body.appendChild(overview);
+        ovIndex = cur;
+        scaleOverview();
+        window.addEventListener('resize', scaleOverview);
+        var c = overview.querySelector('.ov-tile.current');   // centred, unless it is in view from the top with the header
+        if (c && c.offsetTop + c.offsetHeight > overview.clientHeight) c.scrollIntoView({ block: 'center' });
+    }
+    /* Arrow keys move the highlight through the grid (up/down by a row); Enter opens it. */
+    function moveOverview(dx, dy) {
+        var tiles = overview.querySelectorAll('.ov-tile');
+        if (!tiles.length) return;
+        var n = tiles.length, i = ovIndex, cols = 1;
+        if (dy) {
+            var top = tiles[0].offsetTop;
+            while (cols < n && tiles[cols].offsetTop === top) cols++;
+        }
+        i += dx + dy * cols;
+        if (i < 0 || i >= n) { if (dx) i = (i + n) % n; else return; }
+        if (i === ovIndex) return;
+        tiles[ovIndex].classList.remove('current');
+        tiles[i].classList.add('current');
+        ovIndex = i;
+        tiles[i].scrollIntoView({ block: 'nearest' });
+    }
+    function scaleOverview() {
+        if (!overview) return;
+        // The tiles are scaled copies of the stage, whatever size the deck's CSS gives it.
+        var sw = stage.offsetWidth || 1920, sh = stage.offsetHeight || 1080;
+        overview.style.setProperty('--deck-w', sw + 'px'); overview.style.setProperty('--deck-h', sh + 'px'); overview.style.setProperty('--deck-ar', sw + '/' + sh);
+        Array.prototype.forEach.call(overview.querySelectorAll('.ov-tile'), function (tile) {
+            var k = tile.clientWidth / sw;
+            tile.querySelector('.ov-inner').style.transform = 'scale(' + k + ')';
+        });
+    }
+    function closeOverview() {
+        if (!overview) return;
+        window.removeEventListener('resize', scaleOverview);
+        overview.remove();
+        overview = null;
+    }
+
+    /* ============================================================
+       PRESENTER WINDOW (P)
+       ============================================================ */
+    var popup = null, ui = null, started = 0;
+    var CSS = [
+        ':root{--bg:#131417;--panel:#1d1f24;--line:#2c2f36;--ink:#f2f2f4;--ink-2:#b6b8c0;--ink-3:#7d808a}',
+        '*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 "Segoe UI",-apple-system,BlinkMacSystemFont,Inter,Roboto,"Helvetica Neue",Arial,sans-serif;overflow:hidden}',
+        '#app{display:grid;grid-template-columns:1fr 380px;grid-template-rows:1fr auto;height:100%;gap:14px;padding:14px}',
+        '.stage{position:relative;background:#000;border-radius:8px;overflow:hidden}.stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;pointer-events:none}',
+        '.tag{position:absolute;left:10px;top:8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);background:rgba(0,0,0,.55);padding:2px 6px;border-radius:4px;z-index:1}',
+        '.side{display:flex;flex-direction:column;gap:12px;min-height:0}.side .stage{aspect-ratio:16/9;flex:none}',
+        '.notes{flex:1;min-height:0;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;font-size:20px;line-height:1.5;white-space:pre-wrap}',
+        '.notes:empty::before{content:"No notes for this slide";color:var(--ink-3);font-size:15px}.sizes{display:flex;gap:4px;justify-content:flex-end}',
+        '.bar{grid-column:1/-1;display:flex;align-items:center;gap:18px;padding:8px 4px 0;border-top:1px solid var(--line)}',
+        '.time{font-variant-numeric:tabular-nums;font-size:30px;font-weight:600;min-width:130px;cursor:pointer}.clock{font-variant-numeric:tabular-nums;font-size:18px;color:var(--ink-2)}',
+        '.count{font-size:18px;color:var(--ink-2)}.count b{color:var(--ink);font-size:24px}.grow{flex:1}.hint{font-size:12px;color:var(--ink-3)}',
+        '.slidetime{font-variant-numeric:tabular-nums;font-size:18px;color:var(--ink-2);min-width:64px}.slidetime.over{color:#ff8b6a}',
+        'button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}button:hover{border-color:var(--ink-3)}button.big{font-size:20px;padding:6px 18px}',
+        '.end{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);background:var(--bg)}'
+    ].join('');
+    var HTML = '<div id="app">'
+        + '<div class="stage"><span class="tag">Current</span><iframe id="cur"></iframe></div>'
+        + '<div class="side"><div class="stage"><span class="tag">Next</span><iframe id="next"></iframe><div class="end" id="end" hidden>End of the deck</div></div>'
+        + '<div class="sizes"><button data-size="-1">A-</button><button data-size="1">A+</button></div><div class="notes" id="notes"></div></div>'
+        + '<div class="bar"><div class="time" id="time" title="Click to reset">00:00</div><div class="slidetime" id="slidetime" title="On this slide">00:00</div><button id="reset">Reset</button><div class="clock" id="clock"></div><div class="grow"></div>'
+        + '<div class="count"><b id="now">-</b> / <span id="total">-</span> <span class="hint" id="frag"></span> <span class="hint" id="name"></span></div>'
+        + '<button class="big" id="prev">&larr;</button><button class="big" id="next-btn">&rarr;</button></div></div>';
+
+    var slideStarted = Date.now(), notifiedIndex = -1;
+    function deckUrl() { return location.href.replace(/#.*$/, ''); }
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+    function openPresenter() {
+        if (popup && !popup.closed) { popup.focus(); notify(); return; }
+        popup = window.open('', 'deck-presenter', 'width=1280,height=760');
+        if (!popup) { alert('The browser blocked the presenter window. Allow pop-ups for this page and press P again.'); return; }
+        var d = popup.document;
+        d.open();
+        d.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Presenter</title><style>' + CSS + '</style></head><body>' + HTML + '</body></html>');
+        d.close();
+        ui = {};
+        ['cur', 'next', 'end', 'notes', 'time', 'slidetime', 'reset', 'clock', 'now', 'total', 'frag', 'name', 'prev', 'next-btn'].forEach(function (id) { ui[id] = d.getElementById(id); });
+        var base = deckUrl();
+        ui.cur.src = base + '#' + (current() + 1);
+        ui.next.src = base + '#' + (current() + 2);
+        ui.prev.onclick = prev;
+        ui['next-btn'].onclick = next;
+        ui.reset.onclick = function () { started = Date.now(); slideStarted = Date.now(); tick(); };
+        ui.time.onclick = ui.reset.onclick;
+        d.addEventListener('keydown', function (e) {
+            switch (e.key) {
+                case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': e.preventDefault(); next(); break;
+                case 'ArrowLeft': case 'ArrowUp': case 'PageUp': e.preventDefault(); prev(); break;
+                case 'Home': e.preventDefault(); goTo(0); break;
+                case 'End': e.preventDefault(); goTo(slides().length - 1); break;
+            }
+        });
+        d.querySelector('.sizes').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-size]'); if (!b) return;
+            var size = parseFloat(ui.notes.style.fontSize) || 20;
+            ui.notes.style.fontSize = Math.max(12, Math.min(48, size + 2 * parseInt(b.getAttribute('data-size'), 10))) + 'px';
+        });
+        started = Date.now();
+        tick();
+        notify();
+    }
+    /* Frames follow the deck by hash only, so this works even when the frames are a different origin (file://). */
+    function steer(frame, index) {
+        var want = deckUrl() + '#' + (index + 1);
+        try { if (frame.contentWindow.location.href !== want) frame.contentWindow.location.replace(want); }
+        catch (e) { if (frame.src !== want) frame.src = want; }
+    }
+    function notify() {
+        if (!popup || popup.closed || !ui) return;
+        var all = slides(), i = current();
+        if (i !== notifiedIndex) { notifiedIndex = i; slideStarted = Date.now(); }
+        steer(ui.cur, i);
+        ui.end.hidden = i + 1 < all.length;
+        if (i + 1 < all.length) steer(ui.next, i + 1);
+        var fs = fragmentState(all[i]);
+        ui.now.textContent = i + 1;
+        ui.total.textContent = all.length;
+        ui.frag.textContent = fs.total ? '(step ' + fs.shown + '/' + fs.total + ')' : '';
+        ui.name.textContent = labelOf(all[i]);
+        ui.notes.textContent = notesOf(all[i]);
+        popup.document.title = 'Presenter ' + (i + 1) + '/' + all.length;
+        // Mirror the fragment state in the current frame (same origin only).
+        try {
+            var doc = ui.cur.contentDocument, cs = doc && doc.querySelectorAll('.deck-stage .slide')[i];
+            if (cs) { var shown = 0; fragmentsOf(cs).forEach(function (g) { var on = shown++ < fs.shown; g.els.forEach(function (el) { el.classList.toggle('visible', on); }); }); }
+        } catch (e) { /* cross-origin frame */ }
+    }
+    function clock(s) { return (s >= 3600 ? pad(Math.floor(s / 3600)) + ':' : '') + pad(Math.floor(s / 60) % 60) + ':' + pad(s % 60); }
+    function tick() {
+        if (!popup || popup.closed || !ui) return;
+        var s = Math.floor((Date.now() - started) / 1000);
+        ui.time.textContent = clock(s);
+        // Time on this slide, and how it compares with the slide's own data-auto-advance.
+        var on = Math.floor((Date.now() - slideStarted) / 1000), want = autoSeconds(slides()[current()]);
+        ui.slidetime.textContent = clock(on) + (want ? ' / ' + clock(Math.round(want)) : '');
+        ui.slidetime.classList.toggle('over', !!want && on > want);
+        var d = new Date();
+        ui.clock.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+    setInterval(tick, 500);
+
+    /* ============================================================
+       LASER POINTER (L): the cursor becomes a bright dot with a glow.
+       ============================================================ */
+    var laser = null;
+    function setLaser(on) {
+        if (on && !laser) {
+            laser = document.createElement('div');
+            laser.className = 'deck-laser';
+            document.body.appendChild(laser);
+            document.documentElement.classList.add('deck-laser-on');
+            window.addEventListener('pointermove', moveLaser);
+        } else if (!on && laser) {
+            window.removeEventListener('pointermove', moveLaser);
+            laser.remove(); laser = null;
+            document.documentElement.classList.remove('deck-laser-on');
+        }
+    }
+    function moveLaser(e) { if (laser) { laser.style.left = e.clientX + 'px'; laser.style.top = e.clientY + 'px'; laser.style.opacity = '1'; } }
+
+    /* ============================================================
+       DRAWING (D): a canvas layer over the stage. Strokes are kept in
+       stage coordinates (so they follow a resize), per slide, for as
+       long as the page is open. Nothing is written into the deck.
+       ============================================================ */
+    var COLOURS = ['#ff2d55', '#ffcc00', '#2f6fed', '#22c55e', '#ffffff'];
+    var draw = null;                                          // { canvas, ctx, bar, colour, width, strokes: {slideIndex: [stroke]}, live }
+    function setDrawing(on) {
+        if (on && !draw) {
+            var canvas = document.createElement('canvas');
+            canvas.className = 'deck-draw';
+            var bar = document.createElement('div');
+            bar.className = 'deck-draw-bar';
+            bar.innerHTML = COLOURS.map(function (c, i) { return '<button data-colour="' + i + '" title="Colour ' + (i + 1) + ' (key ' + (i + 1) + ')" style="background:' + c + '"></button>'; }).join('')
+                + '<span class="sep"></span><button data-w="-1" title="Thinner ([)">&minus;</button><button data-w="1" title="Thicker (])">+</button>'
+                + '<span class="sep"></span><button data-act="undo" title="Undo last stroke (Ctrl+Z)">&#8630;</button><button data-act="clear" title="Clear this slide (C)">Clear</button><button data-act="close" title="Stop drawing (D or Esc)">Done</button>';
+            document.body.appendChild(canvas);
+            document.body.appendChild(bar);
+            draw = { canvas: canvas, ctx: canvas.getContext('2d'), bar: bar, colour: lastColour, width: lastWidth, live: null };
+            document.documentElement.classList.add('deck-drawing');
+            canvas.addEventListener('pointerdown', drawStart);
+            canvas.addEventListener('pointermove', drawMove);
+            canvas.addEventListener('pointerup', drawEnd);
+            canvas.addEventListener('pointercancel', drawEnd);
+            bar.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+            bar.addEventListener('click', function (e) {
+                var b = e.target.closest('button'); if (!b) return;
+                if (b.dataset.colour != null) setColour(+b.dataset.colour);
+                else if (b.dataset.w) setWidth(draw.width + 2 * +b.dataset.w);
+                else if (b.dataset.act === 'undo') undoStroke();
+                else if (b.dataset.act === 'clear') clearStrokes();
+                else if (b.dataset.act === 'close') setDrawing(false);
+            });
+            window.addEventListener('resize', sizeCanvas);
+            sizeCanvas();
+            setColour(draw.colour);
+        } else if (!on && draw) {
+            window.removeEventListener('resize', sizeCanvas);
+            draw.canvas.remove(); draw.bar.remove();
+            document.documentElement.classList.remove('deck-drawing');
+            draw = null;
+        }
+    }
+    var drawStore = {};                                       // slide index -> strokes, survives toggling the mode
+    var lastColour = 0, lastWidth = 8;                        // stroke width in stage pixels
+    function currentStrokes() { var i = current(); return drawStore[i] || (drawStore[i] = []); }
+    function setColour(i) {
+        draw.colour = lastColour = i;
+        Array.prototype.forEach.call(draw.bar.querySelectorAll('[data-colour]'), function (b) { b.classList.toggle('on', +b.dataset.colour === i); });
+    }
+    function setWidth(w) { draw.width = lastWidth = Math.max(2, Math.min(40, w)); }
+    function sizeCanvas() {
+        if (!draw) return;
+        var dpr = window.devicePixelRatio || 1;
+        draw.canvas.width = Math.round(innerWidth * dpr); draw.canvas.height = Math.round(innerHeight * dpr);
+        draw.canvas.style.width = innerWidth + 'px'; draw.canvas.style.height = innerHeight + 'px';
+        draw.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        redraw();
+    }
+    function toStage(x, y) { var s = stage.getBoundingClientRect(), k = stageScale(); return { x: (x - s.left) / k, y: (y - s.top) / k }; }
+    function fromStage(p) { var s = stage.getBoundingClientRect(), k = stageScale(); return { x: s.left + p.x * k, y: s.top + p.y * k }; }
+    function drawStart(e) {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        draw.canvas.setPointerCapture(e.pointerId);
+        var p = toStage(e.clientX, e.clientY);
+        draw.live = { colour: COLOURS[draw.colour], width: draw.width * (e.pressure && e.pointerType === 'pen' ? 0.5 + e.pressure : 1), points: [p] };
+        currentStrokes().push(draw.live);
+        redraw();
+    }
+    function drawMove(e) {
+        if (!draw.live) return;
+        var events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+        events.forEach(function (ev) { draw.live.points.push(toStage(ev.clientX, ev.clientY)); });
+        redraw();
+    }
+    function drawEnd() { if (draw) draw.live = null; }
+    function undoStroke() { currentStrokes().pop(); redraw(); }
+    function clearStrokes() { drawStore[current()] = []; redraw(); }
+    function redraw() {
+        if (!draw) return;
+        var ctx = draw.ctx, k = stageScale();
+        ctx.clearRect(0, 0, innerWidth, innerHeight);
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        currentStrokes().forEach(function (st) {
+            var pts = st.points.map(fromStage);
+            if (!pts.length) return;
+            ctx.strokeStyle = st.colour; ctx.lineWidth = st.width * k;
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            if (pts.length === 1) ctx.lineTo(pts[0].x + 0.1, pts[0].y);
+            for (var i = 1; i < pts.length - 1; i++) {
+                var mx = (pts[i].x + pts[i + 1].x) / 2, my = (pts[i].y + pts[i + 1].y) / 2;
+                ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+            }
+            if (pts.length > 1) ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+            ctx.stroke();
+        });
+    }
+    document.addEventListener('deck:slide', redraw);
+    window.addEventListener('hashchange', redraw);
+
+    /* ============================================================
+       RUN BY ITSELF (A, or data-auto-advance in the deck)
+       Each slide waits its own seconds - data-auto-advance on the slide, else on the
+       stage - then steps: a fragment if the slide has one left, otherwise the next
+       slide; at the end it stops, or starts again with data-loop on the stage. Any key
+       or click stops it, so nobody is fighting the deck.
+       ============================================================ */
+    var autoTimer = null, autoOn = false;
+    function autoSeconds(slide) {
+        var v = parseFloat((slide && slide.getAttribute('data-auto-advance')) || stage.getAttribute('data-auto-advance'));
+        return isFinite(v) && v > 0 ? v : 0;
+    }
+    function autoStep() {
+        autoTimer = null;
+        if (!autoOn) return;
+        var all = slides(), i = current();
+        if (!nextFragment()) {
+            if (i + 1 < all.length) goTo(i + 1);
+            else if (stage.hasAttribute('data-loop')) goTo(0);
+            else { setAuto(false); return; }
+        }
+        autoSchedule();
+    }
+    function autoSchedule() {
+        if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+        if (!autoOn) return;
+        var s = autoSeconds(slides()[current()]);
+        autoTimer = setTimeout(autoStep, (s || 5) * 1000);
+    }
+    function setAuto(on) {
+        autoOn = !!on;
+        document.documentElement.classList.toggle('deck-auto', autoOn);
+        if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+        if (autoOn) autoSchedule(); else notify();
+        if (autoOn) notify();
+    }
+    /* A deck that says so starts by itself once it is shown on its own. */
+    if (!editing() && autoSeconds(slides()[current()])) setTimeout(function () { if (!editing()) setAuto(true); }, 300);
+
+    /* ============================================================
+       KEYS. Captured on the window so fragments are handled before the
+       deck's own navigation sees the key; nothing runs inside the editor.
+       ============================================================ */
+    document.addEventListener('pointerdown', function () { if (autoOn) setAuto(false); }, true);
+    /* Links on elements: data-href opens on click (not while editing). */
+    document.addEventListener('click', function (e) {
+        if (editing() || overview) return;
+        var el = e.target && e.target.closest ? e.target.closest('[data-href]') : null;
+        if (!el || !stage.contains(el)) return;
+        var url = el.getAttribute('data-href');
+        if (!url) return;
+        e.preventDefault();
+        if (el.getAttribute('data-href-target') === '_self') location.href = url; else window.open(url, '_blank', 'noopener');
+    }, true);
+
+    window.addEventListener('keydown', function (e) {
+        if (editing()) return;
+        var t = e.target;
+        if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
+        if ((e.ctrlKey || e.metaKey) && draw && (e.key === 'z' || e.key === 'Z')) { undoStroke(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        var consumed = true;
+        if (autoOn && e.key !== 'a' && e.key !== 'A') setAuto(false);        // a key takes the deck back
+        switch (e.key) {
+            case 'p': case 'P': openPresenter(); break;
+            case 'F5': if (e.shiftKey) openPresenter(); else consumed = false; break;
+            case 'o': case 'O': overview ? closeOverview() : openOverview(); break;
+            case 'a': case 'A': setAuto(!autoOn); break;
+            case 'l': case 'L': setLaser(!laser); break;
+            case 'd': case 'D': setDrawing(!draw); break;
+            case 'Escape': if (overview) closeOverview(); else if (draw) setDrawing(false); else if (laser) setLaser(false); else consumed = false; break;
+            case 'c': case 'C': if (draw) clearStrokes(); else consumed = false; break;
+            case '[': if (draw) setWidth(draw.width - 2); else consumed = false; break;
+            case ']': if (draw) setWidth(draw.width + 2); else consumed = false; break;
+            case '1': case '2': case '3': case '4': case '5': if (draw) setColour(+e.key - 1); else consumed = false; break;
+            case 'Enter': if (overview) { var pick = ovIndex; closeOverview(); goTo(pick); } else consumed = false; break;
+            case 'ArrowRight': if (overview) moveOverview(1, 0); else next(); break;
+            case 'ArrowLeft': if (overview) moveOverview(-1, 0); else prev(); break;
+            case 'ArrowDown': if (overview) moveOverview(0, 1); else next(); break;
+            case 'ArrowUp': if (overview) moveOverview(0, -1); else prev(); break;
+            case ' ': case 'PageDown': if (overview) { consumed = false; break; } next(); break;
+            case 'PageUp': if (overview) { consumed = false; break; } prev(); break;
+            default: consumed = false;
+        }
+        if (consumed) { e.preventDefault(); e.stopImmediatePropagation(); }
+    }, true);
+    // Mouse wheel and touch swipes in the deck also step through fragments first.
+    window.addEventListener('wheel', function (e) {
+        if (editing() || overview || Math.abs(e.deltaY) < 30) return;
+        var slide = slides()[current()];
+        if (!slide || !fragmentsOf(slide).length) return;
+        if (e.deltaY > 0 ? nextFragment() : prevFragment()) e.stopImmediatePropagation();
+    }, { capture: true, passive: true });
+
+    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, version: 10 };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+node_modules/
+tests/.tmp-workspace/
+test-results/
+playwright-report/
+ff-results.json
+__pycache__/
+tests/.preview-settings*.json
+build/
+dist/
+*.spec
+tools/pptx-corpus/
+tools/pptx-export/
+tools/vendor-src/
+tests/.deck-editor-samples/

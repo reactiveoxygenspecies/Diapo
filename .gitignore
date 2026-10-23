@@ -1,0 +1,7 @@
+# Your own decks: the launchers open this folder the first time; nothing in it is committed
+workspace/*
+!workspace/README.md
+# Files the operating system leaves behind
+Thumbs.db
+.DS_Store
+__pycache__/

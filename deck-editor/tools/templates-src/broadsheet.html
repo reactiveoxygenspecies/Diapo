@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Broadsheet</title>
+<!-- Broadsheet: a newspaper front page. A masthead with a dateline, Playfair Display headlines, justified text
+     columns in a text serif, pull quotes, a black-and-white photo slot, small caps kickers.
+     Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #111111;   /* headings, key text        */
+    --ink-2:    #2c2c2c;   /* body text                 */
+    --ink-3:    #6f6f6f;   /* captions, secondary       */
+    --rule:     #111111;   /* rules are black           */
+    --rule-2:   #d8d5cf;   /* the light column rules    */
+    --paper:    #f7f5f0;   /* newsprint                 */
+    --paper-2:  #ecebe5;   /* boxes                     */
+    --accent:   #b3261e;   /* the one red, for kickers  */
+    --accent-2: #111111;   /* black blocks              */
+
+    --stage-bg: #1b1a18;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #f7f5f0;
+    --font: 'Source Serif 4', Georgia, serif;
+    --font-display: 'Playfair Display', Georgia, serif;
+
+    --pad-x: 90px;         /* layout rhythm at 1920x1080 */
+    --pad-top: 60px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* motion: the reveal's curve   */
+    --dur: 0.6s;                                 /* ... its duration             */
+    --stagger: 0.08s;                            /* ... the step between --i's   */
+    --reveal-y: 10px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-display); font-size: 120px; font-weight: 900; line-height: 1.0; letter-spacing: -0.02em; color: var(--ink); }
+h2 { font-family: var(--font-display); font-size: 76px; font-weight: 700; line-height: 1.05; letter-spacing: -0.015em; color: var(--ink); }
+h3 { font-family: var(--font-display); font-size: 36px; font-weight: 700; line-height: 1.2; color: var(--ink); }
+p  { font-size: 26px; line-height: 1.45; color: var(--ink-2); }
+ul, ol { font-size: 26px; line-height: 1.45; padding-left: 36px; color: var(--ink-2); }
+li { margin-bottom: 10px; }
+blockquote { font-family: var(--font-display); font-style: italic; font-size: 64px; font-weight: 400; line-height: 1.2; color: var(--ink); }
+.eyebrow, .kicker { font-family: var(--font); font-size: 20px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 18px; }
+.sub, .deck-line { font-family: var(--font); font-style: italic; font-size: 34px; line-height: 1.35; color: var(--ink-2); margin-top: 20px; }
+.caption { font-family: var(--font); font-size: 20px; line-height: 1.4; color: var(--ink-3); }
+.byline { font-family: var(--font); font-size: 20px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink); }
+.dropcap::first-letter { font-family: var(--font-display); font-weight: 700; font-size: 96px; line-height: 0.78; float: left; margin: 8px 14px 0 0; color: var(--ink); }
+.justified p { text-align: justify; hyphens: auto; }
+
+/* ===========================================
+   LAYOUT - the page
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: 100px; }
+.masthead { text-align: center; border-bottom: 4px double var(--rule); padding-bottom: 20px; }
+.masthead .name { font-family: var(--font-display); font-size: 100px; font-weight: 900; line-height: 1; letter-spacing: -0.02em; color: var(--ink); }
+.masthead .dateline { display: flex; justify-content: space-between; margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--rule); font-family: var(--font); font-size: 18px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-2); }
+.hairline { height: 1px; background: var(--rule); }
+.thick { height: 4px; background: var(--rule); }
+.cols { display: grid; gap: 40px; }
+.cols > * { border-right: 1px solid var(--rule-2); padding-right: 40px; }
+.cols > *:last-child { border-right: 0; padding-right: 0; }
+
+/* Front page */
+.front .story { display: grid; grid-template-columns: 1fr 1fr 640px; gap: 40px; margin-top: 24px; }
+.front .story .lead { grid-column: 1 / 3; }
+.front .story .lead h1 { font-size: 84px; }
+.front .story .text { padding-right: 40px; border-right: 1px solid var(--rule-2); }
+.front .story .photo { grid-row: 1 / 3; grid-column: 3; }
+.front .photo .plate { width: 640px; height: 470px; background: var(--paper-2); border: 1px solid var(--rule); filter: grayscale(1); }
+.front .photo .caption { margin-top: 12px; }
+
+/* Contents as an index box */
+.index .box { border-top: 4px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 32px 0; margin-top: 40px; }
+.index .rows { display: grid; grid-template-columns: 1fr 1fr; gap: 0 80px; }
+.index .row { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 20px; padding: 16px 0; border-bottom: 1px solid var(--rule-2); }
+.index .row h3 { font-size: 32px; }
+.index .row .pg { font-family: var(--font); font-size: 20px; color: var(--ink-3); }
+
+/* Section: a section page header */
+.section .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.section .band { width: 100%; border-top: 4px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 40px 0; }
+.section h2 { font-size: 128px; font-weight: 900; }
+.section .kicker { margin-bottom: 0; margin-top: 28px; }
+
+/* Article: three justified columns with a drop cap */
+.article h2 { max-width: 1500px; }
+.article .cols { grid-template-columns: repeat(3, 1fr); margin-top: 36px; }
+.article .cols p { margin-bottom: 20px; font-size: 25px; }
+
+/* Photo story */
+.photo-story .plate { position: absolute; left: 0; top: 0; width: 1140px; height: 800px; background: var(--paper-2); border: 1px solid var(--rule); }
+.photo-story .text { position: absolute; left: 1220px; top: 0; width: 520px; }
+.photo-story .text p { margin-top: 20px; }
+.photo-story .figcap { position: absolute; left: 0; top: 816px; width: 1140px; }
+
+/* Pull quote */
+.pull .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.pull blockquote { max-width: 1400px; padding: 44px 0; border-top: 4px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.pull .who { margin-top: 28px; }
+
+/* Numbers: a stats box */
+.stats .box { border: 1px solid var(--rule); padding: 40px; margin-top: 40px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 40px; }
+.stats .box > div { border-right: 1px solid var(--rule-2); padding-right: 40px; }
+.stats .box > div:last-child { border-right: 0; }
+.stats .big { font-family: var(--font-display); font-size: 96px; font-weight: 900; line-height: 1; color: var(--ink); }
+.stats h3 { font-size: 26px; margin: 16px 0 8px; }
+.stats p { font-size: 22px; }
+
+/* Table: a listings box */
+.listings table { width: 100%; border-collapse: collapse; font-size: 24px; margin-top: 36px; }
+.listings th { font-family: var(--font); font-weight: 600; font-size: 18px; letter-spacing: 0.14em; text-transform: uppercase; text-align: left; padding: 0 16px 14px; border-bottom: 4px solid var(--rule); }
+.listings td { padding: 16px; border-bottom: 1px solid var(--rule-2); color: var(--ink-2); }
+.listings td:first-child { font-family: var(--font-display); font-weight: 700; color: var(--ink); }
+.listings th.num, .listings td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Back page */
+.back .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.back .lines { display: flex; gap: 60px; margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--rule); }
+
+/* ===========================================
+   MASTER LAYER - the running folio: paper name, date, page
+   =========================================== */
+.deck-footer {
+    position: absolute; left: var(--pad-x); right: var(--pad-x); bottom: 40px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: baseline; padding-top: 10px; border-top: 1px solid var(--rule);
+    font-family: var(--font); font-size: 18px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-2);
+}
+.deck-footer .num { font-variant-numeric: tabular-nums; }
+.deck-footer b { font-weight: 600; color: var(--ink); }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Front page
+     ====================================================== -->
+<section class="slide front active" data-name="front" data-no-master>
+    <div class="content">
+        <div class="masthead reveal" style="--i:0">
+            <div class="name" data-edit>The Quarterly Ledger</div>
+            <div class="dateline">
+                <span data-edit>Vol. XII, No. 3</span>
+                <span data-edit>Thursday, 17 September 2026</span>
+                <span data-edit>Late edition</span>
+            </div>
+        </div>
+        <div class="story">
+            <div class="lead reveal" style="--i:1">
+                <div class="kicker" data-edit>Exclusive · The year in review</div>
+                <h1 data-edit>Small team doubles output, keeps its standards</h1>
+                <p class="deck-line" style="font-size:28px" data-edit>Twelve months, three decisions and one surprising result, reported from the inside</p>
+            </div>
+            <div class="text justified reveal" style="--i:2">
+                <p class="byline" style="margin-bottom:14px" data-edit>By Your Name, Staff Writer</p>
+                <p class="dropcap" data-edit>Every year begins with a question nobody can yet answer. This one asked whether a team of twelve could hold its standards while doubling what it shipped. The answer, twelve months on, is mostly yes.</p>
+            </div>
+            <div class="text justified reveal" style="--i:3">
+                <p data-edit>The exceptions are the interesting part: two projects that slipped, one cancelled, and the quiet autumn week that changed the plan.</p>
+                <p data-edit><i>Continued on page 4</i></p>
+            </div>
+            <div class="photo reveal-img" style="--i:2">
+                <div class="plate"></div>
+                <p class="caption" data-edit>The team in the autumn week that changed the plan. Photograph: Staff</p>
+            </div>
+        </div>
+    </div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:1195px; top:275px; width:630px; height:463px; align-items:center; justify-content:center; border:3px dashed var(--rule-2); color:var(--ink-3); font-family:var(--font); font-size:26px; text-align:center">Double-click to choose a photograph</div>
+    <aside class="notes" hidden>Treat the front page as the summary: headline, deck line, first paragraph. Everything else is inside.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Index
+     ====================================================== -->
+<section class="slide index" data-name="index">
+    <div class="content">
+        <div class="kicker reveal" style="--i:0" data-edit>Inside this edition</div>
+        <h2 class="reveal" style="--i:1" data-edit>Contents</h2>
+        <div class="box reveal" style="--i:2">
+            <div class="rows" data-group>
+                <div class="row"><h3 data-edit>The year in brief</h3><span class="pg">Page 3</span></div>
+                <div class="row"><h3 data-edit>What we built</h3><span class="pg">Page 5</span></div>
+                <div class="row"><h3 data-edit>Interview: the quiet week</h3><span class="pg">Page 6</span></div>
+                <div class="row"><h3 data-edit>By the numbers</h3><span class="pg">Page 7</span></div>
+                <div class="row"><h3 data-edit>Listings</h3><span class="pg">Page 8</span></div>
+                <div class="row"><h3 data-edit>Letters and the back page</h3><span class="pg">Page 9</span></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Section
+     ====================================================== -->
+<section class="slide section" data-name="section" data-section="The year in brief">
+    <div class="content">
+        <div class="band reveal" style="--i:0">
+            <h2 data-edit>The Year in Brief</h2>
+            <div class="kicker" data-edit>Section B · Pages 3 to 5</div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Article
+     ====================================================== -->
+<section class="slide article" data-name="article">
+    <div class="content">
+        <div class="kicker reveal" style="--i:0" data-edit>Continued from page 1</div>
+        <h2 class="reveal" style="--i:1" data-edit>Three decisions that made the difference</h2>
+        <div class="cols justified">
+            <div class="reveal" style="--i:2">
+                <p class="dropcap" data-edit>The first decision was to plan in seasons rather than quarters. Each season carried one theme, and every project had to earn its place under that theme or wait for the next.</p>
+                <p data-edit>It sounds like a change of vocabulary. It was a change of behaviour: projects that did not fit were no longer squeezed in.</p>
+            </div>
+            <div class="reveal" style="--i:3">
+                <p data-edit>The second was slower and harder. The team stopped measuring effort and started measuring what shipped. Meetings shrank. Documents grew. The work improved.</p>
+                <p data-edit>"We stopped being busy," one engineer said, "and started being finished."</p>
+            </div>
+            <div class="reveal" style="--i:4">
+                <p data-edit>The third decision was made in a single week in October, when the team paused new work entirely and repaired what it had. That week is the subject of the interview on page 6.</p>
+                <p data-edit>What follows is the record: the projects, the numbers, and the voices of the people who did the work.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Photo story
+     ====================================================== -->
+<section class="slide photo-story" data-name="photo" data-section="What we built">
+    <div class="content">
+        <div class="plate reveal-img" style="--i:0"></div>
+        <div data-placeholder="image" style="display:none; position:absolute; left:0; top:0; width:1140px; height:800px; align-items:center; justify-content:center; border:3px dashed var(--rule-2); color:var(--ink-3); font-family:var(--font); font-size:26px; text-align:center">Double-click to choose a photograph</div>
+        <p class="caption figcap reveal" style="--i:1" data-edit>The launch, seen from the back of the room. Photograph: Staff</p>
+        <div class="text">
+            <div class="kicker reveal" style="--i:2" data-edit>Picture story</div>
+            <h2 class="reveal" style="--i:3; font-size:56px" data-edit>The night the first version shipped</h2>
+            <p class="reveal" style="--i:4" data-edit>The photograph on the left takes a picture: double-click it in the editor. Black and white suits the page; colour pictures are shown in colour all the same.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Pull quote
+     ====================================================== -->
+<section class="slide pull" data-name="quote" data-section="Interview">
+    <div class="content">
+        <div class="kicker reveal" style="--i:0" data-edit>Interview · The quiet week</div>
+        <blockquote class="reveal" style="--i:1" data-edit>"The best thing we did this year was decide what not to do."</blockquote>
+        <p class="byline who reveal" style="--i:2" data-edit>A team lead, speaking to the Ledger</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Numbers
+     ====================================================== -->
+<section class="slide stats" data-name="numbers" data-section="By the numbers">
+    <div class="content">
+        <div class="kicker reveal" style="--i:0" data-edit>By the numbers</div>
+        <h2 class="reveal" style="--i:1" data-edit>The year in four figures</h2>
+        <div class="box">
+            <div class="reveal" style="--i:2"><div class="big" data-edit>2x</div><h3 data-edit>Output</h3><p data-edit>Projects shipped against last year, same team.</p></div>
+            <div class="reveal" style="--i:3"><div class="big" data-edit>94%</div><h3 data-edit>On time</h3><p data-edit>Delivered inside the season they were planned for.</p></div>
+            <div class="reveal" style="--i:4"><div class="big" data-edit>12</div><h3 data-edit>People</h3><p data-edit>Including the two who joined in autumn.</p></div>
+            <div class="reveal" style="--i:5"><div class="big" data-edit>1</div><h3 data-edit>Quiet week</h3><p data-edit>The one that changed the plan.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Listings
+     ====================================================== -->
+<section class="slide listings" data-name="listings" data-section="Listings">
+    <div class="content">
+        <div class="kicker reveal" style="--i:0" data-edit>Listings</div>
+        <h2 class="reveal" style="--i:1" data-edit>Every project, by season</h2>
+        <table class="reveal" style="--i:2" data-group>
+            <thead><tr><th>Season</th><th>Theme</th><th>Projects</th><th class="num">Shipped</th><th class="num">On time</th></tr></thead>
+            <tbody>
+                <tr><td>Spring</td><td>Foundations</td><td>Platform, accounts, billing</td><td class="num">4</td><td class="num">100%</td></tr>
+                <tr><td>Summer</td><td>First release</td><td>Public beta, onboarding, docs</td><td class="num">6</td><td class="num">83%</td></tr>
+                <tr><td>Autumn</td><td>Listening</td><td>Interviews, repairs, the quiet week</td><td class="num">3</td><td class="num">100%</td></tr>
+                <tr><td>Winter</td><td>Scale</td><td>Search, sharing, offline</td><td class="num">5</td><td class="num">100%</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Back page
+     ====================================================== -->
+<section class="slide back" data-name="back" data-no-master>
+    <div class="content">
+        <div class="masthead reveal" style="--i:0; width:100%">
+            <div class="name" style="font-size:72px" data-edit>The Quarterly Ledger</div>
+        </div>
+        <div class="kicker reveal" style="--i:1; margin-top:60px" data-edit>Letters to the editor</div>
+        <h2 class="reveal" style="--i:2" data-edit>Thank you for reading</h2>
+        <div class="lines reveal" style="--i:3">
+            <span class="byline" data-edit>letters@example.com</span>
+            <span class="byline" data-edit>example.com/ledger</span>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: the running folio, edited once in the editor -->
+<div class="deck-footer">
+    <span data-edit>The Quarterly Ledger</span>
+    <span data-edit>Thursday, 17 September 2026</span>
+    <span class="num">Page <b data-page-now>1</b> of <span data-page-total>@@SLIDES@@</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

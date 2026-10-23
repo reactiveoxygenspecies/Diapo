@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minimal</title>
+<!-- Minimal: white space, one quiet grotesque at light weights, black on off-white, hairlines only.
+     Nothing decorates; the type and the empty space are the design. Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #111111;   /* headings, key text        */
+    --ink-2:    #3a3a3a;   /* body text                 */
+    --ink-3:    #8c8c8c;   /* captions, secondary       */
+    --rule:     #e4e4e4;   /* hairlines                 */
+    --paper:    #fbfbfa;   /* slide background          */
+    --paper-2:  #f1f1ef;   /* the one panel tone        */
+    --accent:   #111111;   /* the accent is black       */
+    --accent-2: #c9c9c6;   /* a lighter grey for marks  */
+
+    --stage-bg: #1a1a1a;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #fbfbfa;
+    --font: 'Hanken Grotesk', 'Helvetica Neue', Arial, sans-serif;
+
+    --pad-x: 140px;        /* layout rhythm at 1920x1080 */
+    --pad-top: 120px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* motion: the reveal's curve   */
+    --dur: 1s;                                   /* ... its duration             */
+    --stagger: 0.14s;                            /* ... the step between --i's   */
+    --reveal-y: 14px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-size: 128px; font-weight: 300; line-height: 1.02; letter-spacing: -0.035em; color: var(--ink); }
+h2 { font-size: 84px; font-weight: 300; line-height: 1.06; letter-spacing: -0.03em; color: var(--ink); }
+h3 { font-size: 34px; font-weight: 500; line-height: 1.25; letter-spacing: -0.01em; color: var(--ink); }
+p  { font-size: 30px; font-weight: 400; line-height: 1.5; color: var(--ink-2); }
+ul, ol { font-size: 30px; line-height: 1.5; padding-left: 36px; color: var(--ink-2); }
+li { margin-bottom: 14px; }
+blockquote { font-size: 72px; font-weight: 300; line-height: 1.2; letter-spacing: -0.03em; color: var(--ink); }
+.eyebrow { font-size: 20px; font-weight: 500; letter-spacing: 0.02em; color: var(--ink-3); margin-bottom: 36px; }
+.sub { font-size: 34px; font-weight: 300; line-height: 1.4; color: var(--ink-3); margin-top: 32px; }
+.caption { font-size: 20px; line-height: 1.5; color: var(--ink-3); }
+b, strong { font-weight: 600; color: var(--ink); }
+
+/* ===========================================
+   LAYOUT
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: var(--pad-top); }
+.rule { height: 1px; background: var(--rule); }
+
+/* Cover: everything sits low and left */
+.cover .content { display: flex; flex-direction: column; justify-content: flex-end; }
+.cover h1 { max-width: 1300px; }
+.cover .meta { position: absolute; left: 0; top: 0; display: flex; gap: 60px; }
+.cover .meta p { font-size: 20px; color: var(--ink-3); }
+
+/* Statement */
+.statement .content { display: flex; flex-direction: column; justify-content: center; }
+.statement h2 { font-size: 96px; max-width: 1500px; }
+
+/* Agenda */
+.agenda .cols { display: grid; grid-template-columns: 560px 1fr; gap: 80px; }
+.agenda ol { list-style: none; padding: 0; }
+.agenda li { display: grid; grid-template-columns: 90px 1fr; align-items: baseline; padding: 26px 0; border-top: 1px solid var(--rule); font-size: 34px; font-weight: 300; color: var(--ink); margin: 0; }
+.agenda li .n { font-size: 20px; font-weight: 500; color: var(--ink-3); }
+
+/* Two columns */
+.pair .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 100px; margin-top: 72px; }
+.pair .col h3 { padding-bottom: 20px; margin-bottom: 24px; border-bottom: 1px solid var(--ink); }
+.pair .col p { font-size: 27px; }
+
+/* Picture: the right half of the slide */
+.picture .plate { position: absolute; left: 960px; top: 0; width: 960px; height: 1080px; background: var(--paper-2); }
+.picture .content { right: 1060px; display: flex; flex-direction: column; justify-content: center; }
+
+/* Big number */
+.number .content { display: flex; flex-direction: column; justify-content: center; }
+.number .big { font-size: 420px; font-weight: 300; line-height: 0.9; letter-spacing: -0.06em; color: var(--ink); }
+.number p { margin-top: 48px; max-width: 900px; }
+
+/* Quote */
+.quote .content { display: flex; flex-direction: column; justify-content: center; }
+.quote blockquote { max-width: 1500px; }
+.quote .who { margin-top: 48px; }
+
+/* Three columns */
+.trio .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 80px; margin-top: 80px; }
+.trio .cell { border-top: 1px solid var(--ink); padding-top: 28px; }
+.trio .cell .n { font-size: 20px; font-weight: 500; color: var(--ink-3); margin-bottom: 60px; }
+.trio .cell h3 { margin-bottom: 14px; }
+.trio .cell p { font-size: 25px; }
+
+/* Table */
+.data table { width: 100%; border-collapse: collapse; font-size: 28px; margin-top: 56px; }
+.data th { text-align: left; font-weight: 500; font-size: 20px; color: var(--ink-3); padding: 0 0 20px; border-bottom: 1px solid var(--ink); }
+.data td { padding: 24px 0; border-bottom: 1px solid var(--rule); color: var(--ink-2); font-weight: 300; }
+.data td:first-child { color: var(--ink); font-weight: 500; }
+.data th.num, .data td.num { text-align: right; font-variant-numeric: tabular-nums; width: 260px; }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: flex-end; }
+.closing .lines { display: flex; gap: 80px; margin-top: 60px; padding-top: 28px; border-top: 1px solid var(--rule); }
+.closing .lines p { font-size: 22px; color: var(--ink-3); }
+
+/* ===========================================
+   MASTER LAYER - only a page number, bottom right
+   =========================================== */
+.deck-footer {
+    position: absolute; right: var(--pad-x); bottom: 56px; z-index: 5;
+    font-family: var(--font); font-size: 18px; font-weight: 500; color: var(--ink-3); font-variant-numeric: tabular-nums;
+}
+.deck-footer b { font-weight: 500; color: var(--ink); }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="content">
+        <div class="meta reveal" style="--i:0">
+            <p data-edit>Your Name</p>
+            <p data-edit>September 2026</p>
+        </div>
+        <h1 class="reveal" style="--i:1" data-edit>Less, but better</h1>
+        <p class="sub reveal" style="--i:2" data-edit>A short talk on what to leave out</p>
+    </div>
+    <aside class="notes" hidden>Say the title and stop. Let the space do the work.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Statement
+     ====================================================== -->
+<section class="slide statement" data-name="statement">
+    <div class="content">
+        <h2 class="reveal" style="--i:0" data-edit>Every element on a slide is a claim on the audience's attention.</h2>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Agenda
+     ====================================================== -->
+<section class="slide agenda" data-name="agenda">
+    <div class="content">
+        <div class="cols">
+            <div>
+                <div class="eyebrow reveal" style="--i:0" data-edit>Contents</div>
+                <h2 class="reveal" style="--i:1" data-edit>Four ideas</h2>
+            </div>
+            <ol data-group>
+                <li class="reveal" style="--i:2"><span class="n">01</span><span data-edit>Subtract before you add</span></li>
+                <li class="reveal" style="--i:3"><span class="n">02</span><span data-edit>One idea per surface</span></li>
+                <li class="reveal" style="--i:4"><span class="n">03</span><span data-edit>Let type carry the hierarchy</span></li>
+                <li class="reveal" style="--i:5"><span class="n">04</span><span data-edit>Stop when it is clear</span></li>
+            </ol>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Two columns
+     ====================================================== -->
+<section class="slide pair" data-name="subtract" data-section="Subtract">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>01</div>
+        <h2 class="reveal" style="--i:1" data-edit>Subtract before you add</h2>
+        <div class="cols">
+            <div class="col reveal" style="--i:2">
+                <h3 data-edit>What we removed</h3>
+                <p data-edit>The logo on every slide. The gradient. The second accent colour. The icons that repeated the words beside them. The footer sentence nobody read.</p>
+            </div>
+            <div class="col reveal" style="--i:3">
+                <h3 data-edit>What was left</h3>
+                <p data-edit>The argument. It turned out to be enough, and it turned out to be clearer once it was alone.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Picture
+     ====================================================== -->
+<section class="slide picture" data-name="picture" data-section="One idea">
+    <div class="plate reveal-img" style="--i:0"></div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:960px; top:0; width:960px; height:1080px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:28px; text-align:center">Double-click to choose an image</div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:1" data-edit>02</div>
+        <h2 class="reveal" style="--i:2" data-edit>One idea per surface</h2>
+        <p class="reveal" style="--i:3; margin-top:36px" data-edit>The right half is a picture: double-click it in the editor to choose one. The left half is the one sentence the picture needs.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Big number
+     ====================================================== -->
+<section class="slide number" data-name="number">
+    <div class="content">
+        <div class="big reveal" style="--i:0" data-edit>40%</div>
+        <p class="reveal" style="--i:1" data-edit>fewer slides than the first draft, and nothing anyone asked to have back.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Quote
+     ====================================================== -->
+<section class="slide quote" data-name="quote" data-section="Type">
+    <div class="content">
+        <blockquote class="reveal" style="--i:0" data-edit>Good design is as little design as possible.</blockquote>
+        <p class="who caption reveal" style="--i:1" data-edit>Dieter Rams, the tenth principle</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Three columns
+     ====================================================== -->
+<section class="slide trio" data-name="hierarchy">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>03</div>
+        <h2 class="reveal" style="--i:1" data-edit>Let type carry the hierarchy</h2>
+        <div class="grid">
+            <div class="cell reveal" style="--i:2"><div class="n">Weight</div><h3 data-edit>Light for statements</h3><p data-edit>The large sizes stay at 300; the thin strokes keep them calm.</p></div>
+            <div class="cell reveal" style="--i:3"><div class="n">Size</div><h3 data-edit>Three sizes, no more</h3><p data-edit>A headline, a body, a caption. Everything belongs to one of them.</p></div>
+            <div class="cell reveal" style="--i:4"><div class="n">Colour</div><h3 data-edit>Black, then grey</h3><p data-edit>Secondary text drops to grey instead of shrinking.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Table
+     ====================================================== -->
+<section class="slide data" data-name="table" data-section="Stop">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>04</div>
+        <h2 class="reveal" style="--i:1" data-edit>Before and after</h2>
+        <table class="reveal" style="--i:2" data-group>
+            <thead><tr><th>Measure</th><th class="num">First draft</th><th class="num">Final</th><th class="num">Change</th></tr></thead>
+            <tbody>
+                <tr><td>Slides</td><td class="num">42</td><td class="num">25</td><td class="num">-40%</td></tr>
+                <tr><td>Words per slide</td><td class="num">61</td><td class="num">18</td><td class="num">-70%</td></tr>
+                <tr><td>Colours</td><td class="num">7</td><td class="num">2</td><td class="num">-5</td></tr>
+                <tr><td>Questions afterwards</td><td class="num">3</td><td class="num">11</td><td class="num">+8</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 10 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing" data-no-master>
+    <div class="content">
+        <h1 class="reveal" style="--i:0" data-edit>Thank you</h1>
+        <div class="lines">
+            <p class="reveal" style="--i:1" data-edit>hello@example.com</p>
+            <p class="reveal" style="--i:2" data-edit>example.com</p>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: a page number on every slide, edited once in the editor -->
+<div class="deck-footer"><b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

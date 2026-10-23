@@ -1,0 +1,109 @@
+/* ===========================================
+   FIXED STAGE - MANDATORY BASE STYLES
+   Include this ENTIRE file, unchanged, in every deck's <style> block,
+   right after the :root theme variables and the * reset.
+
+   Slides are authored at 1920x1080 and the whole stage is scaled to the
+   window by the controller (deck-controller.js). The deck editor relies on
+   exactly these selectors and classes:
+     .deck-viewport > .deck-stage > .slide     the structure it opens
+     .slide.active / .slide.visible            how a slide is shown
+     .reveal / .reveal-img / .reveal-right     entrances it can keep when
+                                               an element is moved (--dx/--dy)
+     --i                                       the stagger index it shows
+                                               in the Animation panel
+   Taken from the editor's own template (deck-editor/app/templates/blank.html),
+   with fallbacks for the variables a deck may leave out.
+   Part of the Diapo Format. Copyright (c) 2026 Daniele Rossetto. MIT licence (SPDX-License-Identifier: MIT);
+   free to keep in any deck.
+   =========================================== */
+
+/* 1. Lock the browser viewport */
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--stage-bg, #000); }
+
+/* 2. Full-window deck viewport */
+.deck-viewport { position: fixed; inset: 0; overflow: hidden; background: var(--stage-bg, #000); }
+
+/* 3. Fixed design canvas. The controller sets transform: translate() scale().
+   For another slide size, override width/height here AND on .slide below
+   (the controller reads the stage's laid-out size, the editor does too). */
+.deck-stage {
+    position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;
+    overflow: hidden; transform-origin: 0 0; background: var(--slide-bg, #fff);
+}
+
+/* 4. Slides stack inside the stage. Visibility is switched with classes,
+   NEVER with display:none (a later `display:flex` rule would show every
+   slide at once, and the editor's thumbnails and PDF need the box). */
+.slide {
+    position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: hidden;
+    display: block; visibility: hidden; opacity: 0; pointer-events: none;
+    background: var(--slide-bg, #fff);
+    font-family: var(--font); color: var(--ink-2, var(--ink, #222));
+}
+.slide.active, .slide.visible { visibility: visible; opacity: 1; pointer-events: auto; z-index: 1; }
+
+/* 5. Keep media inside authored slide bounds */
+img, video, canvas, svg { max-width: 100%; max-height: 100%; }
+
+/* 6. Speaker notes never render on the slide (the presenter view reads them) */
+.notes { display: none; }
+
+/* 7. Presentation chrome outside the stage (the controller's prev/next and page number).
+   Thin CSS chevrons in white blended by difference, so they read as dark ink on a light
+   slide and light on a dark one; faint until hovered. The controller adds
+   deck-controls-idle to <html> after 2 s without mouse movement (removed on the next
+   move) and toggles deck-controls-off with the H key. Keep the markup: two buttons
+   around the .page span, the chevrons are drawn on button:first-child / :last-child. */
+.deck-controls { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: 14px; color: #fff; mix-blend-mode: difference; transition: opacity 0.4s; }
+.deck-controls button { width: 24px; height: 24px; padding: 0; border: 0; background: none; color: inherit; font-size: 0; cursor: pointer; opacity: 0.4; transition: opacity 0.15s; }
+.deck-controls button:hover { opacity: 1; }
+.deck-controls button::before { content: ""; display: block; width: 8px; height: 8px; margin: auto; border: solid currentColor; border-width: 0 0 1.6px 1.6px; transform: translateX(2px) rotate(45deg); }
+.deck-controls button:last-child::before { transform: translateX(-2px) rotate(-135deg); }
+.deck-controls .page { font: 500 11px var(--font, system-ui, sans-serif); letter-spacing: 0.06em; opacity: 0.5; font-variant-numeric: tabular-nums; }
+html.deck-controls-idle .deck-controls { opacity: 0; pointer-events: none; }
+html.deck-controls-off .deck-controls { display: none; }
+
+/* 8. Print: one fixed-size slide per page (the editor's PDF export builds on this) */
+@media print {
+    html, body { width: 1920px; height: auto; overflow: visible; background: #fff; }
+    .deck-viewport { position: static; overflow: visible; background: #fff; }
+    .deck-stage { position: static; width: auto; height: auto; transform: none !important; background: none; }
+    .slide { position: relative; display: block !important; visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; width: 1920px; height: 1080px; break-after: page; page-break-after: always; }
+    .slide:last-child { break-after: auto; page-break-after: auto; }
+    .slide .reveal, .slide .reveal-img, .slide .reveal-right { opacity: 1 !important; transform: translate(var(--dx, 0px), var(--dy, 0px)) !important; }
+    .deck-controls { display: none !important; }
+}
+
+/* 9. Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; }
+}
+
+/* 10. Superscript and subscript at a typographic size: about two thirds of the text
+   (word processors use 65%, TeX 70%), raised or lowered by the browser as usual, without
+   changing the line height. The editor's text bar writes plain <sup> and <sub>. */
+sup, sub { font-size: 65%; line-height: 0; }
+
+/* ===========================================
+   REVEAL ANIMATIONS (the deck's own entrances)
+   Elements with .reveal / .reveal-img / .reveal-right animate in when
+   the slide becomes .visible. The visible state MUST end in
+   translate(var(--dx, 0px), var(--dy, 0px)): the editor writes --dx/--dy
+   when the user drags such an element, so it stays where they put it and
+   still animates. --i staggers the delay (style="--i:2").
+   Change the durations, distances and easing to suit the style; keep
+   the selectors, the custom properties and the visible transform.
+   =========================================== */
+.reveal, .reveal-img, .reveal-right {
+    opacity: 0;
+    transition: opacity var(--dur, 0.7s) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+                transform var(--dur, 0.7s) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: calc(var(--i, 0) * var(--stagger, 0.12s));
+}
+.reveal { transform: translateY(var(--reveal-y, 28px)); }
+.reveal-img { transform: translateY(calc(var(--reveal-y, 28px) * 0.65)) scale(0.985); }
+.reveal-right { transform: translateX(calc(var(--reveal-y, 28px) * 1.4)); }
+.slide.visible .reveal, .slide.visible .reveal-img, .slide.visible .reveal-right {
+    opacity: 1; transform: translate(var(--dx, 0px), var(--dy, 0px));
+}

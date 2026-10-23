@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deco</title>
+<!-- Deco: art deco luxury. Near-black with gold hairlines, stepped frames, sunburst fans and chevrons,
+     Cinzel capitals for headlines, Cormorant Garamond body. Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #f3e9d2;   /* champagne: headings       */
+    --ink-2:    #cfc3a9;   /* body text                 */
+    --ink-3:    #8c826c;   /* captions, secondary       */
+    --rule:     #3a3327;   /* dark hairlines            */
+    --paper:    #0f0e0c;   /* near-black                */
+    --paper-2:  #191712;   /* panels                    */
+    --accent:   #d4af37;   /* gold                      */
+    --accent-2: #8a6d1f;   /* old gold, second series   */
+    --accent-3: #1f4a46;   /* deep emerald              */
+
+    --stage-bg: #050504;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #0f0e0c;
+    --font: 'Cormorant Garamond', Georgia, serif;
+    --font-display: 'Cinzel', 'Times New Roman', serif;
+
+    --pad-x: 140px;        /* layout rhythm at 1920x1080 */
+    --pad-top: 110px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* motion: the reveal's curve   */
+    --dur: 1s;                                   /* ... its duration             */
+    --stagger: 0.14s;                            /* ... the step between --i's   */
+    --reveal-y: 18px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ===========================================
+   FIXED 16:9 STAGE - mandatory base styles.
+   Slides are authored at 1920x1080 and scaled as a whole.
+   Part of the Diapo Format. Copyright (c) 2026 Daniele Rossetto. MIT licence (SPDX-License-Identifier: MIT);
+   free to keep in any deck.
+   =========================================== */
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--stage-bg, #000); }
+.deck-viewport { position: fixed; inset: 0; overflow: hidden; background: var(--stage-bg, #000); }
+.deck-stage {
+    position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;
+    overflow: hidden; transform-origin: 0 0; background: var(--slide-bg, #fff);
+}
+.slide {
+    position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: hidden;
+    display: block; visibility: hidden; opacity: 0; pointer-events: none;
+    background: var(--slide-bg, #fff);
+    font-family: var(--font); color: var(--ink-2, var(--ink, #222));
+}
+.slide.active, .slide.visible { visibility: visible; opacity: 1; pointer-events: auto; z-index: 1; }
+img, video, canvas, svg { max-width: 100%; max-height: 100%; }
+.notes { display: none; }                 /* speaker notes: shown by the editor's presenter view only */
+/* Controls: previous / next and the page number, outside the stage at the bottom of the
+   window. Thin chevrons drawn in CSS, in whatever ink reads on the slide beneath (white,
+   blended by difference: dark on a light slide, light on a dark one), faint until the mouse
+   is over them. The controller fades them out after 2 s without mouse movement and back on
+   the first move; H hides them altogether (H again brings them back). */
+.deck-controls { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: 14px; color: #fff; mix-blend-mode: difference; transition: opacity 0.4s; }
+.deck-controls button { width: 24px; height: 24px; padding: 0; border: 0; background: none; color: inherit; font-size: 0; cursor: pointer; opacity: 0.4; transition: opacity 0.15s; }
+.deck-controls button:hover { opacity: 1; }
+.deck-controls button::before { content: ""; display: block; width: 8px; height: 8px; margin: auto; border: solid currentColor; border-width: 0 0 1.6px 1.6px; transform: translateX(2px) rotate(45deg); }
+.deck-controls button:last-child::before { transform: translateX(-2px) rotate(-135deg); }
+.deck-controls .page { font: 500 11px var(--font, system-ui, sans-serif); letter-spacing: 0.06em; opacity: 0.5; font-variant-numeric: tabular-nums; }
+html.deck-controls-idle .deck-controls { opacity: 0; pointer-events: none; }
+html.deck-controls-off .deck-controls { display: none; }
+
+/* Print: one fixed-size slide per page */
+@media print {
+    html, body { width: 1920px; height: auto; overflow: visible; background: #fff; }
+    .deck-viewport { position: static; overflow: visible; background: #fff; }
+    .deck-stage { position: static; width: auto; height: auto; transform: none !important; background: none; }
+    .slide { position: relative; display: block !important; visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; width: 1920px; height: 1080px; break-after: page; page-break-after: always; }
+    .slide:last-child { break-after: auto; page-break-after: auto; }
+    .slide .reveal, .slide .reveal-img, .slide .reveal-right { opacity: 1 !important; transform: translate(var(--dx, 0px), var(--dy, 0px)) !important; }
+    .deck-controls { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; }
+}
+
+/* Superscript and subscript at a typographic size: about two thirds of the text
+   (word processors use 65%, TeX 70%), raised or lowered by the browser as usual,
+   without changing the line height. The editor's text bar writes plain <sup> and <sub>. */
+sup, sub { font-size: 65%; line-height: 0; }
+
+/* ===========================================
+   REVEAL ANIMATIONS
+   Elements with .reveal / .reveal-img / .reveal-right animate in
+   when the slide becomes .visible. --dx/--dy are set by the editor
+   when an element is moved, so a moved element still animates.
+   --i staggers the delay.
+   =========================================== */
+.reveal, .reveal-img, .reveal-right {
+    opacity: 0;
+    transition: opacity var(--dur, 0.7s) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)), transform var(--dur, 0.7s) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: calc(var(--i, 0) * var(--stagger, 0.12s));
+}
+.reveal { transform: translateY(var(--reveal-y, 28px)); }
+.reveal-img { transform: translateY(calc(var(--reveal-y, 28px) * 0.65)) scale(0.985); }
+.reveal-right { transform: translateX(calc(var(--reveal-y, 28px) * 1.4)); }
+.slide.visible .reveal, .slide.visible .reveal-img, .slide.visible .reveal-right {
+    opacity: 1; transform: translate(var(--dx, 0px), var(--dy, 0px));
+}
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-display); font-size: 112px; font-weight: 600; line-height: 1.08; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
+h2 { font-family: var(--font-display); font-size: 72px; font-weight: 600; line-height: 1.12; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
+h3 { font-family: var(--font-display); font-size: 32px; font-weight: 600; line-height: 1.25; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+p  { font-size: 32px; line-height: 1.5; color: var(--ink-2); }
+ul, ol { font-size: 32px; line-height: 1.5; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 12px; }
+blockquote { font-family: var(--font); font-style: italic; font-size: 76px; font-weight: 400; line-height: 1.2; color: var(--ink); }
+.eyebrow { font-family: var(--font-display); font-size: 20px; font-weight: 600; letter-spacing: 0.4em; text-transform: uppercase; color: var(--accent); margin-bottom: 28px; }
+.sub { font-style: italic; font-size: 40px; line-height: 1.35; color: var(--ink-3); margin-top: 28px; }
+.caption { font-family: var(--font-display); font-size: 18px; letter-spacing: 0.24em; text-transform: uppercase; line-height: 1.5; color: var(--ink-3); }
+
+/* ===========================================
+   LAYOUT
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: var(--pad-top); }
+.ornament { display: flex; align-items: center; gap: 18px; color: var(--accent); }
+.ornament::before, .ornament::after { content: ''; flex: 1; height: 1px; background: var(--accent); }
+.ornament i { width: 14px; height: 14px; rotate: 45deg; border: 1px solid var(--accent); }
+.ornament i.solid { background: var(--accent); }
+.gold-rule { height: 1px; background: var(--accent); }
+.frame { position: absolute; inset: 40px; border: 1px solid var(--accent); pointer-events: none; }
+.frame::before { content: ''; position: absolute; inset: 10px; border: 1px solid var(--accent-2); }
+.frame::after { content: ''; position: absolute; inset: 24px; border: 1px solid var(--rule); }
+
+/* Cover: a sunburst fan behind the title */
+.cover .fan { position: absolute; left: 460px; top: 560px; width: 1000px; height: 500px; border-radius: 500px 500px 0 0; background: repeating-conic-gradient(from 270deg at 50% 100%, var(--accent) 0 1deg, transparent 1deg 9deg); opacity: 0.35; pointer-events: none; }
+.cover .fan::after { content: ''; position: absolute; left: 50%; bottom: -6px; width: 260px; height: 130px; translate: -50% 0; border-radius: 130px 130px 0 0; background: var(--paper); border: 1px solid var(--accent); border-bottom: 0; }
+.cover .content { display: flex; flex-direction: column; justify-content: flex-start; align-items: center; text-align: center; padding-top: 90px; }
+.cover h1 { max-width: 1400px; }
+.cover .ornament { width: 700px; margin: 32px 0 8px; }
+.cover .credit { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; }
+
+/* Programme */
+.programme .rows { margin-top: 48px; max-width: 1400px; margin-left: auto; margin-right: auto; }
+.programme .row { display: grid; grid-template-columns: 120px 1fr auto; align-items: baseline; gap: 40px; padding: 26px 0; border-bottom: 1px solid var(--rule); }
+.programme .row .n { font-family: var(--font-display); font-size: 28px; color: var(--accent); letter-spacing: 0.1em; }
+.programme .row h3 { color: var(--ink); font-size: 34px; }
+.programme .row .caption { text-align: right; }
+.programme .content { text-align: center; }
+
+/* Section: a stepped frame */
+.section .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.section .step { width: 900px; padding: 60px 40px; border: 1px solid var(--accent); position: relative; }
+.section .step::before, .section .step::after { content: ''; position: absolute; left: 40px; right: 40px; height: 1px; background: var(--accent); }
+.section .step::before { top: -14px; } .section .step::after { bottom: -14px; }
+.section .step h2 { font-size: 88px; }
+.section .n { font-family: var(--font-display); font-size: 26px; letter-spacing: 0.4em; color: var(--accent); margin-bottom: 26px; }
+
+/* Three columns with chevrons */
+.trio .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; margin-top: 60px; }
+.trio .cell { text-align: center; padding: 48px 36px; border: 1px solid var(--rule); position: relative; }
+.trio .cell .chev { width: 40px; height: 40px; margin: 0 auto 32px; border-left: 2px solid var(--accent); border-bottom: 2px solid var(--accent); rotate: -45deg; }
+.trio .cell h3 { margin-bottom: 16px; }
+.trio .cell p { font-size: 27px; }
+
+/* Picture in a gold frame */
+.picture .plate { position: absolute; left: 0; top: 0; width: 820px; height: 860px; border: 1px solid var(--accent); padding: 18px; }
+.picture .plate::before { content: ''; position: absolute; inset: 18px; background: var(--paper-2); border: 1px solid var(--accent-2); }
+.picture .text { position: absolute; left: 960px; top: 60px; width: 680px; }
+.picture .text .ornament { margin: 36px 0 32px; }
+
+/* Big number */
+.number .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.number .big { font-family: var(--font-display); font-size: 300px; font-weight: 600; line-height: 1; letter-spacing: 0.04em; color: var(--accent); }
+.number h2 { margin-top: 24px; font-size: 52px; }
+.number p { margin-top: 20px; max-width: 1100px; }
+.number .ornament { width: 500px; margin: 36px 0 0; }
+
+/* Quote */
+.quote .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.quote blockquote { max-width: 1500px; }
+.quote .ornament { width: 400px; margin: 44px 0 24px; }
+
+/* Timeline of chevrons */
+.timeline .track { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 80px; }
+.timeline .step { text-align: center; padding-top: 48px; position: relative; }
+.timeline .step::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--rule); }
+.timeline .step::after { content: ''; position: absolute; left: 50%; top: -9px; width: 18px; height: 18px; translate: -50% 0; rotate: 45deg; background: var(--paper); border: 1px solid var(--accent); }
+.timeline .step .yr { font-family: var(--font-display); font-size: 40px; color: var(--accent); margin-bottom: 20px; }
+.timeline .step h3 { color: var(--ink); font-size: 28px; margin-bottom: 12px; }
+.timeline .step p { font-size: 25px; }
+
+/* Table */
+.data table { width: 100%; border-collapse: collapse; font-size: 30px; margin-top: 48px; }
+.data th { font-family: var(--font-display); font-weight: 600; font-size: 18px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); text-align: left; padding: 0 20px 20px; border-bottom: 1px solid var(--accent); }
+.data td { padding: 22px 20px; border-bottom: 1px solid var(--rule); color: var(--ink-2); }
+.data td:first-child { color: var(--ink); font-family: var(--font-display); font-size: 24px; letter-spacing: 0.06em; }
+.data th.num, .data td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.closing .lines { display: flex; gap: 64px; margin-top: 48px; }
+
+/* ===========================================
+   MASTER LAYER - the running footer (a stage child outside the slides)
+   =========================================== */
+.deck-footer {
+    position: absolute; left: var(--pad-x); right: var(--pad-x); bottom: 56px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font-display); font-size: 16px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--ink-3);
+}
+.deck-footer .num { color: var(--accent); }
+.deck-footer b { font-weight: 600; color: var(--accent); }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="frame"></div>
+    <div class="fan reveal-img" style="--i:0"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:1" data-edit>The Grand Hotel presents</div>
+        <h1 class="reveal" style="--i:2" data-edit>The Winter Gala</h1>
+        <div class="ornament reveal" style="--i:3"><i></i><i class="solid"></i><i></i></div>
+        <p class="sub reveal" style="--i:4" data-edit>An evening of music, dinner and the launch of the new season</p>
+        <div class="credit reveal" style="--i:5">
+            <span class="caption" data-edit>Saturday, 12 December 2026</span>
+            <span class="caption" data-edit>Black tie</span>
+        </div>
+    </div>
+    <aside class="notes" hidden>Let the room settle. Read the title; do not explain it.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Programme
+     ====================================================== -->
+<section class="slide programme" data-name="programme">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Programme</div>
+        <h2 class="reveal" style="--i:1" data-edit>The evening</h2>
+        <div class="rows">
+            <div class="row reveal" style="--i:2"><span class="n">I</span><h3 data-edit>Reception in the Palm Court</h3><span class="caption" data-edit>7 o'clock</span></div>
+            <div class="row reveal" style="--i:3"><span class="n">II</span><h3 data-edit>The season, announced</h3><span class="caption" data-edit>8 o'clock</span></div>
+            <div class="row reveal" style="--i:4"><span class="n">III</span><h3 data-edit>Dinner in the Ballroom</h3><span class="caption" data-edit>Half past eight</span></div>
+            <div class="row reveal" style="--i:5"><span class="n">IV</span><h3 data-edit>Dancing until late</h3><span class="caption" data-edit>From ten</span></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Section
+     ====================================================== -->
+<section class="slide section" data-name="section" data-section="The season">
+    <div class="content">
+        <div class="step reveal" style="--i:0">
+            <div class="n" data-edit>Part II</div>
+            <h2 data-edit>The New Season</h2>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Three columns
+     ====================================================== -->
+<section class="slide trio" data-name="pillars">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Three promises</div>
+        <h2 class="reveal" style="--i:1" data-edit>What the season brings</h2>
+        <div class="grid">
+            <div class="cell reveal" style="--i:2"><div class="chev"></div><h3 data-edit>The Ballroom</h3><p data-edit>Restored to its 1928 plan, with the original parquet and the mirrored bar.</p></div>
+            <div class="cell reveal" style="--i:3"><div class="chev"></div><h3 data-edit>The Kitchen</h3><p data-edit>A new chef, a shorter menu, and the Sunday lunch back on the table.</p></div>
+            <div class="cell reveal" style="--i:4"><div class="chev"></div><h3 data-edit>The Rooms</h3><p data-edit>Forty suites reopened on the upper floors, each with a view of the river.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Picture
+     ====================================================== -->
+<section class="slide picture" data-name="picture">
+    <div class="content">
+        <div class="plate reveal-img" style="--i:0"></div>
+        <div data-placeholder="image" style="display:none; position:absolute; left:18px; top:18px; width:784px; height:824px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:28px; text-align:center">Double-click to choose a picture</div>
+        <div class="text">
+            <div class="eyebrow reveal" style="--i:1" data-edit>The Ballroom</div>
+            <h2 class="reveal" style="--i:2; font-size:60px" data-edit>Restored, not replaced</h2>
+            <div class="ornament reveal" style="--i:3"><i class="solid"></i></div>
+            <p class="reveal" style="--i:4" data-edit>The gold frame takes a photograph: double-click it in the editor to choose one. A portrait crop suits the proportions.</p>
+            <p class="caption reveal" style="--i:5; margin-top:28px" data-edit>Photograph, 1928</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Big number
+     ====================================================== -->
+<section class="slide number" data-name="number">
+    <div class="content">
+        <div class="big reveal" style="--i:0" data-edit>1928</div>
+        <h2 class="reveal" style="--i:1" data-edit>The year it opened</h2>
+        <div class="ornament reveal" style="--i:2"><i></i><i class="solid"></i><i></i></div>
+        <p class="reveal" style="--i:3" data-edit>Ninety-eight years, three closures, one war, and the same doorman's family for four generations.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Quote
+     ====================================================== -->
+<section class="slide quote" data-name="quote">
+    <div class="frame"></div>
+    <div class="content">
+        <blockquote class="reveal" style="--i:0" data-edit>"A hotel is a promise kept every night."</blockquote>
+        <div class="ornament reveal" style="--i:1"><i class="solid"></i></div>
+        <p class="caption reveal" style="--i:2" data-edit>The founder, 1928</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Timeline
+     ====================================================== -->
+<section class="slide timeline" data-name="timeline" data-section="History">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>A short history</div>
+        <h2 class="reveal" style="--i:1" data-edit>Four dates</h2>
+        <div class="track">
+            <div class="step reveal" style="--i:2"><div class="yr" data-edit>1928</div><h3 data-edit>Opening</h3><p data-edit>Three hundred guests and a jazz orchestra.</p></div>
+            <div class="step reveal" style="--i:3"><div class="yr" data-edit>1954</div><h3 data-edit>The Ballroom</h3><p data-edit>Rebuilt after the fire, the mirrors saved.</p></div>
+            <div class="step reveal" style="--i:4"><div class="yr" data-edit>1999</div><h3 data-edit>Closed</h3><p data-edit>Twelve years dark, the doorman kept the keys.</p></div>
+            <div class="step reveal" style="--i:5"><div class="yr" data-edit>2026</div><h3 data-edit>Reopened</h3><p data-edit>The season we launch tonight.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Table
+     ====================================================== -->
+<section class="slide data" data-name="table">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>The menu</div>
+        <h2 class="reveal" style="--i:1" data-edit>Dinner</h2>
+        <table class="reveal" style="--i:2" data-group>
+            <thead><tr><th>Course</th><th>Dish</th><th>Wine</th><th class="num">Served</th></tr></thead>
+            <tbody>
+                <tr><td>First</td><td>Oysters, champagne mignonette</td><td>Blanc de blancs</td><td class="num">8:30</td></tr>
+                <tr><td>Second</td><td>Consommé with gold leaf</td><td>Fino</td><td class="num">8:50</td></tr>
+                <tr><td>Main</td><td>Beef Wellington, winter truffle</td><td>Pauillac 2009</td><td class="num">9:15</td></tr>
+                <tr><td>Dessert</td><td>Baked Alaska, flamed at the table</td><td>Sauternes</td><td class="num">9:50</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 10 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing" data-no-master>
+    <div class="frame"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>With our compliments</div>
+        <h1 class="reveal" style="--i:1" data-edit>Good night</h1>
+        <div class="ornament reveal" style="--i:2; width:500px"><i></i><i class="solid"></i><i></i></div>
+        <div class="lines">
+            <span class="caption reveal" style="--i:3" data-edit>grandhotel.example</span>
+            <span class="caption reveal" style="--i:4" data-edit>reservations@example.com</span>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: shown on every slide, edited once in the editor -->
+<div class="deck-footer">
+    <span data-edit>The Grand Hotel · The Winter Gala</span>
+    <span class="num"><b data-page-now>1</b> / <span data-page-total>10</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">10</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   Scales the stage (1920x1080 unless the deck's CSS says otherwise)
+   into the window, navigates with the
+   keyboard, touch and wheel, and exposes the hooks the editor uses:
+   - reads --ed-panel on <html> (space reserved for a side panel)
+   - listens for deck:rescale
+   - dispatches deck:slide (detail = slide index)
+   - honours #n in the URL to show slide n
+   Part of the Diapo Format. Copyright (c) 2026 Daniele Rossetto. MIT licence (SPDX-License-Identifier: MIT);
+   free to keep in any deck.
+   =========================================== */
+class SlidePresentation {
+    constructor() {
+        this.stage = document.getElementById('deckStage');
+        this.current = 0;
+        this.setupStageScale();
+        this.setupKeyboardNav();
+        this.setupTouchNav();
+        this.setupWheelNav();
+        this.setupControls();
+        const fromHash = () => parseInt(location.hash.replace('#', ''), 10);
+        this.showSlide(Number.isFinite(fromHash()) ? fromHash() - 1 : 0, true);
+        window.addEventListener('hashchange', () => {
+            const n = fromHash();
+            if (Number.isFinite(n) && n - 1 !== this.current) this.showSlide(n - 1);
+        });
+    }
+
+    /* Slides are read live so the editor can add and remove them. */
+    get slides() { return Array.from(this.stage.querySelectorAll('.slide')); }
+
+    setupStageScale() {
+        const scale = () => {
+            const pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ed-panel')) || 0;
+            const vw = window.innerWidth - pad, vh = window.innerHeight;
+            const sw = this.stage.offsetWidth || 1920, sh = this.stage.offsetHeight || 1080;
+            const factor = Math.min(vw / sw, vh / sh);
+            const x = (vw - sw * factor) / 2, y = (vh - sh * factor) / 2;
+            this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
+        };
+        scale();
+        window.addEventListener('resize', scale);
+        document.addEventListener('deck:rescale', scale);
+    }
+
+    setupKeyboardNav() {
+        document.addEventListener('keydown', (e) => {
+            if (e.target.getAttribute && e.target.getAttribute('contenteditable') === 'true') return;
+            switch (e.key) {
+                case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': e.preventDefault(); this.next(); break;
+                case 'ArrowLeft': case 'ArrowUp': case 'PageUp': e.preventDefault(); this.prev(); break;
+                case 'Home': e.preventDefault(); this.showSlide(0); break;
+                case 'End': e.preventDefault(); this.showSlide(this.slides.length - 1); break;
+                case 'h': case 'H': if (!e.ctrlKey && !e.metaKey && !e.altKey) document.documentElement.classList.toggle('deck-controls-off'); break;
+            }
+        });
+    }
+
+    /* The on-screen controls: click to move, faded out after 2 s without mouse
+       movement (not while the mouse is over them) and back on the first move or
+       touch. H hides them altogether, for when the mouse is needed where they sit. */
+    setupControls() {
+        document.getElementById('btnPrev').addEventListener('click', () => this.prev());
+        document.getElementById('btnNext').addEventListener('click', () => this.next());
+        const root = document.documentElement, box = document.querySelector('.deck-controls');
+        let timer = null, over = false;
+        const idle = () => { if (!over) root.classList.add('deck-controls-idle'); };
+        const wake = () => { root.classList.remove('deck-controls-idle'); clearTimeout(timer); timer = setTimeout(idle, 2000); };
+        box.addEventListener('mouseenter', () => { over = true; });
+        box.addEventListener('mouseleave', () => { over = false; wake(); });
+        document.addEventListener('mousemove', wake, { passive: true });
+        document.addEventListener('touchstart', wake, { passive: true });
+        timer = setTimeout(idle, 2000);
+    }
+
+    setupTouchNav() {
+        let x0 = null, y0 = null;
+        document.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+        document.addEventListener('touchend', (e) => {
+            if (x0 === null) return;
+            const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) (dx < 0 ? this.next() : this.prev());
+            x0 = y0 = null;
+        }, { passive: true });
+    }
+
+    setupWheelNav() {
+        let lock = false;
+        document.addEventListener('wheel', (e) => {
+            if (lock || Math.abs(e.deltaY) < 30) return;
+            lock = true; setTimeout(() => lock = false, 700);
+            e.deltaY > 0 ? this.next() : this.prev();
+        }, { passive: true });
+    }
+
+    next() { this.showSlide(this.current + 1); }
+    prev() { this.showSlide(this.current - 1); }
+
+    showSlide(index, initial = false) {
+        const slides = this.slides;
+        this.current = Math.max(0, Math.min(index, slides.length - 1));
+        slides.forEach((s, i) => {
+            const on = i === this.current;
+            s.classList.toggle('active', on);
+            if (on) requestAnimationFrame(() => requestAnimationFrame(() => s.classList.add('visible')));
+            else s.classList.remove('visible');
+        });
+        document.querySelectorAll('#pageNow, [data-page-now]').forEach(e => { e.textContent = this.current + 1; });
+        document.querySelectorAll('#pageTotal, [data-page-total]').forEach(e => { e.textContent = slides.length; });
+        document.dispatchEvent(new CustomEvent('deck:slide', { detail: this.current }));
+        // A sandboxed preview (Teams, SharePoint, a srcdoc frame) cannot change its URL: keep the page going.
+        if (!initial || location.hash) { try { history.replaceState(null, '', '#' + (this.current + 1)); } catch (e) { /* URL stays as it is */ } }
+    }
+}
+
+new SlidePresentation();
+</script>
+
+<!-- Presentation features for this deck on its own: P = presenter view, O = overview, L = laser, D = draw, Space steps through fragments. Added by the deck editor; safe to delete. -->
+<script id="deck-runtime">
+/* ============================================================
+   DECK RUNTIME - presentation features for standalone HTML decks.
+   No dependencies. The deck editor puts this script at the end of the body
+   (Presenter menu > "Add presentation features to this deck"); it is
+   also part of new decks. Safe to delete: the deck then only has
+   its own navigation.
+
+   Keys in the deck
+     P, Shift+F5      presenter window (current + next slide, notes,
+                      timer, clock); arrows there move the deck too
+     O                overview: a grid of all slides; click or arrows +
+                      Enter to jump,
+                      O or Esc closes
+     A                run by itself: each slide (and each fragment) waits
+                      its data-auto-advance seconds, then moves on
+     L                laser pointer on / off
+     D                draw on the slide (a layer over it, never saved):
+                      1-5 colours, [ ] thinner / thicker, Ctrl+Z undo,
+                      C clear this slide, D or Esc done
+     Space / Right / Down / PgDn   next fragment, then next slide
+     Left / Up / PgUp              previous fragment, then previous slide
+
+   Markup it understands
+     [data-fragment]                    revealed one step at a time
+     [data-fragment-index="n"]          order (equal numbers together)
+     <section class="slide" data-auto-animate>
+                                        morph matching elements into the
+                                        next slide (matched by data-id,
+                                        else by tag + text / image src):
+                                        they travel and resize into place,
+                                        colours and corners tween, a shape
+                                        (an svg of one path) morphs outline
+                                        to outline into another, and two
+                                        that do not look alike cross-fade
+     data-transition="fade|slide|zoom|up|none"
+                                        how a slide comes in (cross-fade, push,
+                                        push up, cross-zoom), on the slide or
+                                        (as the default) on .deck-stage;
+                                        data-transition-duration="0.5" in seconds
+     data-text-effect="letters|words|typewriter"
+                                        the text appears piece by piece when its
+                                        slide shows (or when it is revealed as a
+                                        fragment); data-text-effect-speed="1"
+                                        scales the pace
+     data-section="Name"                the slide starts a section (shown in the
+                                        overview and the editor's slide strip)
+     data-auto-advance="8"              the deck moves on by itself after 8 seconds
+                                        (fragments first, a step at a time); on a slide,
+                                        or on .deck-stage for every slide.
+                                        data-loop on .deck-stage starts again at the end.
+                                        A key or a click stops it; A starts and stops it
+     data-href="https://..."            a click on the element (a picture, an icon,
+                                        a shape, a text box) opens the address in a
+                                        new tab; data-href-target="_self" in this one
+     <aside class="notes" hidden>       speaker notes
+
+   Requirements
+     The deck shows slide n for location.hash "#n" and dispatches
+     deck:slide (or updates the hash) when it navigates. The deck
+     editor's template does both.
+
+   Licence
+     Part of the Diapo Format. Copyright (c) 2026 Daniele Rossetto. MIT licence (SPDX-License-Identifier: MIT);
+     free to keep in any deck.
+   ============================================================ */
+(function () {
+    'use strict';
+    if (window.deckRuntime) return;
+
+    var editing = function () { return document.documentElement.classList.contains('deck-editing'); };
+    var stage = document.querySelector('.deck-stage');
+    if (!stage) return;
+
+    /* ---------- reading the deck ---------- */
+    function slides() { return Array.prototype.slice.call(stage.querySelectorAll('.slide')); }
+    function current() {
+        var all = slides();
+        for (var i = 0; i < all.length; i++) if (all[i].classList.contains('active')) return i;
+        var n = parseInt(location.hash.replace('#', ''), 10);
+        return isFinite(n) && n >= 1 ? Math.min(n, all.length) - 1 : 0;
+    }
+    function stageScale() {
+        var m = getComputedStyle(stage).transform;
+        if (!m || m === 'none') return 1;
+        var a = parseFloat(m.split('(')[1]);
+        return a || 1;
+    }
+    function notesOf(slide) {
+        if (!slide) return '';
+        var aside = slide.querySelector(':scope > aside.notes, :scope > .notes');
+        if (aside) {
+            var t = document.createElement('div');
+            t.innerHTML = aside.innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li)>/gi, '\n');
+            return t.textContent.replace(/[ \t]+\n/g, '\n').trim();
+        }
+        var n = slide.previousSibling;
+        while (n && n.nodeType === 3 && !n.textContent.trim()) n = n.previousSibling;
+        if (n && n.nodeType === 8) {
+            var text = n.textContent.split('\n').map(function (l) { return l.replace(/^[\s=\-*#]+|[\s=\-*#]+$/g, ''); }).filter(Boolean).join('\n').trim();
+            if (text && !/^slides?\s*\d+(\s*[-\u2013\u2014]\s*\d+)?\b/i.test(text)) return text;
+        }
+        return '';
+    }
+    function labelOf(slide) {
+        if (slide.getAttribute('data-name')) return slide.getAttribute('data-name');
+        var h = slide.querySelector('h1, h2, h3');
+        return h ? h.textContent.trim().replace(/\s+/g, ' ').slice(0, 40) : '';
+    }
+    function goTo(index) {
+        var n = Math.max(0, Math.min(index, slides().length - 1));
+        if (n === current()) return;
+        location.hash = '#' + (n + 1);                         // the deck's controller does the rest
+    }
+
+    /* ---------- base styles for fragments and the overview ---------- */
+    var style = document.createElement('style');
+    style.id = 'deck-runtime-style';
+    style.textContent = [
+        '.deck-stage [data-href]{cursor:pointer}',
+        '.deck-stage [data-fragment]:not(.visible){opacity:0;pointer-events:none}',
+        '.deck-stage [data-fragment].visible{opacity:1}',
+        '.deck-stage [data-fragment]:not([data-anim]){transition:opacity .4s ease}',
+        'html.deck-editing .deck-stage [data-fragment]{opacity:1!important;pointer-events:auto!important}',
+        // The overview: a grid of framed tiles with a numbered caption under each, sections as
+        // headed rows. grid-auto-rows:max-content is what keeps the rows as tall as the tiles:
+        // with auto rows Chrome sizes the track from the aspect-ratio box's minimum contribution
+        // and the rows overlap.
+        '.deck-overview{position:fixed;inset:0;z-index:100000;background:#0f1013;overflow:auto;padding:24px 40px 56px;display:grid;gap:30px 28px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));grid-auto-rows:max-content;align-content:start;font:12px/1.3 system-ui,sans-serif;color:#9a9da6}',
+        '.deck-overview .ov-head{grid-column:1/-1;display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:-6px}',
+        '.deck-overview .ov-head b{color:#e8e9ec;font-weight:600;font-size:13px}',
+        '.deck-overview .ov-head kbd{font:inherit;color:#c8cad1;border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:1px 5px}',
+        '.deck-overview .ov-tile{position:relative;cursor:pointer;outline:none}',
+        '.deck-overview .ov-frame{position:relative;aspect-ratio:var(--deck-ar,16/9);background:#000;border-radius:6px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.14),0 6px 18px rgba(0,0,0,.45);transition:transform .15s ease,box-shadow .15s ease}',
+        '.deck-overview .ov-tile:hover .ov-frame{transform:translateY(-2px);box-shadow:0 0 0 2px #9ab8ff,0 10px 24px rgba(0,0,0,.5)}',
+        '.deck-overview .ov-tile.current .ov-frame{box-shadow:0 0 0 3px #4d8dff,0 6px 18px rgba(0,0,0,.45)}',
+        '.deck-overview .ov-cap{display:flex;align-items:baseline;gap:8px;margin-top:9px;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+        '.deck-overview .ov-tile.current .ov-cap{color:#c8cad1}',
+        '.deck-overview .ov-n{flex:none;font-weight:700;color:#e8e9ec;font-variant-numeric:tabular-nums}',
+        '.deck-overview .ov-t{overflow:hidden;text-overflow:ellipsis}',
+        '.deck-overview .ov-section{grid-column:1/-1;color:#c8cad1;font:600 13px/1.2 system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;padding:14px 2px 0;margin-bottom:-8px;border-top:1px solid rgba(255,255,255,.12)}',
+        '.deck-overview .ov-inner{position:absolute;left:0;top:0;width:var(--deck-w,1920px);height:var(--deck-h,1080px);transform-origin:0 0;background:#fff;pointer-events:none}',
+        '.deck-overview .ov-inner *{transition:none!important;animation:none!important}',
+        '.deck-overview .ov-inner [data-fragment]{opacity:1!important}',
+        'html.deck-laser-on, html.deck-laser-on *{cursor:none!important}',
+        '.deck-laser{position:fixed;left:-100px;top:-100px;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:radial-gradient(circle,#fff 0 18%,#ff2d2d 30%,rgba(255,45,45,.85) 55%,rgba(255,45,45,0) 75%);box-shadow:0 0 18px 6px rgba(255,45,45,.55);pointer-events:none;z-index:100001;opacity:0}',
+        '.deck-draw{position:fixed;inset:0;z-index:99999;cursor:crosshair;touch-action:none}',
+        'html.deck-drawing .deck-controls{display:none!important}',
+        '.deck-draw-bar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:100000;display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:12px;background:rgba(20,21,26,.92);box-shadow:0 8px 24px rgba(0,0,0,.35);font:12px system-ui,sans-serif}',
+        '.deck-draw-bar button{height:28px;min-width:28px;padding:0 8px;border:2px solid transparent;border-radius:8px;background:#2a2d35;color:#fff;font:inherit;cursor:pointer}',
+        '.deck-draw-bar button[data-colour]{width:28px;padding:0}.deck-draw-bar button.on{border-color:#fff}.deck-draw-bar button:hover{filter:brightness(1.15)}',
+        '.deck-draw-bar .sep{width:1px;height:20px;background:#3a3d46;margin:0 2px}',
+    ].join('\n');
+    document.head.appendChild(style);
+
+    /* ============================================================
+       FRAGMENTS
+       ============================================================ */
+    function fragmentsOf(slide) {
+        var els = Array.prototype.slice.call(slide.querySelectorAll('[data-fragment]'));
+        var items = els.map(function (el, i) {
+            var explicit = parseInt(el.getAttribute('data-fragment-index'), 10);
+            return { el: el, order: isFinite(explicit) ? explicit : i, pos: i };
+        });
+        items.sort(function (a, b) { return a.order - b.order || a.pos - b.pos; });
+        // Groups: equal order numbers reveal together.
+        var groups = [];
+        items.forEach(function (it) {
+            var last = groups[groups.length - 1];
+            if (last && last.order === it.order) last.els.push(it.el); else groups.push({ order: it.order, els: [it.el] });
+        });
+        return groups;
+    }
+    function nextFragment() {
+        var slide = slides()[current()]; if (!slide) return false;
+        var groups = fragmentsOf(slide);
+        for (var i = 0; i < groups.length; i++) {
+            if (!groups[i].els[0].classList.contains('visible')) {
+                groups[i].els.forEach(function (el) { el.classList.add('visible'); if (el.hasAttribute('data-text-effect')) playTextEffect(el); });
+                notify();
+                return true;
+            }
+        }
+        return false;
+    }
+    function prevFragment() {
+        var slide = slides()[current()]; if (!slide) return false;
+        var groups = fragmentsOf(slide);
+        for (var i = groups.length - 1; i >= 0; i--) {
+            if (groups[i].els[0].classList.contains('visible')) {
+                groups[i].els.forEach(function (el) { el.classList.remove('visible'); });
+                notify();
+                return true;
+            }
+        }
+        return false;
+    }
+    function setFragments(slide, visible) {
+        if (!slide) return;
+        Array.prototype.forEach.call(slide.querySelectorAll('[data-fragment]'), function (el) { el.classList.toggle('visible', visible); });
+    }
+    function fragmentState(slide) {
+        var groups = fragmentsOf(slide || slides()[current()]);
+        var shown = 0;
+        groups.forEach(function (g) { if (g.els[0].classList.contains('visible')) shown++; });
+        return { total: groups.length, shown: shown };
+    }
+
+    function next() { if (editing()) return; if (!nextFragment()) goTo(current() + 1); }
+    function prev() { if (editing()) return; if (!prevFragment()) goTo(current() - 1); }
+
+    /* When a slide is entered going forward its fragments start hidden; going back
+       they are all shown, so the audience sees what they saw before. */
+    var lastIndex = current();
+    /* A page counter in the master layer (Insert > Footer on every slide writes data-page-now /
+       data-page-total; the template's own script handles its #pageNow). */
+    function syncCounter() {
+        var all = slides(), i = current();
+        Array.prototype.forEach.call(document.querySelectorAll('.deck-stage [data-page-now]'), function (e) { e.textContent = String(i + 1); });
+        Array.prototype.forEach.call(document.querySelectorAll('.deck-stage [data-page-total]'), function (e) { e.textContent = String(all.length); });
+    }
+    function onSlideChange() {
+        var i = current();
+        if (autoOn) autoSchedule();
+        syncCounter();
+        if (i === lastIndex) return;
+        var forward = i > lastIndex;
+        var from = slides()[lastIndex], to = slides()[i];
+        lastIndex = i;
+        if (!editing()) {
+            setFragments(to, !forward);
+            var morphing = forward && from && to && from.hasAttribute('data-auto-animate');
+            if (morphing) autoAnimate(from, to);
+            else playTransition(to, forward, from);
+            textEffects(to);
+        }
+        notify();
+    }
+
+    /* ============================================================
+       SLIDE TRANSITIONS, with the Web Animations API so the deck's own
+       CSS needs nothing. Both slides take part: the deck's CSS hides
+       the outgoing slide at once, so it is kept visible (a keyframe
+       with visibility: visible wins over the stylesheet) while it
+       fades or moves out under the incoming one, which sits on top.
+       ============================================================ */
+    var SHOWN = { visibility: 'visible', opacity: 1 };     // the deck's CSS hides an inactive slide; these keyframes win
+    var TRANSITIONS = {
+        // cross-fade: the new slide fades in over the old one, which stays put
+        fade: function () { return { in: [{ opacity: 0 }, { opacity: 1 }], out: [SHOWN, SHOWN], ease: 'ease-in-out' }; },
+        // push sideways: both slides move together, one width
+        slide: function (fwd) {
+            var d = fwd ? 1 : -1;
+            return { in: [{ transform: 'translateX(' + (100 * d) + '%)' }, { transform: 'none' }], out: [{ visibility: 'visible', opacity: 1, transform: 'none' }, { visibility: 'visible', opacity: 1, transform: 'translateX(' + (-100 * d) + '%)' }] };
+        },
+        // push upwards (downwards going back)
+        up: function (fwd) {
+            var d = fwd ? 1 : -1;
+            return { in: [{ transform: 'translateY(' + (100 * d) + '%)' }, { transform: 'none' }], out: [{ visibility: 'visible', opacity: 1, transform: 'none' }, { visibility: 'visible', opacity: 1, transform: 'translateY(' + (-100 * d) + '%)' }] };
+        },
+        // the old slide grows and fades away while the new one settles in from slightly small
+        zoom: function (fwd) {
+            return { in: [{ opacity: 0, transform: 'scale(' + (fwd ? 0.92 : 1.08) + ')' }, { opacity: 1, transform: 'none' }], out: [{ visibility: 'visible', opacity: 1, transform: 'none' }, { visibility: 'visible', opacity: 0, transform: 'scale(' + (fwd ? 1.08 : 0.92) + ')' }] };
+        }
+    };
+    var MOVE_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+    function transitionOf(slide) {
+        var own = slide && slide.getAttribute('data-transition');
+        return own || stage.getAttribute('data-transition') || 'none';
+    }
+    function playTransition(to, forward, from) {
+        if (!to || !to.animate) return;
+        var make = TRANSITIONS[transitionOf(to)];
+        if (!make) return;
+        var t = make(forward !== false);
+        var dur = (parseFloat(to.getAttribute('data-transition-duration') || stage.getAttribute('data-transition-duration')) || 0.5) * 1000;
+        var opts = { duration: dur, easing: t.ease || MOVE_EASE };
+        // A transition still running on either slide (fast clicking) is cut short.
+        [to, from].forEach(function (s) { if (s && s.getAnimations) s.getAnimations().forEach(function (a) { if (a.__transition) a.cancel(); }); });
+        var a = to.animate(t.in, opts);
+        a.__transition = true;
+        if (from && from !== to && from.animate) {
+            var b = from.animate(t.out, opts);
+            b.__transition = true;
+        }
+    }
+
+    /* ============================================================
+       TEXT EFFECTS: letters, words or a typewriter. The text nodes are
+       wrapped in spans for the duration of the animation and unwrapped
+       afterwards, so the document (and a saved file) never carries them.
+       ============================================================ */
+    var FX = {
+        letters: { split: 'chars', stagger: 28, duration: 420, kf: [{ opacity: 0, transform: 'translateY(0.35em)' }, { opacity: 1, transform: 'none' }], block: true },
+        words: { split: 'words', stagger: 90, duration: 520, kf: [{ opacity: 0, transform: 'translateY(0.3em)' }, { opacity: 1, transform: 'none' }], block: true },
+        typewriter: { split: 'chars', stagger: 45, duration: 1, kf: [{ opacity: 0 }, { opacity: 1 }], block: false }
+    };
+    function textEffects(slide) {
+        if (!slide) return;
+        Array.prototype.forEach.call(slide.querySelectorAll('[data-text-effect]'), function (el) {
+            if (el.hasAttribute('data-fragment') && !el.classList.contains('visible')) return;
+            playTextEffect(el);
+        });
+    }
+    function unwrapTextEffect(el) {
+        if (!el.__fx) return;
+        el.__fx.animations.forEach(function (a) { try { a.cancel(); } catch (e) { /* done */ } });
+        el.__fx.spans.forEach(function (s) { if (s.parentNode) s.parentNode.replaceChild(document.createTextNode(s.textContent), s); });
+        el.normalize();
+        el.__fx = null;
+    }
+    function playTextEffect(el) {
+        var fx = FX[el.getAttribute('data-text-effect')];
+        if (!fx || !el.animate) return;
+        unwrapTextEffect(el);
+        var speed = parseFloat(el.getAttribute('data-text-effect-speed')) || 1;
+        var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        var spans = [];
+        nodes.forEach(function (node) {
+            if (!node.textContent.trim()) return;
+            var parts = fx.split === 'words' ? node.textContent.split(/(\s+)/) : Array.from(node.textContent);
+            var frag = document.createDocumentFragment();
+            parts.forEach(function (p) {
+                if (!p) return;
+                if (fx.split === 'words' && /^\s+$/.test(p)) { frag.appendChild(document.createTextNode(p)); return; }
+                var s = document.createElement('span');
+                s.className = 'de-fx';
+                s.textContent = p;
+                if (fx.block) { s.style.display = 'inline-block'; s.style.whiteSpace = 'pre'; }
+                frag.appendChild(s);
+                spans.push(s);
+            });
+            node.parentNode.replaceChild(frag, node);
+        });
+        if (!spans.length) return;
+        var animations = spans.map(function (s, i) {
+            return s.animate(fx.kf, { duration: fx.duration / speed, delay: i * fx.stagger / speed, fill: 'backwards', easing: fx.duration > 1 ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'steps(1, end)' });
+        });
+        el.__fx = { spans: spans, animations: animations };
+        var last = animations[animations.length - 1];
+        var done = function () { if (el.__fx && el.__fx.animations === animations) unwrapTextEffect(el); };
+        if (last.finished) last.finished.then(done, done); else last.onfinish = done;
+    }
+    document.addEventListener('deck:slide', onSlideChange);
+    window.addEventListener('hashchange', onSlideChange);
+    if (window.MutationObserver) {
+        var pending = 0;
+        new MutationObserver(function () { clearTimeout(pending); pending = setTimeout(onSlideChange, 30); })
+            .observe(stage, { attributes: true, attributeFilter: ['class'], subtree: true });
+    }
+
+    /* ============================================================
+       AUTO-ANIMATE: morph matching elements from one slide into the next
+       ============================================================ */
+    function matchKey(el) {
+        if (el.getAttribute('data-id')) return 'id:' + el.getAttribute('data-id');
+        var tag = el.tagName.toLowerCase();
+        if (tag === 'img') return 'img:' + el.getAttribute('src');
+        var text = (el.textContent || '').trim().replace(/\s+/g, ' ');
+        return text ? tag + ':' + text.slice(0, 120) : null;
+    }
+    function morphCandidates(slide) {
+        // Elements with a data-id, plus text blocks and images that are direct layout units.
+        var sel = '[data-id], h1, h2, h3, h4, p, li, img, [data-edit]';
+        return Array.prototype.filter.call(slide.querySelectorAll(sel), function (el) { return !el.closest('[data-fig]') && el.closest('.slide') === slide; });
+    }
+    function rectOf(el) {
+        var r = el.getBoundingClientRect(), s = stage.getBoundingClientRect(), k = stageScale();
+        return { x: (r.left - s.left) / k, y: (r.top - s.top) / k, w: r.width / k, h: r.height / k };
+    }
+    /* The look of an element, for the morph: what tweens between two linked elements, and what
+       a ghost of the old one needs to look the same on the new slide. */
+    var TWEEN_PROPS = ['background-color', 'color', 'border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius', 'border-color', 'opacity', 'box-shadow'];
+    var GHOST_PROPS = TWEEN_PROPS.concat(['background-image', 'background-size', 'background-position', 'border-width', 'border-style', 'padding', 'font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing', 'text-transform', 'text-align', 'white-space', 'display', 'align-items', 'justify-content', 'flex-direction', 'gap', 'object-fit', 'fill', 'stroke', 'stroke-width']);
+    function lookOf(el, props) {
+        var cs = getComputedStyle(el), out = {};
+        props.forEach(function (p) { out[p] = cs.getPropertyValue(p); });
+        return out;
+    }
+    /* A shape the polygon morph can take: an <svg> drawing one <path> of one subpath. */
+    function singlePath(el) {
+        if (!el || el.tagName.toLowerCase() !== 'svg') return null;
+        var shapes = el.querySelectorAll('path, rect, circle, ellipse, polygon, polyline, line');
+        if (shapes.length !== 1 || shapes[0].tagName.toLowerCase() !== 'path') return null;
+        var d = shapes[0].getAttribute('d') || '';
+        if ((d.match(/[Mm]/g) || []).length !== 1) return null;
+        return shapes[0];
+    }
+    function viewBoxOf(svg) {
+        var vb = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(parseFloat);
+        return vb.length === 4 && vb.every(isFinite) ? { x: vb[0], y: vb[1], w: vb[2] || 1, h: vb[3] || 1 } : null;
+    }
+    /* n points along the path, in its own user units. */
+    function samplePath(path, n) {
+        var L = path.getTotalLength(), pts = [];
+        if (!L) return null;
+        for (var i = 0; i < n; i++) { var p = path.getPointAtLength(L * i / n); pts.push([p.x, p.y]); }
+        return pts;
+    }
+    /* The old polygon, in the new svg's coordinates, started and wound so its points travel least. */
+    function alignPolygon(from, to) {
+        var n = to.length, best = null, bestCost = Infinity;
+        [from, from.slice().reverse()].forEach(function (cand) {
+            for (var k = 0; k < n; k++) {
+                var cost = 0;
+                for (var i = 0; i < n; i++) { var a = cand[(i + k) % n], b = to[i]; cost += (a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]); if (cost >= bestCost) break; }
+                if (cost < bestCost) { bestCost = cost; best = cand.slice(k).concat(cand.slice(0, k)); }
+            }
+        });
+        return best;
+    }
+    function polygonD(pts, closed) {
+        return pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(2) + ' ' + p[1].toFixed(2); }).join('') + (closed ? 'Z' : '');
+    }
+    /* The morph's easing: a gentle in-out (a start you can see, a soft landing), so a move
+       reads as a move and a turn as a turn. MORPH_EASE is the CSS form, easeOut the same curve
+       for the frames drawn by hand. */
+    var MORPH_BEZIER = [0.45, 0.05, 0.25, 1], MORPH_EASE = 'cubic-bezier(' + MORPH_BEZIER.join(', ') + ')';
+    function easeOut(u) {
+        var x1 = MORPH_BEZIER[0], y1 = MORPH_BEZIER[1], x2 = MORPH_BEZIER[2], y2 = MORPH_BEZIER[3], lo = 0, hi = 1, t;
+        for (var i = 0; i < 16; i++) { t = (lo + hi) / 2; var x = 3 * (1 - t) * (1 - t) * t * x1 + 3 * (1 - t) * t * t * x2 + t * t * t; if (x < u) lo = t; else hi = t; }
+        return 3 * (1 - t) * (1 - t) * t * y1 + 3 * (1 - t) * t * t * y2 + t * t * t;
+    }
+    /* Tween one shape into another: both sampled into polygons with the same number of points,
+       drawn frame by frame from the old shape to the new one, the real path put back at the end. */
+    function morphPath(oldPath, oldSvg, newPath, newSvg, ms) {
+        var n = 96, a = samplePath(oldPath, n), b = samplePath(newPath, n);
+        if (!a || !b) return false;
+        var va = viewBoxOf(oldSvg), vb = viewBoxOf(newSvg);
+        if (va && vb) a = a.map(function (p) { return [(p[0] - va.x) / va.w * vb.w + vb.x, (p[1] - va.y) / va.h * vb.h + vb.y]; });
+        a = alignPolygon(a, b);
+        var closed = /[zZ]\s*$/.test(newPath.getAttribute('d') || '');
+        var d0 = newPath.getAttribute('d'), t0 = null;
+        function frame(now) {
+            if (t0 === null) t0 = now;
+            var u = Math.min(1, (now - t0) / ms), e = easeOut(u);
+            var pts = b.map(function (p, i) { return [a[i][0] + (p[0] - a[i][0]) * e, a[i][1] + (p[1] - a[i][1]) * e]; });
+            if (u < 1) { newPath.setAttribute('d', polygonD(pts, closed)); requestAnimationFrame(frame); }
+            else newPath.setAttribute('d', d0);
+        }
+        requestAnimationFrame(frame);
+        return true;
+    }
+    /* A copy of the old element, laid over the new slide where the old one was, to fade out
+       while the new one fades in: the morph for two elements that do not look alike. */
+    function ghostOf(el, pose, look) {
+        var g = el.cloneNode(true);
+        g.removeAttribute('id'); g.removeAttribute('data-id');
+        Array.prototype.forEach.call(g.querySelectorAll('[id]'), function (n) { n.removeAttribute('id'); });
+        g.classList.add('deck-morph-ghost');
+        var st = '';
+        for (var p in look) if (look[p]) st += p + ':' + look[p] + ';';
+        // Its box is the old element's own (unrotated) box at the old centre; the old rotation and
+        // scale are one matrix about that centre, so the keyframes can replace it.
+        var m = pose.m;
+        st += 'position:absolute;left:' + (pose.cx - pose.w / 2) + 'px;top:' + (pose.cy - pose.h / 2) + 'px;width:' + pose.w + 'px;height:' + pose.h + 'px;margin:0;max-width:none;max-height:none;box-sizing:border-box;';
+        st += 'transform:matrix(' + [m.a, m.b, m.c, m.d, 0, 0].join(',') + ');transform-origin:center;translate:none;rotate:none;scale:none;pointer-events:none;z-index:2147483000;transition:none;animation:none;visibility:visible';
+        g.style.cssText = st;
+        return g;
+    }
+    /* Where an element is and how it is turned: its centre on the stage, its own (unrotated,
+       unscaled) box, and the matrix of all its transforms (translate, rotate, scale, transform,
+       in the order CSS applies them, about the centre of the box). A rotated element's bounding
+       box is not its box: the morph works with the pose, so a turn tweens as a turn. */
+    function matrixOf(el) {
+        var cs = getComputedStyle(el), m = new DOMMatrix(), v, p;
+        v = cs.translate; if (v && v !== 'none') { p = v.split(/\s+/).map(parseFloat); m = m.translate(p[0] || 0, p[1] || 0); }
+        v = cs.rotate; if (v && v !== 'none') { p = v.split(/\s+/); m = m.rotate(parseFloat(p[p.length - 1]) || 0); }
+        v = cs.scale; if (v && v !== 'none') { p = v.split(/\s+/).map(parseFloat); m = m.scale(p[0] || 1, p.length > 1 ? p[1] : (p[0] || 1)); }
+        v = cs.transform; if (v && v !== 'none') m = m.multiply(new DOMMatrix(v));
+        return m;
+    }
+    function poseOf(el, r) {
+        var m = matrixOf(el);
+        var w = el.offsetWidth !== undefined ? el.offsetWidth : el.clientWidth, h = el.offsetHeight !== undefined ? el.offsetHeight : el.clientHeight;
+        return { cx: r.x + r.w / 2, cy: r.y + r.h / 2, w: w || r.w, h: h || r.h, m: m,
+                 angle: Math.atan2(m.b, m.a) * 180 / Math.PI, sx: Math.hypot(m.a, m.b) || 1, sy: Math.hypot(m.c, m.d) || 1 };
+    }
+    /* The matrix that puts a box of size w x h, centred at c0 before any transform, at centre c,
+       turned by ang, scaled to the visual size vw x vh. */
+    function placed(c0x, c0y, w, h, cx, cy, ang, vw, vh) {
+        return new DOMMatrix().translate(cx - c0x, cy - c0y).rotate(ang).scale(vw / w, vh / h);
+    }
+    function matrixCss(m) { return 'matrix(' + [m.a, m.b, m.c, m.d, m.e, m.f].map(function (v) { return +v.toFixed(4); }).join(',') + ')'; }
+    /* Keyframes from one pose to another: the centre, the angle (the short way round) and the
+       visual size each eased, sampled so the matrices between samples interpolate cleanly. */
+    function poseFrames(a, b, toMatrix, extra) {
+        var dAng = ((b.angle - a.angle + 540) % 360) - 180, frames = [], N = 24;
+        var aw = a.w * a.sx, ah = a.h * a.sy, bw = b.w * b.sx, bh = b.h * b.sy;
+        for (var i = 0; i <= N; i++) {
+            var t = i / N, e = easeOut(t);
+            var f = { offset: t, easing: 'linear', transform: matrixCss(toMatrix(a.cx + (b.cx - a.cx) * e, a.cy + (b.cy - a.cy) * e, a.angle + dAng * e, aw + (bw - aw) * e, ah + (bh - ah) * e)) };
+            if (extra) extra(f, t);
+            frames.push(f);
+        }
+        return frames;
+    }
+    function autoAnimate(from, to) {
+        var duration = parseFloat(to.getAttribute('data-auto-animate-duration') || from.getAttribute('data-auto-animate-duration')) || 0.8;
+        var ms = duration * 1000, ease = MORPH_EASE;
+        // Both slides are measured with their transitions and entrance animations held off: the
+        // old one put back in its shown state for a moment (its reveals are already on their way
+        // out), the new one shown now (the deck would a frame later), so what is measured is where
+        // things are at rest, not a frame of a reveal on its way there. The morph is the entrance
+        // of what is matched, the fade below the entrance of the rest.
+        var hold = document.createElement('style');
+        hold.textContent = '.deck-morph-measure, .deck-morph-measure * { transition: none !important; animation: none !important; }';
+        document.head.appendChild(hold);
+        var fromShown = from.classList.contains('visible');
+        from.classList.add('deck-morph-measure'); from.classList.add('visible');
+        void from.offsetWidth;
+        var old = {};
+        morphCandidates(from).forEach(function (el) { var k = matchKey(el); if (k && !old[k]) { var r = rectOf(el); old[k] = { el: el, r: r, pose: poseOf(el, r), look: lookOf(el, GHOST_PROPS) }; } });
+        if (!fromShown) from.classList.remove('visible');
+        from.classList.remove('deck-morph-measure');
+        to.classList.add('deck-morph-measure');
+        to.classList.add('visible');
+        void to.offsetWidth;
+        var matched = [];
+        morphCandidates(to).forEach(function (el) {
+            var k = matchKey(el);
+            if (!k || !old[k] || matched.some(function (m) { return m.contains(el) || el.contains(m); })) return;
+            var was = old[k], a = was.r, b = rectOf(el);
+            if (!b.w || !b.h) return;
+            delete old[k];
+            matched.push(el);
+            // 1. The pose: the new element travels, turns and resizes from where the old one was.
+            //    Its own transforms stay as they are; what is added underneath is what takes the
+            //    element from its own pose to the tweened one (inverse of its matrix, then the pose).
+            var pa = was.pose, pb = poseOf(el, b), inv = pb.m.inverse(), c0x = pb.cx - pb.m.e, c0y = pb.cy - pb.m.f;
+            el.style.transition = 'none';
+            var anim = el.animate(poseFrames(pa, pb, function (cx, cy, ang, vw, vh) { return inv.multiply(placed(c0x, c0y, pb.w, pb.h, cx, cy, ang, vw, vh)); }, function (f) { f.opacity = 1; }),
+                { duration: ms, fill: 'backwards', composite: 'add' });
+            anim.onfinish = function () { el.style.transition = ''; if (!el.getAttribute('style')) el.removeAttribute('style'); };
+            // 2. The look: colours, corners, rotation and shadow tween from the old values.
+            var now = lookOf(el, TWEEN_PROPS), f0 = {}, f1 = {}, tween = false;
+            TWEEN_PROPS.forEach(function (p) {
+                var name = p.replace(/-([a-z])/g, function (m, c) { return c.toUpperCase(); });   // keyframes take the IDL names
+                if (was.look[p] && now[p] && was.look[p] !== now[p] && p !== 'opacity') { f0[name] = was.look[p]; f1[name] = now[p]; tween = true; }
+            });
+            if (tween) { try { el.animate([f0, f1], { duration: ms, easing: ease, fill: 'backwards' }); } catch (err) { /* a value the browser cannot tween: the change is instant */ } }
+            // 3. The shape: two single-path drawings morph outline to outline; two elements that
+            //    do not look alike cross-fade, a ghost of the old one fading out over the new.
+            var sa = singlePath(was.el), sb = singlePath(el);
+            var alike = was.el.tagName === el.tagName && (was.el.textContent || '').trim() === (el.textContent || '').trim() &&
+                        (was.el.getAttribute('src') || '') === (el.getAttribute('src') || '');
+            if (sa && sb && morphPath(sa, was.el, sb, el, ms)) {
+                var fa = getComputedStyle(sa), fb = getComputedStyle(sb);
+                if (fa.fill !== fb.fill || fa.stroke !== fb.stroke) sb.animate([{ fill: fa.fill, stroke: fa.stroke }, { fill: fb.fill, stroke: fb.stroke }], { duration: ms, easing: ease, fill: 'backwards' });
+            } else if (!alike) {
+                var g = ghostOf(was.el, pa, was.look);
+                to.appendChild(g);
+                var ga = g.animate(poseFrames(pa, pb, function (cx, cy, ang, vw, vh) { return placed(pa.cx, pa.cy, pa.w, pa.h, cx, cy, ang, vw, vh); }, function (f, t) { f.opacity = 1 - easeOut(t); }),
+                    { duration: ms, fill: 'forwards' });
+                ga.onfinish = function () { g.remove(); };
+                el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, easing: ease, fill: 'backwards' });
+            }
+        });
+        // Everything else on the new slide fades in a little later.
+        Array.prototype.forEach.call(to.querySelectorAll('*'), function (el) {
+            if (el.classList.contains('deck-morph-ghost') || el.closest('.deck-morph-ghost')) return;
+            if (matched.some(function (m) { return m === el || m.contains(el) || el.contains(m); })) return;
+            if (el.children.length && !el.matches('img, svg')) return;      // leaves only, so containers do not double-fade
+            if (el.closest('[data-fig]') && el.closest('[data-fig]') !== el) return;
+            el.animate([{ opacity: 0 }, { opacity: 0, offset: 0.4 }, { opacity: 1 }], { duration: ms, easing: 'ease-out' });
+        });
+        to.classList.remove('deck-morph-measure');
+        hold.remove();
+    }
+
+    /* ============================================================
+       OVERVIEW (O)
+       ============================================================ */
+    var overview = null, ovIndex = 0;
+    function openOverview() {
+        if (overview) return;
+        var all = slides(), cur = current();
+        overview = document.createElement('div');
+        overview.className = 'deck-overview';
+        var head = document.createElement('div');
+        head.className = 'ov-head';
+        var title = document.createElement('b'); title.textContent = (document.title || 'Deck').trim() + ' · ' + all.length + (all.length === 1 ? ' slide' : ' slides');
+        var hint = document.createElement('span'); hint.innerHTML = 'Click or <kbd>Enter</kbd> opens a slide, arrows move, <kbd>Esc</kbd> closes';
+        head.appendChild(title); head.appendChild(hint);
+        overview.appendChild(head);
+        all.forEach(function (slide, i) {
+            if (slide.getAttribute('data-section')) {
+                var label = document.createElement('div');
+                label.className = 'ov-section';
+                label.textContent = slide.getAttribute('data-section');
+                overview.appendChild(label);
+            }
+            var tile = document.createElement('div');
+            tile.className = 'ov-tile' + (i === cur ? ' current' : '');
+            var frame = document.createElement('div');
+            frame.className = 'ov-frame';
+            var inner = document.createElement('div');
+            inner.className = 'ov-inner';
+            var clone = slide.cloneNode(true);
+            clone.classList.add('active', 'visible');
+            clone.removeAttribute('id');
+            Array.prototype.forEach.call(clone.querySelectorAll('[id]'), function (n) { n.removeAttribute('id'); });
+            Array.prototype.forEach.call(clone.querySelectorAll('[data-fragment]'), function (n) { n.classList.add('visible'); });
+            Array.prototype.forEach.call(clone.querySelectorAll('aside.notes, .notes'), function (n) { n.remove(); });
+            inner.appendChild(clone);
+            frame.appendChild(inner);
+            tile.appendChild(frame);
+            var cap = document.createElement('div'); cap.className = 'ov-cap';
+            var num = document.createElement('span'); num.className = 'ov-n'; num.textContent = i + 1; cap.appendChild(num);
+            var name = labelOf(slide);
+            if (name) { var t = document.createElement('span'); t.className = 'ov-t'; t.textContent = name; cap.appendChild(t); }
+            tile.appendChild(cap);
+            tile.addEventListener('click', function () { closeOverview(); goTo(i); });
+            overview.appendChild(tile);
+        });
+        document.body.appendChild(overview);
+        ovIndex = cur;
+        scaleOverview();
+        window.addEventListener('resize', scaleOverview);
+        var c = overview.querySelector('.ov-tile.current');   // centred, unless it is in view from the top with the header
+        if (c && c.offsetTop + c.offsetHeight > overview.clientHeight) c.scrollIntoView({ block: 'center' });
+    }
+    /* Arrow keys move the highlight through the grid (up/down by a row); Enter opens it. */
+    function moveOverview(dx, dy) {
+        var tiles = overview.querySelectorAll('.ov-tile');
+        if (!tiles.length) return;
+        var n = tiles.length, i = ovIndex, cols = 1;
+        if (dy) {
+            var top = tiles[0].offsetTop;
+            while (cols < n && tiles[cols].offsetTop === top) cols++;
+        }
+        i += dx + dy * cols;
+        if (i < 0 || i >= n) { if (dx) i = (i + n) % n; else return; }
+        if (i === ovIndex) return;
+        tiles[ovIndex].classList.remove('current');
+        tiles[i].classList.add('current');
+        ovIndex = i;
+        tiles[i].scrollIntoView({ block: 'nearest' });
+    }
+    function scaleOverview() {
+        if (!overview) return;
+        // The tiles are scaled copies of the stage, whatever size the deck's CSS gives it.
+        var sw = stage.offsetWidth || 1920, sh = stage.offsetHeight || 1080;
+        overview.style.setProperty('--deck-w', sw + 'px'); overview.style.setProperty('--deck-h', sh + 'px'); overview.style.setProperty('--deck-ar', sw + '/' + sh);
+        Array.prototype.forEach.call(overview.querySelectorAll('.ov-tile'), function (tile) {
+            var k = tile.clientWidth / sw;
+            tile.querySelector('.ov-inner').style.transform = 'scale(' + k + ')';
+        });
+    }
+    function closeOverview() {
+        if (!overview) return;
+        window.removeEventListener('resize', scaleOverview);
+        overview.remove();
+        overview = null;
+    }
+
+    /* ============================================================
+       PRESENTER WINDOW (P)
+       ============================================================ */
+    var popup = null, ui = null, started = 0;
+    var CSS = [
+        ':root{--bg:#131417;--panel:#1d1f24;--line:#2c2f36;--ink:#f2f2f4;--ink-2:#b6b8c0;--ink-3:#7d808a}',
+        '*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 "Segoe UI",-apple-system,BlinkMacSystemFont,Inter,Roboto,"Helvetica Neue",Arial,sans-serif;overflow:hidden}',
+        '#app{display:grid;grid-template-columns:1fr 380px;grid-template-rows:1fr auto;height:100%;gap:14px;padding:14px}',
+        '.stage{position:relative;background:#000;border-radius:8px;overflow:hidden}.stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;pointer-events:none}',
+        '.tag{position:absolute;left:10px;top:8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);background:rgba(0,0,0,.55);padding:2px 6px;border-radius:4px;z-index:1}',
+        '.side{display:flex;flex-direction:column;gap:12px;min-height:0}.side .stage{aspect-ratio:16/9;flex:none}',
+        '.notes{flex:1;min-height:0;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;font-size:20px;line-height:1.5;white-space:pre-wrap}',
+        '.notes:empty::before{content:"No notes for this slide";color:var(--ink-3);font-size:15px}.sizes{display:flex;gap:4px;justify-content:flex-end}',
+        '.bar{grid-column:1/-1;display:flex;align-items:center;gap:18px;padding:8px 4px 0;border-top:1px solid var(--line)}',
+        '.time{font-variant-numeric:tabular-nums;font-size:30px;font-weight:600;min-width:130px;cursor:pointer}.clock{font-variant-numeric:tabular-nums;font-size:18px;color:var(--ink-2)}',
+        '.count{font-size:18px;color:var(--ink-2)}.count b{color:var(--ink);font-size:24px}.grow{flex:1}.hint{font-size:12px;color:var(--ink-3)}',
+        '.slidetime{font-variant-numeric:tabular-nums;font-size:18px;color:var(--ink-2);min-width:64px}.slidetime.over{color:#ff8b6a}',
+        'button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}button:hover{border-color:var(--ink-3)}button.big{font-size:20px;padding:6px 18px}',
+        '.end{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);background:var(--bg)}'
+    ].join('');
+    var HTML = '<div id="app">'
+        + '<div class="stage"><span class="tag">Current</span><iframe id="cur"></iframe></div>'
+        + '<div class="side"><div class="stage"><span class="tag">Next</span><iframe id="next"></iframe><div class="end" id="end" hidden>End of the deck</div></div>'
+        + '<div class="sizes"><button data-size="-1">A-</button><button data-size="1">A+</button></div><div class="notes" id="notes"></div></div>'
+        + '<div class="bar"><div class="time" id="time" title="Click to reset">00:00</div><div class="slidetime" id="slidetime" title="On this slide">00:00</div><button id="reset">Reset</button><div class="clock" id="clock"></div><div class="grow"></div>'
+        + '<div class="count"><b id="now">-</b> / <span id="total">-</span> <span class="hint" id="frag"></span> <span class="hint" id="name"></span></div>'
+        + '<button class="big" id="prev">&larr;</button><button class="big" id="next-btn">&rarr;</button></div></div>';
+
+    var slideStarted = Date.now(), notifiedIndex = -1;
+    function deckUrl() { return location.href.replace(/#.*$/, ''); }
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+    function openPresenter() {
+        if (popup && !popup.closed) { popup.focus(); notify(); return; }
+        popup = window.open('', 'deck-presenter', 'width=1280,height=760');
+        if (!popup) { alert('The browser blocked the presenter window. Allow pop-ups for this page and press P again.'); return; }
+        var d = popup.document;
+        d.open();
+        d.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Presenter</title><style>' + CSS + '</style></head><body>' + HTML + '</body></html>');
+        d.close();
+        ui = {};
+        ['cur', 'next', 'end', 'notes', 'time', 'slidetime', 'reset', 'clock', 'now', 'total', 'frag', 'name', 'prev', 'next-btn'].forEach(function (id) { ui[id] = d.getElementById(id); });
+        var base = deckUrl();
+        ui.cur.src = base + '#' + (current() + 1);
+        ui.next.src = base + '#' + (current() + 2);
+        ui.prev.onclick = prev;
+        ui['next-btn'].onclick = next;
+        ui.reset.onclick = function () { started = Date.now(); slideStarted = Date.now(); tick(); };
+        ui.time.onclick = ui.reset.onclick;
+        d.addEventListener('keydown', function (e) {
+            switch (e.key) {
+                case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': e.preventDefault(); next(); break;
+                case 'ArrowLeft': case 'ArrowUp': case 'PageUp': e.preventDefault(); prev(); break;
+                case 'Home': e.preventDefault(); goTo(0); break;
+                case 'End': e.preventDefault(); goTo(slides().length - 1); break;
+            }
+        });
+        d.querySelector('.sizes').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-size]'); if (!b) return;
+            var size = parseFloat(ui.notes.style.fontSize) || 20;
+            ui.notes.style.fontSize = Math.max(12, Math.min(48, size + 2 * parseInt(b.getAttribute('data-size'), 10))) + 'px';
+        });
+        started = Date.now();
+        tick();
+        notify();
+    }
+    /* Frames follow the deck by hash only, so this works even when the frames are a different origin (file://). */
+    function steer(frame, index) {
+        var want = deckUrl() + '#' + (index + 1);
+        try { if (frame.contentWindow.location.href !== want) frame.contentWindow.location.replace(want); }
+        catch (e) { if (frame.src !== want) frame.src = want; }
+    }
+    function notify() {
+        if (!popup || popup.closed || !ui) return;
+        var all = slides(), i = current();
+        if (i !== notifiedIndex) { notifiedIndex = i; slideStarted = Date.now(); }
+        steer(ui.cur, i);
+        ui.end.hidden = i + 1 < all.length;
+        if (i + 1 < all.length) steer(ui.next, i + 1);
+        var fs = fragmentState(all[i]);
+        ui.now.textContent = i + 1;
+        ui.total.textContent = all.length;
+        ui.frag.textContent = fs.total ? '(step ' + fs.shown + '/' + fs.total + ')' : '';
+        ui.name.textContent = labelOf(all[i]);
+        ui.notes.textContent = notesOf(all[i]);
+        popup.document.title = 'Presenter ' + (i + 1) + '/' + all.length;
+        // Mirror the fragment state in the current frame (same origin only).
+        try {
+            var doc = ui.cur.contentDocument, cs = doc && doc.querySelectorAll('.deck-stage .slide')[i];
+            if (cs) { var shown = 0; fragmentsOf(cs).forEach(function (g) { var on = shown++ < fs.shown; g.els.forEach(function (el) { el.classList.toggle('visible', on); }); }); }
+        } catch (e) { /* cross-origin frame */ }
+    }
+    function clock(s) { return (s >= 3600 ? pad(Math.floor(s / 3600)) + ':' : '') + pad(Math.floor(s / 60) % 60) + ':' + pad(s % 60); }
+    function tick() {
+        if (!popup || popup.closed || !ui) return;
+        var s = Math.floor((Date.now() - started) / 1000);
+        ui.time.textContent = clock(s);
+        // Time on this slide, and how it compares with the slide's own data-auto-advance.
+        var on = Math.floor((Date.now() - slideStarted) / 1000), want = autoSeconds(slides()[current()]);
+        ui.slidetime.textContent = clock(on) + (want ? ' / ' + clock(Math.round(want)) : '');
+        ui.slidetime.classList.toggle('over', !!want && on > want);
+        var d = new Date();
+        ui.clock.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+    setInterval(tick, 500);
+
+    /* ============================================================
+       LASER POINTER (L): the cursor becomes a bright dot with a glow.
+       ============================================================ */
+    var laser = null;
+    function setLaser(on) {
+        if (on && !laser) {
+            laser = document.createElement('div');
+            laser.className = 'deck-laser';
+            document.body.appendChild(laser);
+            document.documentElement.classList.add('deck-laser-on');
+            window.addEventListener('pointermove', moveLaser);
+        } else if (!on && laser) {
+            window.removeEventListener('pointermove', moveLaser);
+            laser.remove(); laser = null;
+            document.documentElement.classList.remove('deck-laser-on');
+        }
+    }
+    function moveLaser(e) { if (laser) { laser.style.left = e.clientX + 'px'; laser.style.top = e.clientY + 'px'; laser.style.opacity = '1'; } }
+
+    /* ============================================================
+       DRAWING (D): a canvas layer over the stage. Strokes are kept in
+       stage coordinates (so they follow a resize), per slide, for as
+       long as the page is open. Nothing is written into the deck.
+       ============================================================ */
+    var COLOURS = ['#ff2d55', '#ffcc00', '#2f6fed', '#22c55e', '#ffffff'];
+    var draw = null;                                          // { canvas, ctx, bar, colour, width, strokes: {slideIndex: [stroke]}, live }
+    function setDrawing(on) {
+        if (on && !draw) {
+            var canvas = document.createElement('canvas');
+            canvas.className = 'deck-draw';
+            var bar = document.createElement('div');
+            bar.className = 'deck-draw-bar';
+            bar.innerHTML = COLOURS.map(function (c, i) { return '<button data-colour="' + i + '" title="Colour ' + (i + 1) + ' (key ' + (i + 1) + ')" style="background:' + c + '"></button>'; }).join('')
+                + '<span class="sep"></span><button data-w="-1" title="Thinner ([)">&minus;</button><button data-w="1" title="Thicker (])">+</button>'
+                + '<span class="sep"></span><button data-act="undo" title="Undo last stroke (Ctrl+Z)">&#8630;</button><button data-act="clear" title="Clear this slide (C)">Clear</button><button data-act="close" title="Stop drawing (D or Esc)">Done</button>';
+            document.body.appendChild(canvas);
+            document.body.appendChild(bar);
+            draw = { canvas: canvas, ctx: canvas.getContext('2d'), bar: bar, colour: lastColour, width: lastWidth, live: null };
+            document.documentElement.classList.add('deck-drawing');
+            canvas.addEventListener('pointerdown', drawStart);
+            canvas.addEventListener('pointermove', drawMove);
+            canvas.addEventListener('pointerup', drawEnd);
+            canvas.addEventListener('pointercancel', drawEnd);
+            bar.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+            bar.addEventListener('click', function (e) {
+                var b = e.target.closest('button'); if (!b) return;
+                if (b.dataset.colour != null) setColour(+b.dataset.colour);
+                else if (b.dataset.w) setWidth(draw.width + 2 * +b.dataset.w);
+                else if (b.dataset.act === 'undo') undoStroke();
+                else if (b.dataset.act === 'clear') clearStrokes();
+                else if (b.dataset.act === 'close') setDrawing(false);
+            });
+            window.addEventListener('resize', sizeCanvas);
+            sizeCanvas();
+            setColour(draw.colour);
+        } else if (!on && draw) {
+            window.removeEventListener('resize', sizeCanvas);
+            draw.canvas.remove(); draw.bar.remove();
+            document.documentElement.classList.remove('deck-drawing');
+            draw = null;
+        }
+    }
+    var drawStore = {};                                       // slide index -> strokes, survives toggling the mode
+    var lastColour = 0, lastWidth = 8;                        // stroke width in stage pixels
+    function currentStrokes() { var i = current(); return drawStore[i] || (drawStore[i] = []); }
+    function setColour(i) {
+        draw.colour = lastColour = i;
+        Array.prototype.forEach.call(draw.bar.querySelectorAll('[data-colour]'), function (b) { b.classList.toggle('on', +b.dataset.colour === i); });
+    }
+    function setWidth(w) { draw.width = lastWidth = Math.max(2, Math.min(40, w)); }
+    function sizeCanvas() {
+        if (!draw) return;
+        var dpr = window.devicePixelRatio || 1;
+        draw.canvas.width = Math.round(innerWidth * dpr); draw.canvas.height = Math.round(innerHeight * dpr);
+        draw.canvas.style.width = innerWidth + 'px'; draw.canvas.style.height = innerHeight + 'px';
+        draw.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        redraw();
+    }
+    function toStage(x, y) { var s = stage.getBoundingClientRect(), k = stageScale(); return { x: (x - s.left) / k, y: (y - s.top) / k }; }
+    function fromStage(p) { var s = stage.getBoundingClientRect(), k = stageScale(); return { x: s.left + p.x * k, y: s.top + p.y * k }; }
+    function drawStart(e) {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        draw.canvas.setPointerCapture(e.pointerId);
+        var p = toStage(e.clientX, e.clientY);
+        draw.live = { colour: COLOURS[draw.colour], width: draw.width * (e.pressure && e.pointerType === 'pen' ? 0.5 + e.pressure : 1), points: [p] };
+        currentStrokes().push(draw.live);
+        redraw();
+    }
+    function drawMove(e) {
+        if (!draw.live) return;
+        var events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+        events.forEach(function (ev) { draw.live.points.push(toStage(ev.clientX, ev.clientY)); });
+        redraw();
+    }
+    function drawEnd() { if (draw) draw.live = null; }
+    function undoStroke() { currentStrokes().pop(); redraw(); }
+    function clearStrokes() { drawStore[current()] = []; redraw(); }
+    function redraw() {
+        if (!draw) return;
+        var ctx = draw.ctx, k = stageScale();
+        ctx.clearRect(0, 0, innerWidth, innerHeight);
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        currentStrokes().forEach(function (st) {
+            var pts = st.points.map(fromStage);
+            if (!pts.length) return;
+            ctx.strokeStyle = st.colour; ctx.lineWidth = st.width * k;
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            if (pts.length === 1) ctx.lineTo(pts[0].x + 0.1, pts[0].y);
+            for (var i = 1; i < pts.length - 1; i++) {
+                var mx = (pts[i].x + pts[i + 1].x) / 2, my = (pts[i].y + pts[i + 1].y) / 2;
+                ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+            }
+            if (pts.length > 1) ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+            ctx.stroke();
+        });
+    }
+    document.addEventListener('deck:slide', redraw);
+    window.addEventListener('hashchange', redraw);
+
+    /* ============================================================
+       RUN BY ITSELF (A, or data-auto-advance in the deck)
+       Each slide waits its own seconds - data-auto-advance on the slide, else on the
+       stage - then steps: a fragment if the slide has one left, otherwise the next
+       slide; at the end it stops, or starts again with data-loop on the stage. Any key
+       or click stops it, so nobody is fighting the deck.
+       ============================================================ */
+    var autoTimer = null, autoOn = false;
+    function autoSeconds(slide) {
+        var v = parseFloat((slide && slide.getAttribute('data-auto-advance')) || stage.getAttribute('data-auto-advance'));
+        return isFinite(v) && v > 0 ? v : 0;
+    }
+    function autoStep() {
+        autoTimer = null;
+        if (!autoOn) return;
+        var all = slides(), i = current();
+        if (!nextFragment()) {
+            if (i + 1 < all.length) goTo(i + 1);
+            else if (stage.hasAttribute('data-loop')) goTo(0);
+            else { setAuto(false); return; }
+        }
+        autoSchedule();
+    }
+    function autoSchedule() {
+        if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+        if (!autoOn) return;
+        var s = autoSeconds(slides()[current()]);
+        autoTimer = setTimeout(autoStep, (s || 5) * 1000);
+    }
+    function setAuto(on) {
+        autoOn = !!on;
+        document.documentElement.classList.toggle('deck-auto', autoOn);
+        if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+        if (autoOn) autoSchedule(); else notify();
+        if (autoOn) notify();
+    }
+    /* A deck that says so starts by itself once it is shown on its own. */
+    if (!editing() && autoSeconds(slides()[current()])) setTimeout(function () { if (!editing()) setAuto(true); }, 300);
+
+    /* ============================================================
+       KEYS. Captured on the window so fragments are handled before the
+       deck's own navigation sees the key; nothing runs inside the editor.
+       ============================================================ */
+    document.addEventListener('pointerdown', function () { if (autoOn) setAuto(false); }, true);
+    /* Links on elements: data-href opens on click (not while editing). */
+    document.addEventListener('click', function (e) {
+        if (editing() || overview) return;
+        var el = e.target && e.target.closest ? e.target.closest('[data-href]') : null;
+        if (!el || !stage.contains(el)) return;
+        var url = el.getAttribute('data-href');
+        if (!url) return;
+        e.preventDefault();
+        if (el.getAttribute('data-href-target') === '_self') location.href = url; else window.open(url, '_blank', 'noopener');
+    }, true);
+
+    window.addEventListener('keydown', function (e) {
+        if (editing()) return;
+        var t = e.target;
+        if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
+        if ((e.ctrlKey || e.metaKey) && draw && (e.key === 'z' || e.key === 'Z')) { undoStroke(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        var consumed = true;
+        if (autoOn && e.key !== 'a' && e.key !== 'A') setAuto(false);        // a key takes the deck back
+        switch (e.key) {
+            case 'p': case 'P': openPresenter(); break;
+            case 'F5': if (e.shiftKey) openPresenter(); else consumed = false; break;
+            case 'o': case 'O': overview ? closeOverview() : openOverview(); break;
+            case 'a': case 'A': setAuto(!autoOn); break;
+            case 'l': case 'L': setLaser(!laser); break;
+            case 'd': case 'D': setDrawing(!draw); break;
+            case 'Escape': if (overview) closeOverview(); else if (draw) setDrawing(false); else if (laser) setLaser(false); else consumed = false; break;
+            case 'c': case 'C': if (draw) clearStrokes(); else consumed = false; break;
+            case '[': if (draw) setWidth(draw.width - 2); else consumed = false; break;
+            case ']': if (draw) setWidth(draw.width + 2); else consumed = false; break;
+            case '1': case '2': case '3': case '4': case '5': if (draw) setColour(+e.key - 1); else consumed = false; break;
+            case 'Enter': if (overview) { var pick = ovIndex; closeOverview(); goTo(pick); } else consumed = false; break;
+            case 'ArrowRight': if (overview) moveOverview(1, 0); else next(); break;
+            case 'ArrowLeft': if (overview) moveOverview(-1, 0); else prev(); break;
+            case 'ArrowDown': if (overview) moveOverview(0, 1); else next(); break;
+            case 'ArrowUp': if (overview) moveOverview(0, -1); else prev(); break;
+            case ' ': case 'PageDown': if (overview) { consumed = false; break; } next(); break;
+            case 'PageUp': if (overview) { consumed = false; break; } prev(); break;
+            default: consumed = false;
+        }
+        if (consumed) { e.preventDefault(); e.stopImmediatePropagation(); }
+    }, true);
+    // Mouse wheel and touch swipes in the deck also step through fragments first.
+    window.addEventListener('wheel', function (e) {
+        if (editing() || overview || Math.abs(e.deltaY) < 30) return;
+        var slide = slides()[current()];
+        if (!slide || !fragmentsOf(slide).length) return;
+        if (e.deltaY > 0 ? nextFragment() : prevFragment()) e.stopImmediatePropagation();
+    }, { capture: true, passive: true });
+
+    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, version: 10 };
+})();
+</script>
+</body>
+</html>

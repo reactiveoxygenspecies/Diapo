@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notebook</title>
+<!-- Notebook: paper and ink. A ruled page with a red margin, Caveat handwriting for headlines and annotations,
+     Mulish for the body, hand-drawn underlines, circles and arrows as inline SVG, sticky notes, taped pictures.
+     Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Mulish:wght@400;600;800&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #1f2a3a;   /* blue-black ink            */
+    --ink-2:    #3e4a5c;   /* body text                 */
+    --ink-3:    #8391a3;   /* captions, secondary       */
+    --rule:     #cfdbe8;   /* the ruled lines           */
+    --paper:    #fbf8f0;   /* paper                     */
+    --paper-2:  #f2ecdc;   /* panels                    */
+    --accent:   #d64545;   /* red pen                   */
+    --accent-2: #fff27a;   /* highlighter               */
+    --accent-3: #2f6fb5;   /* blue pen                  */
+    --margin:   #efb3b3;   /* the margin line           */
+
+    --stage-bg: #24201a;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #fbf8f0;
+    --font: 'Mulish', 'Helvetica Neue', Arial, sans-serif;
+    --font-hand: 'Caveat', 'Segoe Print', cursive;
+
+    --pad-x: 200px;        /* layout rhythm at 1920x1080: past the margin line */
+    --pad-top: 110px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* motion: the reveal's curve   */
+    --dur: 0.7s;                                 /* ... its duration             */
+    --stagger: 0.12s;                            /* ... the step between --i's   */
+    --reveal-y: 12px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-hand); font-size: 150px; font-weight: 700; line-height: 1.0; color: var(--ink); }
+h2 { font-family: var(--font-hand); font-size: 96px; font-weight: 700; line-height: 1.02; color: var(--ink); }
+h3 { font-family: var(--font-hand); font-size: 52px; font-weight: 700; line-height: 1.1; color: var(--ink); }
+p  { font-size: 30px; line-height: 1.5; color: var(--ink-2); }
+ul, ol { font-size: 30px; line-height: 1.5; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 12px; }
+blockquote { font-family: var(--font-hand); font-size: 84px; font-weight: 500; line-height: 1.12; color: var(--ink); }
+.eyebrow { font-family: var(--font-hand); font-size: 36px; font-weight: 500; color: var(--accent); margin-bottom: 16px; }
+.sub { font-size: 36px; line-height: 1.4; color: var(--ink-3); margin-top: 24px; }
+.caption { font-family: var(--font-hand); font-size: 30px; line-height: 1.3; color: var(--ink-3); }
+.hl { background: linear-gradient(transparent 20%, var(--accent-2) 20%, var(--accent-2) 90%, transparent 90%); padding: 0 6px; }
+.red { color: var(--accent); }
+
+/* ===========================================
+   LAYOUT - the page: ruled lines every 60px, a red margin at 160px
+   =========================================== */
+.slide { background-image: repeating-linear-gradient(180deg, transparent 0, transparent 59px, var(--rule) 59px, var(--rule) 60px); background-position: 0 50px; }
+.margin-line { position: absolute; left: 160px; top: 0; width: 2px; height: 1080px; background: var(--margin); pointer-events: none; }
+.holes { position: absolute; left: 60px; top: 0; width: 40px; height: 1080px; pointer-events: none; }
+.holes i { position: absolute; left: 0; width: 40px; height: 40px; border-radius: 50%; background: var(--stage-bg); opacity: 0.85; }
+.slide .content { position: absolute; left: var(--pad-x); right: 120px; top: var(--pad-top); bottom: var(--pad-top); }
+.sticky { position: absolute; width: 360px; padding: 32px 30px; background: var(--accent-2); font-family: var(--font-hand); font-size: 34px; line-height: 1.2; color: var(--ink); box-shadow: 4px 6px 18px rgba(31,42,58,0.18); rotate: -3deg; }
+.sticky.blue { background: #cfe6ff; }
+.sticky.pink { background: #ffd3dc; }
+.tape { position: absolute; width: 180px; height: 44px; background: rgba(255,255,255,0.55); border: 1px solid rgba(31,42,58,0.12); box-shadow: 0 2px 6px rgba(31,42,58,0.1); }
+svg.hand { position: absolute; overflow: visible; max-width: none; max-height: none; }
+svg.hand path, svg.hand ellipse, svg.hand line { fill: none; stroke: var(--accent); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Cover */
+.cover .content { display: flex; flex-direction: column; justify-content: center; }
+.cover h1 { max-width: 1560px; }
+
+/* To-do agenda */
+.todo ul { list-style: none; padding: 0; margin-top: 40px; }
+.todo li { position: relative; padding-left: 80px; font-size: 40px; line-height: 60px; margin: 0 0 30px; color: var(--ink); font-family: var(--font-hand); font-weight: 500; }
+.todo li::before { content: ''; position: absolute; left: 0; top: 10px; width: 40px; height: 40px; border: 3px solid var(--ink); border-radius: 6px; rotate: -2deg; }
+.todo li.done { color: var(--ink-3); text-decoration: line-through; text-decoration-color: var(--accent); text-decoration-thickness: 4px; }
+.todo li.done::after { content: ''; position: absolute; left: 12px; top: 8px; width: 14px; height: 28px; border-right: 5px solid var(--accent); border-bottom: 5px solid var(--accent); rotate: 40deg; }
+
+/* Section: a page tab */
+.section .tab { position: absolute; right: 0; top: 200px; width: 140px; height: 360px; background: var(--accent); border-radius: 24px 0 0 24px; display: flex; align-items: center; justify-content: center; font-family: var(--font-hand); font-size: 60px; font-weight: 700; color: #fff; writing-mode: vertical-rl; }
+.section .content { display: flex; flex-direction: column; justify-content: center; }
+.section h2 { font-size: 140px; max-width: 1300px; }
+
+/* Notes: paragraphs with a drawn underline and a circled word */
+.notes-slide .cols { display: grid; grid-template-columns: 1fr 480px; gap: 60px; margin-top: 32px; }
+.notes-slide .cols p { margin-bottom: 26px; font-size: 31px; line-height: 60px; }
+.notes-slide .circled { position: relative; display: inline-block; }
+
+/* Picture taped to the page */
+.picture .photo { position: absolute; left: 900px; top: 40px; width: 720px; height: 540px; background: var(--paper-2); border: 14px solid #fff; box-shadow: 0 10px 30px rgba(31,42,58,0.18); rotate: 2deg; }
+.picture .text { position: absolute; left: 0; top: 20px; width: 760px; }
+.picture .text p { margin-top: 24px; font-size: 30px; line-height: 60px; }
+
+/* Big number circled in red */
+.number .content { display: flex; flex-direction: column; justify-content: center; }
+.number .big { position: relative; display: inline-block; font-family: var(--font-hand); font-size: 300px; font-weight: 700; line-height: 1; color: var(--ink); align-self: flex-start; padding: 0 40px; }
+.number p { margin-top: 24px; max-width: 1100px; }
+
+/* Quote with a bracket */
+.quote .content { display: flex; flex-direction: column; justify-content: center; }
+.quote blockquote { max-width: 1400px; padding-left: 60px; }
+.quote .who { margin: 28px 0 0 60px; }
+
+/* Sketch flow */
+.flow .stage { position: absolute; left: 0; right: 0; top: 260px; height: 520px; }
+.flow .box { position: absolute; width: 340px; height: 150px; border: 4px solid var(--ink); border-radius: 24px 30px 22px 28px / 28px 22px 30px 24px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; font-family: var(--font-hand); font-size: 40px; font-weight: 700; color: var(--ink); background: var(--paper); }
+.flow .box.hi { border-color: var(--accent); }
+.flow .note { position: absolute; font-family: var(--font-hand); font-size: 30px; color: var(--accent-3); }
+
+/* Two columns */
+.pair .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; margin-top: 32px; }
+.pair .col h3 { margin-bottom: 20px; }
+.pair .col.no h3 { color: var(--accent); }
+.pair .col ul { list-style: none; padding: 0; }
+.pair .col li { position: relative; padding-left: 48px; font-size: 30px; line-height: 60px; margin: 0; }
+.pair .col li::before { content: '+'; position: absolute; left: 0; top: 0; font-family: var(--font-hand); font-size: 44px; font-weight: 700; color: var(--accent-3); }
+.pair .col.no li::before { content: '–'; color: var(--accent); }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; }
+
+/* ===========================================
+   MASTER LAYER - a handwritten page number
+   =========================================== */
+.deck-footer {
+    position: absolute; right: 120px; bottom: 44px; z-index: 5;
+    font-family: var(--font-hand); font-size: 34px; font-weight: 500; color: var(--ink-3);
+}
+.deck-footer b { font-weight: 700; color: var(--ink); }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="margin-line"></div>
+    <div class="holes"><i style="top:180px"></i><i style="top:520px"></i><i style="top:860px"></i></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Notes from the field, week 38</div>
+        <h1 class="reveal" style="--i:1" data-edit>What we learned this week</h1>
+        <svg class="hand reveal" style="--i:2; position:relative; display:block; top:-14px; width:1300px; height:40px" viewBox="0 0 1300 40" preserveAspectRatio="none"><path d="M4 22 C 250 8, 500 34, 650 18 S 1050 30, 1296 14"/></svg>
+        <p class="sub reveal" style="--i:3; max-width:900px" data-edit>Rough, honest and a little untidy, the way notebooks are</p>
+    </div>
+    <div class="sticky reveal-img" style="--i:4; left:1440px; top:40px" data-edit>Read this before Monday!</div>
+    <div class="sticky blue reveal-img" style="--i:5; left:1400px; top:620px; rotate:4deg" data-edit>Your Name, Sept 2026</div>
+    <aside class="notes" hidden>Say it is a working document: things will be crossed out and added as we go.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - To-do list
+     ====================================================== -->
+<section class="slide todo" data-name="agenda">
+    <div class="margin-line"></div>
+    <div class="holes"><i style="top:180px"></i><i style="top:520px"></i><i style="top:860px"></i></div>
+    <div class="content">
+        <h2 class="reveal" style="--i:0" data-edit>Today's list</h2>
+        <ul data-group>
+            <li class="done reveal" style="--i:1" data-edit>Recap of last week's decision</li>
+            <li class="reveal" style="--i:2" data-edit>Three things we learned from the interviews</li>
+            <li class="reveal" style="--i:3" data-edit>The sketch of the new flow</li>
+            <li class="reveal" style="--i:4" data-edit>Pros and cons, then decide</li>
+            <li class="reveal" style="--i:5" data-edit>Who does what by Friday</li>
+        </ul>
+    </div>
+    <div class="sticky pink reveal-img" style="--i:6; left:1400px; top:300px; rotate:3deg" data-edit>Tick these off with the class "done"</div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Section
+     ====================================================== -->
+<section class="slide section" data-name="section" data-section="Interviews">
+    <div class="margin-line"></div>
+    <div class="holes"><i style="top:180px"></i><i style="top:520px"></i><i style="top:860px"></i></div>
+    <div class="tab reveal-img" style="--i:0" data-edit>Part 1</div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:1" data-edit>Part one</div>
+        <h2 class="reveal" style="--i:2" data-edit>What the interviews told us</h2>
+        <p class="sub reveal" style="--i:3" data-edit>Twelve conversations, one surprise.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Notes
+     ====================================================== -->
+<section class="slide notes-slide" data-name="notes">
+    <div class="margin-line"></div>
+    <div class="holes"><i style="top:180px"></i><i style="top:520px"></i><i style="top:860px"></i></div>
+    <div class="content">
+        <h2 class="reveal" style="--i:0" data-edit>Three things we heard</h2>
+        <div class="cols">
+            <div>
+                <p class="reveal" style="--i:1" data-edit>Nobody used the word "dashboard". They said <span class="hl">"the page I check in the morning"</span>, which tells us what the page is for.</p>
+                <p class="reveal" style="--i:2" data-edit>Eight of twelve open it on a phone first, then on a laptop only when something is <span class="circled">wrong<svg class="hand" style="left:-14px; top:-10px; width:130px; height:80px" viewBox="0 0 130 80"><ellipse cx="65" cy="40" rx="60" ry="34"/></svg></span>.</p>
+                <p class="reveal" style="--i:3" data-edit>The alert email is deleted unread by everyone. Every single person.</p>
+            </div>
+            <div>
+                <div class="sticky reveal-img" style="--i:2; position:relative; left:0; top:60px; width:420px" data-edit>Surprise: the phone comes first. Redesign for that.</div>
+            </div>
+        </div>
+    </div>
+    <aside class="notes" hidden>The circled word is an SVG: select it to recolour or move it.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Taped picture
+     ====================================================== -->
+<section class="slide picture" data-name="picture">
+    <div class="margin-line"></div>
+    <div class="holes"><i style="top:180px"></i><i style="top:520px"></i><i style="top:860px"></i></div>
+    <div class="content">
+        <div class="photo reveal-img" style="--i:0"></div>
+        <div data-placeholder="image" style="display:none; position:absolute; left:914px; top:54px; width:692px; height:512px; rotate:2deg; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:26px; text-align:center">Double-click to choose a picture</div>
+        <div class="tape reveal-img" style="--i:1; left:840px; top:10px; rotate:-30deg"></div>
+        <div class="tape reveal-img" style="--i:1; left:1500px; top:500px; rotate:-30deg"></div>
+        <div class="text">
+            <div class="eyebrow reveal" style="--i:2" data-edit>Exhibit A</div>
+            <h2 class="reveal" style="--i:3" data-edit>The morning page, as it is</h2>
+            <p class="reveal" style="--i:4" data-edit>A photograph goes in the frame on the right: double-click it in the editor. The tape and the tilt stay where they are.</p>
+        </div>
+        <svg class="hand reveal" style="--i:5; left:620px; top:340px; width:260px; height:120px" viewBox="0 0 260 120"><path d="M6 100 C 80 90, 160 60, 240 20"/><path d="M200 18 L 246 16 L 236 58"/></svg>
+        <p class="caption reveal" style="--i:5; position:absolute; left:440px; top:440px" data-edit>this one!</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Big number
+     ====================================================== -->
+<section class="slide number" data-name="number" data-section="Numbers">
+    <div class="margin-line"></div>
+    <div class="holes"><i style="top:180px"></i><i style="top:520px"></i><i style="top:860px"></i></div>
+    <div class="content">
+        <div class="big reveal" style="--i:0"><span data-edit>8/12</span><svg class="hand" style="left:-20px; top:-30px; width:calc(100% + 40px); height:calc(100% + 60px)" viewBox="0 0 560 340" preserveAspectRatio="none"><path d="M280 20 C 120 10, 20 80, 24 170 S 130 330, 290 322 S 540 270, 536 160 S 420 14, 300 22"/></svg></div>
+        <p class="reveal" style="--i:1" data-edit>open the page on a phone first. That's the whole redesign brief in one fraction.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Quote
+     ====================================================== -->
+<section class="slide quote" data-name="quote">
+    <div class="margin-line"></div>
+    <div class="holes"><i style="top:180px"></i><i style="top:520px"></i><i style="top:860px"></i></div>
+    <div class="content">
+        <svg class="hand reveal" style="--i:0; left:0; top:280px; width:40px; height:360px" viewBox="0 0 40 360"><path d="M34 6 C 8 20, 10 120, 12 180 S 6 340, 36 354"/></svg>
+        <blockquote class="reveal" style="--i:0; margin-top:260px" data-edit>"I don't need more charts. I need to know if I should worry."</blockquote>
+        <p class="who caption reveal" style="--i:1" data-edit>Interview 7, an operations lead</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Sketch flow
+     ====================================================== -->
+<section class="slide flow" data-name="sketch" data-section="Sketch">
+    <div class="margin-line"></div>
+    <div class="holes"><i style="top:180px"></i><i style="top:520px"></i><i style="top:860px"></i></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Part two</div>
+        <h2 class="reveal" style="--i:1" data-edit>The new flow, roughly</h2>
+        <div class="stage">
+            <div class="box reveal" style="--i:2; left:0; top:60px" data-edit>Phone: one line, worry or not</div>
+            <svg class="hand reveal" style="--i:3; left:350px; top:120px; width:160px; height:40px" viewBox="0 0 160 40"><path d="M4 22 C 50 14, 100 26, 150 18"/><path d="M122 4 L 154 18 L 124 36"/></svg>
+            <div class="box hi reveal" style="--i:3; left:520px; top:60px" data-edit>Tap: the why</div>
+            <svg class="hand reveal" style="--i:4; left:870px; top:120px; width:160px; height:40px" viewBox="0 0 160 40"><path d="M4 18 C 50 26, 100 12, 150 22"/><path d="M122 6 L 154 22 L 124 38"/></svg>
+            <div class="box reveal" style="--i:4; left:1040px; top:60px" data-edit>Laptop: the full page</div>
+            <div class="note reveal" style="--i:5; left:540px; top:250px; width:400px" data-edit>the alert email goes away entirely, replaced by the one line</div>
+            <svg class="hand reveal" style="--i:5; left:700px; top:190px; width:60px; height:60px" viewBox="0 0 60 60"><path d="M30 56 C 26 40, 30 24, 34 6"/><path d="M20 20 L 34 4 L 48 20"/></svg>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Pros and cons
+     ====================================================== -->
+<section class="slide pair" data-name="pros-cons" data-section="Decide">
+    <div class="margin-line"></div>
+    <div class="holes"><i style="top:180px"></i><i style="top:520px"></i><i style="top:860px"></i></div>
+    <div class="content">
+        <h2 class="reveal" style="--i:0" data-edit>Phone first: for and against</h2>
+        <div class="cols">
+            <div class="col reveal" style="--i:1">
+                <h3 data-edit>For</h3>
+                <ul><li data-edit>Matches what eight of twelve people do</li><li data-edit>Forces us to say one thing per page</li><li data-edit>Kills the alert email</li></ul>
+            </div>
+            <div class="col no reveal" style="--i:2">
+                <h3 data-edit>Against</h3>
+                <ul><li data-edit>The four laptop-first people are the loudest</li><li data-edit>Charts need a redesign, not a resize</li><li data-edit>Two quarters, not one</li></ul>
+            </div>
+        </div>
+    </div>
+    <div class="sticky reveal-img" style="--i:3; left:1380px; top:720px; rotate:-2deg" data-edit>Decision: phone first. Charts in Q2.</div>
+</section>
+
+<!-- ======================================================
+     SLIDE 10 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing" data-no-master>
+    <div class="margin-line"></div>
+    <div class="holes"><i style="top:180px"></i><i style="top:520px"></i><i style="top:860px"></i></div>
+    <div class="content">
+        <h1 class="reveal" style="--i:0" data-edit>See you Friday</h1>
+        <svg class="hand reveal" style="--i:1; position:relative; display:block; top:-14px; width:760px; height:40px" viewBox="0 0 760 40"><path d="M4 24 C 200 6, 400 34, 756 12"/></svg>
+        <p class="sub reveal" style="--i:2; max-width:900px" data-edit>Notes and the interview recordings are in the shared folder.</p>
+    </div>
+    <div class="sticky blue reveal-img" style="--i:3; left:1200px; top:260px; rotate:3deg" data-edit>you@example.com</div>
+    <div class="sticky pink reveal-img" style="--i:4; left:1420px; top:540px; rotate:-4deg" data-edit>Bring coffee ☕</div>
+</section>
+
+<!-- The master layer: a handwritten page number, edited once in the editor -->
+<div class="deck-footer">p. <b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

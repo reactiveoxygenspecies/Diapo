@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Diapo mark, dark: charcoal mount with a rimmed white window, no word. -->
+  <rect x="2" y="2" width="96" height="96" rx="7" fill="#2A2A30"/>
+  <rect x="14" y="26" width="72" height="48" rx="1.5" fill="#F7F5EF"/>
+  <rect x="14.6" y="26.6" width="70.8" height="46.8" rx="1" fill="none" stroke="#5A5A64" stroke-width="1.2"/>
+</svg>

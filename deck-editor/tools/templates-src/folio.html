@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Folio</title>
+<!-- Folio: an editorial deck on ivory paper. Fraunces headlines with italic emphasis, Libre Franklin body,
+     hairline rules, oxblood numerals, magazine spreads. Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,600;0,700;1,300;1,600&family=Libre+Franklin:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #1e1a17;   /* headings, key text        */
+    --ink-2:    #3d3630;   /* body text                 */
+    --ink-3:    #857b6e;   /* captions, secondary       */
+    --rule:     #d3c9b6;   /* hairlines                 */
+    --paper:    #f4efe4;   /* ivory slide background    */
+    --paper-2:  #eae3d2;   /* panels                    */
+    --accent:   #8b1e2d;   /* oxblood                   */
+    --accent-2: #b8975a;   /* old gold                  */
+
+    --stage-bg: #17130f;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #f4efe4;
+    --font: 'Libre Franklin', 'Helvetica Neue', Arial, sans-serif;
+    --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+
+    --pad-x: 120px;        /* layout rhythm at 1920x1080 */
+    --pad-top: 88px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* motion: the reveal's curve   */
+    --dur: 0.9s;                                 /* ... its duration             */
+    --stagger: 0.14s;                            /* ... the step between --i's   */
+    --reveal-y: 22px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-display); font-size: 136px; font-weight: 600; line-height: 0.98; letter-spacing: -0.025em; color: var(--ink); }
+h2 { font-family: var(--font-display); font-size: 84px; font-weight: 600; line-height: 1.04; letter-spacing: -0.02em; color: var(--ink); }
+h3 { font-family: var(--font-display); font-size: 46px; font-weight: 600; line-height: 1.15; color: var(--ink); }
+p  { font-size: 30px; line-height: 1.5; color: var(--ink-2); }
+ul, ol { font-size: 30px; line-height: 1.5; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 12px; }
+blockquote { font-family: var(--font-display); font-style: italic; font-weight: 300; font-size: 72px; line-height: 1.22; letter-spacing: -0.01em; color: var(--ink); }
+em, i { font-family: var(--font-display); font-style: italic; font-weight: 300; }
+h1 em, h2 em, h3 em { font-weight: 300; color: var(--accent); }
+.eyebrow { font-size: 20px; font-weight: 500; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); margin-bottom: 28px; }
+.sub { font-family: var(--font-display); font-weight: 300; font-size: 40px; line-height: 1.3; color: var(--ink-3); margin-top: 32px; }
+.caption { font-size: 22px; line-height: 1.4; color: var(--ink-3); }
+.small-caps { font-size: 20px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); }
+
+/* ===========================================
+   LAYOUT - a small system of spreads
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: var(--pad-top); }
+.rule { height: 1px; background: var(--rule); }
+.rule.thick { height: 3px; background: var(--ink); }
+
+/* Cover */
+.cover .content { top: 72px; bottom: 72px; }
+.cover .masthead { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 20px; border-bottom: 3px solid var(--ink); }
+.cover h1 { margin-top: 300px; max-width: 1500px; }
+.cover .byline { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: baseline; padding-top: 20px; border-top: 1px solid var(--rule); }
+
+/* Contents */
+.toc { display: grid; grid-template-columns: 560px 1fr; gap: 80px; }
+.toc-list { list-style: none; padding: 0; margin-top: 8px; }
+.toc-list li { display: grid; grid-template-columns: 110px 1fr auto; align-items: baseline; gap: 24px; padding: 22px 0; border-bottom: 1px solid var(--rule); margin: 0; font-size: 32px; color: var(--ink); }
+.toc-list li:first-child { border-top: 1px solid var(--rule); }
+.toc-list .n { font-family: var(--font-display); font-style: italic; font-weight: 300; font-size: 40px; color: var(--accent); }
+.toc-list .pg { font-size: 22px; color: var(--ink-3); letter-spacing: 0.1em; }
+
+/* Section opener */
+.section .numeral { position: absolute; left: 0; top: 200px; font-family: var(--font-display); font-style: italic; font-weight: 300; font-size: 520px; line-height: 0.8; letter-spacing: -0.06em; color: var(--accent); }
+.section .title-block { position: absolute; left: 760px; top: 340px; width: 1000px; }
+.section .title-block .rule { margin: 40px 0 32px; width: 160px; }
+
+/* Essay: two flowing columns with a drop cap */
+.essay .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; margin-top: 44px; }
+.essay .cols p { font-size: 27px; line-height: 1.6; margin-bottom: 26px; }
+.essay .dropcap::first-letter { font-family: var(--font-display); font-weight: 600; font-size: 118px; line-height: 0.8; float: left; margin: 12px 18px 0 0; color: var(--accent); }
+
+/* Picture spread */
+.picture .frame { position: absolute; left: 0; top: 0; width: 820px; height: 904px; background: var(--paper-2); border: 1px solid var(--rule); }
+.picture .aside { position: absolute; left: 920px; top: 60px; width: 760px; }
+.picture .aside .rule { margin: 40px 0 32px; }
+
+/* Numbers trio */
+.numbers .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 60px; margin-top: 60px; }
+.numbers .cell { border-top: 3px solid var(--ink); padding-top: 32px; }
+.numbers .big { font-family: var(--font-display); font-weight: 300; font-size: 150px; line-height: 1; letter-spacing: -0.04em; color: var(--ink); }
+.numbers .big i { color: var(--accent); }
+.numbers h3 { margin: 16px 0 12px; }
+
+/* Quote */
+.quote .content { display: flex; flex-direction: column; justify-content: center; }
+.quote .mark { font-family: var(--font-display); font-weight: 600; font-size: 260px; line-height: 0.6; color: var(--accent-2); margin-bottom: 20px; }
+.quote blockquote { max-width: 1500px; }
+.quote .who { margin-top: 44px; display: flex; align-items: center; gap: 20px; }
+.quote .who .rule { width: 60px; }
+
+/* Timeline */
+.timeline .track { position: absolute; left: 0; right: 0; top: 470px; height: 1px; background: var(--ink); }
+.timeline .steps { position: absolute; left: 0; right: 0; top: 430px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 40px; }
+.timeline .step .dot { width: 18px; height: 18px; border-radius: 50%; background: var(--paper); border: 3px solid var(--accent); margin: 32px 0 28px; }
+.timeline .step .year { font-family: var(--font-display); font-style: italic; font-weight: 300; font-size: 44px; color: var(--accent); }
+.timeline .step h3 { font-size: 34px; margin: 10px 0 8px; }
+.timeline .step p { font-size: 24px; line-height: 1.45; }
+
+/* Table */
+.data table { width: 100%; border-collapse: collapse; margin-top: 44px; font-size: 28px; }
+.data th { text-align: left; font-weight: 500; font-size: 20px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-3); padding: 0 0 18px; border-bottom: 3px solid var(--ink); }
+.data td { padding: 22px 0; border-bottom: 1px solid var(--rule); color: var(--ink-2); }
+.data td:first-child { font-family: var(--font-display); font-weight: 600; font-size: 32px; color: var(--ink); }
+.data th.num, .data td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.data td.up { color: var(--accent); }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; }
+.closing .contacts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 60px; margin-top: 80px; padding-top: 36px; border-top: 1px solid var(--rule); }
+.closing .contacts p { font-size: 26px; }
+
+/* ===========================================
+   DECOR - a hairline frame on the cover and the closing spread
+   =========================================== */
+.sheet-frame { position: absolute; inset: 36px; border: 1px solid var(--rule); pointer-events: none; }
+.sheet-frame::after { content: ''; position: absolute; inset: 8px; border: 1px solid var(--rule); }
+
+/* ===========================================
+   MASTER LAYER - the running footer (a stage child outside the slides)
+   =========================================== */
+.deck-footer {
+    position: absolute; left: var(--pad-x); right: var(--pad-x); bottom: 40px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--font); font-size: 18px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3);
+}
+.deck-footer .num { font-family: var(--font-display); font-style: italic; font-weight: 300; font-size: 26px; letter-spacing: 0; text-transform: none; color: var(--ink); }
+.deck-footer b { font-weight: 600; }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="sheet-frame"></div>
+    <div class="content">
+        <div class="masthead reveal" style="--i:0">
+            <span class="small-caps" data-edit>Volume I · Number 1</span>
+            <span class="small-caps" data-edit>Spring 2026</span>
+        </div>
+        <h1 class="reveal" style="--i:1" data-edit>The Annual <em>Review</em></h1>
+        <p class="sub reveal" style="--i:2" data-edit>A year of work, told in ten spreads</p>
+        <div class="byline reveal" style="--i:3">
+            <span class="small-caps" data-edit>Edited by Your Name</span>
+            <span class="small-caps" data-edit>Studio Folio</span>
+        </div>
+    </div>
+    <aside class="notes" hidden>Open with the title, then the one line that says why this year mattered.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Contents
+     ====================================================== -->
+<section class="slide contents" data-name="contents">
+    <div class="content">
+        <div class="toc">
+            <div>
+                <div class="eyebrow reveal" style="--i:0" data-edit>In this issue</div>
+                <h2 class="reveal" style="--i:1" data-edit>Contents</h2>
+                <p class="reveal" style="--i:2; margin-top:32px; max-width:480px" data-edit>Four chapters and a closing note. Each one stands on its own; together they make the argument.</p>
+            </div>
+            <ol class="toc-list" data-group>
+                <li class="reveal" style="--i:2"><span class="n">01</span><span data-edit>The year in brief</span><span class="pg">p. 3</span></li>
+                <li class="reveal" style="--i:3"><span class="n">02</span><span data-edit>What we built</span><span class="pg">p. 5</span></li>
+                <li class="reveal" style="--i:4"><span class="n">03</span><span data-edit>The numbers</span><span class="pg">p. 6</span></li>
+                <li class="reveal" style="--i:5"><span class="n">04</span><span data-edit>Voices</span><span class="pg">p. 7</span></li>
+                <li class="reveal" style="--i:6"><span class="n">05</span><span data-edit>What comes next</span><span class="pg">p. 8</span></li>
+            </ol>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Section opener
+     ====================================================== -->
+<section class="slide section" data-name="section" data-section="The year in brief">
+    <div class="content">
+        <div class="numeral reveal" style="--i:0" data-edit>01</div>
+        <div class="title-block">
+            <div class="eyebrow reveal" style="--i:1" data-edit>Chapter one</div>
+            <h2 class="reveal" style="--i:2" data-edit>The year <em>in brief</em></h2>
+            <div class="rule reveal" style="--i:3"></div>
+            <p class="reveal" style="--i:4" data-edit>Twelve months, three decisions, one direction. A short account before the detail.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Essay
+     ====================================================== -->
+<section class="slide essay" data-name="essay">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Editorial</div>
+        <h2 class="reveal" style="--i:1" data-edit>What we set out to do</h2>
+        <div class="cols">
+            <div class="reveal" style="--i:2">
+                <p class="dropcap" data-edit>Every year begins with a question we cannot yet answer. This one asked whether a small team could hold its standards while doubling its output. The honest answer, twelve months on, is mostly, and the exceptions are the interesting part.</p>
+                <p data-edit>We changed how we plan. Quarters became seasons, each with one theme, and every project had to earn its place under that theme or wait.</p>
+            </div>
+            <div class="reveal" style="--i:3">
+                <p data-edit>The second change was slower and harder: we stopped measuring effort and started measuring what shipped. Meetings shrank. Documents grew. The work got better.</p>
+                <p data-edit>What follows is the record: the numbers, the projects, and the voices of the people who did the work.</p>
+            </div>
+        </div>
+    </div>
+    <aside class="notes" hidden>Read the drop-cap paragraph aloud; summarise the rest.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Picture spread
+     ====================================================== -->
+<section class="slide picture" data-name="picture" data-section="What we built">
+    <div class="content">
+        <div class="frame reveal-img" style="--i:0"></div>
+        <div data-placeholder="image" style="display:none; position:absolute; left:0px; top:0px; width:820px; height:904px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:28px; text-align:center">Double-click to choose an image</div>
+        <div class="aside">
+            <div class="eyebrow reveal" style="--i:1" data-edit>Chapter two</div>
+            <h2 class="reveal" style="--i:2" data-edit>A picture beside the point</h2>
+            <div class="rule reveal" style="--i:3"></div>
+            <p class="reveal" style="--i:4" data-edit>The frame on the left takes a photograph: double-click it in the editor to choose one. The text keeps to a single measure, the way a magazine column would.</p>
+            <p class="caption reveal" style="--i:5; margin-top:28px" data-edit>Fig. 1: Caption, place and year.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - The numbers
+     ====================================================== -->
+<section class="slide numbers" data-name="numbers" data-section="The numbers">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Chapter three</div>
+        <h2 class="reveal" style="--i:1" data-edit>The numbers</h2>
+        <div class="grid">
+            <div class="cell reveal" style="--i:2">
+                <div class="big" data-edit>2<i>x</i></div>
+                <h3 data-edit>Output</h3>
+                <p data-edit>Projects shipped against last year, with the same team.</p>
+            </div>
+            <div class="cell reveal" style="--i:3">
+                <div class="big" data-edit>94<i>%</i></div>
+                <h3 data-edit>On time</h3>
+                <p data-edit>Delivered inside the season they were planned for.</p>
+            </div>
+            <div class="cell reveal" style="--i:4">
+                <div class="big" data-edit>12</div>
+                <h3 data-edit>People</h3>
+                <p data-edit>The whole team, including the two who joined in autumn.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Quote
+     ====================================================== -->
+<section class="slide quote" data-name="quote" data-section="Voices">
+    <div class="content">
+        <div class="mark reveal" style="--i:0">“</div>
+        <blockquote class="reveal" style="--i:1" data-edit>The best thing we did this year was decide what not to do.</blockquote>
+        <div class="who reveal" style="--i:2">
+            <div class="rule"></div>
+            <span class="small-caps" data-edit>A colleague, in the December retrospective</span>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Timeline
+     ====================================================== -->
+<section class="slide timeline" data-name="timeline" data-section="What comes next">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Chapter five</div>
+        <h2 class="reveal" style="--i:1" data-edit>The road ahead</h2>
+        <div class="track reveal" style="--i:2"></div>
+        <div class="steps">
+            <div class="step reveal" style="--i:2"><div class="dot"></div><div class="year" data-edit>Q1</div><h3 data-edit>Foundations</h3><p data-edit>The platform work everything else depends on.</p></div>
+            <div class="step reveal" style="--i:3"><div class="dot"></div><div class="year" data-edit>Q2</div><h3 data-edit>First release</h3><p data-edit>A small public version, on purpose.</p></div>
+            <div class="step reveal" style="--i:4"><div class="dot"></div><div class="year" data-edit>Q3</div><h3 data-edit>Listen</h3><p data-edit>A season of interviews and corrections.</p></div>
+            <div class="step reveal" style="--i:5"><div class="dot"></div><div class="year" data-edit>Q4</div><h3 data-edit>Scale</h3><p data-edit>What worked, done for everyone.</p></div>
+            <div class="step reveal" style="--i:6"><div class="dot"></div><div class="year" data-edit>Beyond</div><h3 data-edit>The next question</h3><p data-edit>To be decided together.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Table
+     ====================================================== -->
+<section class="slide data" data-name="table">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Appendix</div>
+        <h2 class="reveal" style="--i:1" data-edit>By the season</h2>
+        <table class="reveal" style="--i:2" data-group>
+            <thead><tr><th>Season</th><th>Theme</th><th class="num">Projects</th><th class="num">On time</th><th class="num">Change</th></tr></thead>
+            <tbody>
+                <tr><td>Spring</td><td>Foundations</td><td class="num">4</td><td class="num">100%</td><td class="num up">+2</td></tr>
+                <tr><td>Summer</td><td>First release</td><td class="num">6</td><td class="num">83%</td><td class="num up">+3</td></tr>
+                <tr><td>Autumn</td><td>Listening</td><td class="num">3</td><td class="num">100%</td><td class="num">0</td></tr>
+                <tr><td>Winter</td><td>Scale</td><td class="num">5</td><td class="num">100%</td><td class="num up">+4</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 10 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing" data-no-master>
+    <div class="sheet-frame"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Colophon</div>
+        <h1 class="reveal" style="--i:1" data-edit>Thank <em>you</em></h1>
+        <div class="contacts">
+            <p class="reveal" style="--i:2" data-edit><span class="small-caps">Written by</span><br>Your Name</p>
+            <p class="reveal" style="--i:3" data-edit><span class="small-caps">Reach us</span><br>hello@example.com</p>
+            <p class="reveal" style="--i:4" data-edit><span class="small-caps">Set in</span><br>Fraunces and Libre Franklin</p>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: shown on every slide, edited once in the editor -->
+<div class="deck-footer">
+    <span data-edit>The Annual Review · Spring 2026</span>
+    <span class="num"><b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

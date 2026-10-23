@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brutalist</title>
+<!-- Brutalist: the raw-web look. Visible 3px borders on everything, a heavy grotesque and a mono, one screaming
+     accent, marquee bands, default-looking links. Archivo Black and Space Grotesk, Space Mono for labels.
+     Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #000000;   /* headings, key text        */
+    --ink-2:    #1a1a1a;   /* body text                 */
+    --ink-3:    #5c5c5c;   /* captions, secondary       */
+    --rule:     #000000;   /* borders: black, 3px       */
+    --paper:    #ffffff;   /* white                     */
+    --paper-2:  #efefef;   /* grey panels               */
+    --accent:   #ccff00;   /* acid lime                 */
+    --accent-2: #0000ff;   /* link blue                 */
+    --accent-3: #ff00aa;   /* hot pink                  */
+
+    --stage-bg: #000000;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #ffffff;
+    --font: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif;
+    --font-display: 'Archivo Black', Impact, sans-serif;
+    --font-mono: 'Space Mono', Consolas, monospace;
+
+    --pad-x: 60px;         /* layout rhythm at 1920x1080: tight to the edge */
+    --pad-top: 60px;
+    --ease-out: steps(4, end);                   /* motion: no easing, it snaps */
+    --dur: 0.3s;                                 /* ... its duration             */
+    --stagger: 0.06s;                            /* ... the step between --i's   */
+    --reveal-y: 0px;                             /* ... it does not slide        */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-display); font-size: 150px; font-weight: 400; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase; color: var(--ink); }
+h2 { font-family: var(--font-display); font-size: 88px; font-weight: 400; line-height: 1.0; letter-spacing: -0.02em; text-transform: uppercase; color: var(--ink); }
+h3 { font-family: var(--font-display); font-size: 36px; font-weight: 400; line-height: 1.1; color: var(--ink); }
+p  { font-size: 30px; line-height: 1.4; color: var(--ink-2); }
+ul, ol { font-size: 30px; line-height: 1.4; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 10px; }
+blockquote { font-family: var(--font-display); font-size: 80px; line-height: 1.02; text-transform: uppercase; color: var(--ink); }
+.eyebrow { font-family: var(--font-mono); font-size: 20px; text-transform: uppercase; color: var(--ink); background: var(--accent); display: inline-block; padding: 6px 12px; margin-bottom: 28px; align-self: flex-start; }
+.sub { font-size: 36px; line-height: 1.3; color: var(--ink-2); margin-top: 28px; }
+.caption { font-family: var(--font-mono); font-size: 18px; line-height: 1.5; color: var(--ink-3); }
+a, .link { color: var(--accent-2); text-decoration: underline; }
+mark { background: var(--accent); color: var(--ink); }
+
+/* ===========================================
+   LAYOUT - everything has a border
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: 120px; }
+.box { border: 3px solid var(--rule); padding: 32px 36px; background: var(--paper); }
+.box.shadow { box-shadow: 12px 12px 0 var(--ink); }
+.box.lime { background: var(--accent); } .box.grey { background: var(--paper-2); } .box.pink { background: var(--accent-3); color: #fff; }
+.box.pink h3, .box.pink p { color: #fff; }
+.tag { font-family: var(--font-mono); font-size: 18px; border: 3px solid var(--rule); padding: 6px 12px; display: inline-block; text-transform: uppercase; }
+.marquee { position: absolute; left: 0; width: 1920px; height: 72px; background: var(--ink); color: var(--accent); overflow: hidden; white-space: nowrap; font-family: var(--font-mono); font-size: 28px; line-height: 72px; text-transform: uppercase; }
+.marquee span { display: inline-block; padding-left: 40px; }
+html:not(.deck-editing) .marquee span { animation: marquee 18s linear infinite; }
+@keyframes marquee { to { translate: -100% 0; } }
+
+/* Cover */
+.cover .content { display: flex; flex-direction: column; justify-content: flex-start; bottom: 160px; }
+.cover .grid { display: grid; grid-template-columns: 1fr 520px; gap: 0; border: 3px solid var(--rule); height: 100%; }
+.cover .grid .l { padding: 48px; border-right: 3px solid var(--rule); display: flex; flex-direction: column; justify-content: flex-end; }
+.cover .grid .r { display: grid; grid-template-rows: 1fr 1fr 1fr; }
+.cover .grid .r > div { padding: 32px; border-bottom: 3px solid var(--rule); }
+.cover .grid .r > div:last-child { border-bottom: 0; }
+.cover .grid .r .caption { display: block; margin-bottom: 8px; }
+.cover .grid .r p { font-size: 26px; }
+
+/* Index */
+.index .rows { border: 3px solid var(--rule); border-bottom: 0; margin-top: 40px; }
+.index .row { display: grid; grid-template-columns: 140px 1fr 400px; border-bottom: 3px solid var(--rule); }
+.index .row > * { padding: 22px 28px; border-right: 3px solid var(--rule); }
+.index .row > *:last-child { border-right: 0; }
+.index .row .n { font-family: var(--font-mono); font-size: 28px; }
+.index .row h3 { font-size: 40px; }
+.index .row .caption { font-size: 22px; color: var(--ink); }
+.index .row:hover { background: var(--accent); }
+
+/* Section */
+.section .content { display: flex; flex-direction: column; justify-content: center; }
+.section h2 { font-size: 220px; line-height: 0.9; }
+.section .n { font-family: var(--font-mono); font-size: 28px; margin-bottom: 20px; }
+
+/* Bullets in a box */
+.list .cols { display: grid; grid-template-columns: 1fr 560px; gap: 0; border: 3px solid var(--rule); margin-top: 40px; }
+.list .cols > div { padding: 44px; }
+.list .cols > div:first-child { border-right: 3px solid var(--rule); }
+.list ul { list-style: none; padding: 0; }
+.list li { position: relative; padding-left: 60px; font-size: 32px; margin-bottom: 20px; }
+.list li::before { content: '>'; position: absolute; left: 0; font-family: var(--font-mono); font-weight: 700; }
+
+/* Cards */
+.cards .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 40px; }
+.cards .box h3 { margin-bottom: 14px; }
+.cards .box p { font-size: 25px; }
+.cards .box .tag { margin-bottom: 24px; }
+
+/* Picture */
+.picture .frame { position: absolute; left: 0; top: 0; width: 1000px; height: 860px; border: 3px solid var(--rule); background: var(--paper-2); box-shadow: 16px 16px 0 var(--ink); }
+.picture .text { position: absolute; left: 1100px; top: 0; width: 700px; }
+.picture .text p { margin-top: 28px; }
+
+/* Big number */
+.number .content { display: flex; flex-direction: column; justify-content: center; }
+.number .big { font-family: var(--font-display); font-size: 560px; line-height: 0.85; letter-spacing: -0.05em; color: var(--ink); }
+.number .side { position: absolute; right: 0; top: 0; width: 520px; }
+
+/* Table */
+.data table { width: 100%; border-collapse: collapse; font-size: 26px; border: 3px solid var(--rule); margin-top: 40px; }
+.data th { font-family: var(--font-mono); font-weight: 700; font-size: 18px; text-transform: uppercase; text-align: left; padding: 16px 22px; background: var(--ink); color: var(--paper); border-right: 3px solid var(--paper); }
+.data th:last-child { border-right: 0; }
+.data td { padding: 18px 22px; border: 3px solid var(--rule); color: var(--ink-2); }
+.data td.mono { font-family: var(--font-mono); }
+.data tr:nth-child(even) td { background: var(--paper-2); }
+
+/* Quote */
+.quote .content { display: flex; flex-direction: column; justify-content: center; }
+.quote .box { max-width: 1600px; padding: 60px 64px; }
+.quote .who { margin-top: 32px; }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; }
+.closing .links { display: flex; gap: 40px; margin-top: 48px; }
+.closing .links p { font-family: var(--font-mono); font-size: 30px; }
+
+/* ===========================================
+   MASTER LAYER - a status bar with borders
+   =========================================== */
+.deck-footer {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 60px; z-index: 5;
+    display: grid; grid-template-columns: 1fr auto auto; border-top: 3px solid var(--rule); background: var(--paper);
+    font-family: var(--font-mono); font-size: 18px; text-transform: uppercase; color: var(--ink);
+}
+.deck-footer > span { display: flex; align-items: center; padding: 0 var(--pad-x); border-right: 3px solid var(--rule); }
+.deck-footer > span:last-child { border-right: 0; background: var(--accent); }
+.deck-footer b { font-weight: 700; }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="content">
+        <div class="grid reveal" style="--i:0">
+            <div class="l">
+                <div class="eyebrow" data-edit>index.html · v0.1</div>
+                <h1 data-edit>Raw <mark>web</mark> manifesto</h1>
+                <p class="sub" data-edit>Ten slides on making things that look like what they are.</p>
+            </div>
+            <div class="r">
+                <div class="reveal" style="--i:1"><span class="caption">Author</span><p data-edit>Your Name</p></div>
+                <div class="reveal" style="--i:2"><span class="caption">Date</span><p data-edit>2026-09-17</p></div>
+                <div class="reveal" style="--i:3"><span class="caption">Status</span><p data-edit><span class="link">Under construction</span></p></div>
+            </div>
+        </div>
+    </div>
+    <div class="marquee" style="top:960px"><span data-edit>★ NO ROUNDED CORNERS ★ NO DROP SHADOWS THAT ARE NOT BLACK ★ NO GRADIENTS ★ VIEW SOURCE ★ NO ROUNDED CORNERS ★ NO DROP SHADOWS THAT ARE NOT BLACK ★ NO GRADIENTS ★ VIEW SOURCE ★</span></div>
+    <aside class="notes" hidden>Read the marquee out loud. Then the title.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Index
+     ====================================================== -->
+<section class="slide index" data-name="index">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>/index</div>
+        <h2 class="reveal" style="--i:1" data-edit>Contents</h2>
+        <div class="rows">
+            <div class="row reveal" style="--i:2"><span class="n">01</span><h3 data-edit>Honest materials</h3><span class="caption" data-edit>What a screen is</span></div>
+            <div class="row reveal" style="--i:3"><span class="n">02</span><h3 data-edit>Borders on everything</h3><span class="caption" data-edit>The grid, exposed</span></div>
+            <div class="row reveal" style="--i:4"><span class="n">03</span><h3 data-edit>One loud colour</h3><span class="caption" data-edit>And only one</span></div>
+            <div class="row reveal" style="--i:5"><span class="n">04</span><h3 data-edit>Ship the draft</h3><span class="caption" data-edit>Under construction</span></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Section
+     ====================================================== -->
+<section class="slide section" data-name="section" data-section="Honest materials">
+    <div class="content">
+        <div class="n reveal" style="--i:0" data-edit>01 / 04</div>
+        <h2 class="reveal" style="--i:1" data-edit>Honest<br>materials</h2>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Bullets
+     ====================================================== -->
+<section class="slide list" data-name="bullets">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>01 · Honest materials</div>
+        <h2 class="reveal" style="--i:1" data-edit>A screen is pixels and text</h2>
+        <div class="cols reveal" style="--i:2">
+            <div>
+                <ul>
+                    <li class="reveal" style="--i:3" data-edit>Do not pretend the button is a physical object.</li>
+                    <li class="reveal" style="--i:4" data-edit>Do not blur, feather or glow. Edges are edges.</li>
+                    <li class="reveal" style="--i:5" data-edit>System defaults are a valid design decision.</li>
+                    <li class="reveal" style="--i:6" data-fragment data-edit>If it looks unfinished, that is because it is. Say so.</li>
+                </ul>
+            </div>
+            <div class="box lime" style="border:0; border-left:3px solid var(--rule)">
+                <span class="tag">Note</span>
+                <p style="margin-top:24px" data-edit>The borders on this deck are 3px, black, everywhere. That is the whole visual system.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Cards
+     ====================================================== -->
+<section class="slide cards" data-name="cards" data-section="Borders">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>02 · Borders on everything</div>
+        <h2 class="reveal" style="--i:1" data-edit>Three kinds of box</h2>
+        <div class="grid">
+            <div class="box shadow reveal" style="--i:2"><span class="tag">Default</span><h3 data-edit>White, bordered, shadowed</h3><p data-edit>The shadow is a solid black offset. It is not trying to be light.</p></div>
+            <div class="box grey reveal" style="--i:3"><span class="tag">Muted</span><h3 data-edit>Grey for secondary</h3><p data-edit>The only tint in the palette that is not a shout.</p></div>
+            <div class="box pink reveal" style="--i:4"><span class="tag" style="border-color:#fff">Loud</span><h3 data-edit>Pink for one thing</h3><p data-edit>Used once per deck, for the thing that matters most.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Picture
+     ====================================================== -->
+<section class="slide picture" data-name="picture">
+    <div class="content">
+        <div class="frame reveal-img" style="--i:0"></div>
+        <div data-placeholder="image" style="display:none; position:absolute; left:0; top:0; width:1000px; height:860px; align-items:center; justify-content:center; border:3px dashed var(--ink-3); color:var(--ink-3); font-family:var(--font-mono); font-size:24px; text-align:center">[ image goes here ]</div>
+        <div class="text">
+            <div class="eyebrow reveal" style="--i:1" data-edit>fig. 1</div>
+            <h2 class="reveal" style="--i:2; font-size:72px" data-edit>A screenshot, uncropped</h2>
+            <p class="reveal" style="--i:3" data-edit>The frame takes a picture; double-click it in the editor. Leave the browser chrome in. Leave the scrollbar in.</p>
+            <p class="caption reveal" style="--i:4; margin-top:24px" data-edit>alt="what the picture shows"</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Big number
+     ====================================================== -->
+<section class="slide number" data-name="number" data-section="One colour">
+    <div class="content">
+        <div class="big reveal" style="--i:0" data-edit>1</div>
+        <div class="side">
+            <div class="box lime reveal" style="--i:1"><h3 data-edit>Accent colour</h3><p data-edit>Acid lime, on the tags, the footer cell and nothing else. Blue is for links because links are blue.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Table
+     ====================================================== -->
+<section class="slide data" data-name="table">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>03 · Specification</div>
+        <h2 class="reveal" style="--i:1" data-edit>The rules, as a table</h2>
+        <table class="reveal" style="--i:2" data-group>
+            <thead><tr><th>Property</th><th>Value</th><th>Reason</th></tr></thead>
+            <tbody>
+                <tr><td>border</td><td class="mono">3px solid #000</td><td>The grid is the design</td></tr>
+                <tr><td>border-radius</td><td class="mono">0</td><td>Corners are corners</td></tr>
+                <tr><td>box-shadow</td><td class="mono">12px 12px 0 #000</td><td>Depth without pretending</td></tr>
+                <tr><td>accent</td><td class="mono">#ccff00</td><td>Once per slide, at most</td></tr>
+                <tr><td>transition</td><td class="mono">steps(4)</td><td>It snaps, it does not glide</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Quote
+     ====================================================== -->
+<section class="slide quote" data-name="quote" data-section="Ship it">
+    <div class="content">
+        <div class="box shadow reveal" style="--i:0">
+            <blockquote data-edit>"Perfect is the enemy of published."</blockquote>
+            <p class="who caption reveal" style="--i:1" data-edit>Every personal site that ever shipped</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 10 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing" data-no-master>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>EOF</div>
+        <h1 class="reveal" style="--i:1" data-edit>Under<br>construction</h1>
+        <div class="links">
+            <p class="reveal" style="--i:2"><span class="link" data-edit>you@example.com</span></p>
+            <p class="reveal" style="--i:3"><span class="link" data-edit>example.com/manifesto</span></p>
+        </div>
+    </div>
+    <div class="marquee" style="top:960px"><span data-edit>★ THANK YOU ★ VIEW SOURCE ★ THANK YOU ★ VIEW SOURCE ★ THANK YOU ★ VIEW SOURCE ★ THANK YOU ★ VIEW SOURCE ★</span></div>
+</section>
+
+<!-- The master layer: a bordered status bar, edited once in the editor -->
+<div class="deck-footer">
+    <span data-edit>raw web manifesto · index.html</span>
+    <span data-edit>Your Name</span>
+    <span class="num"><b data-page-now>1</b>&nbsp;/&nbsp;<span data-page-total>@@SLIDES@@</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

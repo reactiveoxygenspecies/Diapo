@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Console</title>
+<!-- Console: a developer deck in an IDE dark theme. JetBrains Mono for labels, code and numbers, Manrope for
+     headlines, terminal window chrome, syntax-coloured code blocks, a diff. Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #e6edf3;   /* headings, key text        */
+    --ink-2:    #b1bac4;   /* body text                 */
+    --ink-3:    #6e7781;   /* comments, secondary       */
+    --rule:     #30363d;   /* borders                   */
+    --paper:    #0d1117;   /* editor background         */
+    --paper-2:  #161b22;   /* panels, windows           */
+    --accent:   #3fb950;   /* green: strings, success   */
+    --accent-2: #58a6ff;   /* blue: keywords, links     */
+    --accent-3: #d2a8ff;   /* purple: functions         */
+    --accent-4: #ffa657;   /* orange: numbers           */
+    --danger:   #f85149;   /* red: removed lines        */
+
+    --stage-bg: #010409;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #0d1117;
+    --font: 'Manrope', 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+
+    --pad-x: 110px;        /* layout rhythm at 1920x1080 */
+    --pad-top: 88px;
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);  /* motion: the reveal's curve   */
+    --dur: 0.5s;                                 /* ... its duration             */
+    --stagger: 0.08s;                            /* ... the step between --i's   */
+    --reveal-y: 16px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-size: 124px; font-weight: 800; line-height: 1.02; letter-spacing: -0.035em; color: var(--ink); }
+h2 { font-size: 76px; font-weight: 800; line-height: 1.06; letter-spacing: -0.03em; color: var(--ink); }
+h3 { font-size: 36px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; color: var(--ink); }
+p  { font-size: 30px; line-height: 1.5; color: var(--ink-2); }
+ul, ol { font-size: 30px; line-height: 1.5; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 14px; }
+blockquote { font-family: var(--font-mono); font-size: 44px; line-height: 1.4; color: var(--ink); }
+code, pre, .mono { font-family: var(--font-mono); }
+.eyebrow { font-family: var(--font-mono); font-size: 22px; font-weight: 500; letter-spacing: 0.04em; color: var(--accent); margin-bottom: 24px; }
+.eyebrow::before { content: '// '; color: var(--ink-3); }
+.sub { font-family: var(--font-mono); font-size: 30px; line-height: 1.5; color: var(--ink-3); margin-top: 28px; }
+.caption { font-family: var(--font-mono); font-size: 20px; line-height: 1.4; color: var(--ink-3); }
+.kw { color: var(--accent-2); } .fn { color: var(--accent-3); } .str { color: var(--accent); } .num { color: var(--accent-4); } .cm { color: var(--ink-3); }
+.tag { display: inline-block; font-family: var(--font-mono); font-size: 20px; padding: 6px 14px; border: 1px solid var(--rule); border-radius: 8px; color: var(--ink-2); background: var(--paper-2); }
+
+/* ===========================================
+   LAYOUT
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: var(--pad-top); }
+
+/* Window chrome: a panel with three dots and a title */
+.window { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 16px; overflow: hidden; }
+.window .titlebar { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 22px; border-bottom: 1px solid var(--rule); font-family: var(--font-mono); font-size: 18px; color: var(--ink-3); }
+.window .titlebar i { width: 14px; height: 14px; border-radius: 50%; background: var(--rule); }
+.window .titlebar i:nth-child(1) { background: #ff5f57; } .window .titlebar i:nth-child(2) { background: #febc2e; } .window .titlebar i:nth-child(3) { background: #28c840; }
+.window .titlebar span { margin-left: 12px; }
+.window .body { padding: 36px 40px; }
+
+/* Cover */
+.cover .content { display: flex; flex-direction: column; justify-content: center; }
+.cover .prompt { font-family: var(--font-mono); font-size: 30px; color: var(--ink-3); margin-bottom: 40px; }
+.cover .prompt b { color: var(--accent); font-weight: 500; }
+.cover .cursor { display: inline-block; width: 18px; height: 34px; background: var(--accent); vertical-align: -6px; margin-left: 6px; }
+html:not(.deck-editing) .cover .cursor { animation: blink 1s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
+.cover h1 { max-width: 1400px; }
+.cover .tags { display: flex; gap: 14px; margin-top: 48px; }
+.cover .status { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 20px; color: var(--ink-3); padding-top: 24px; border-top: 1px solid var(--rule); }
+
+/* Agenda as a file tree */
+.tree .cols { display: grid; grid-template-columns: 720px 1fr; gap: 80px; }
+.tree .files { list-style: none; padding: 0; font-family: var(--font-mono); font-size: 30px; }
+.tree .files li { display: flex; gap: 20px; align-items: baseline; padding: 14px 0; margin: 0; border-bottom: 1px solid var(--rule); color: var(--ink); }
+.tree .files li .path { color: var(--ink-3); }
+.tree .files li .path::before { content: '\251C\2500 '; color: var(--rule); }
+.tree .files li:last-child .path::before { content: '\2514\2500 '; }
+.tree .files li .desc { font-family: var(--font); font-size: 24px; color: var(--ink-2); margin-left: auto; text-align: right; }
+
+/* Section */
+.section .content { display: flex; flex-direction: column; justify-content: center; }
+.section .n { font-family: var(--font-mono); font-size: 200px; font-weight: 700; line-height: 1; color: var(--rule); letter-spacing: -0.04em; }
+.section h2 { font-size: 120px; margin-top: 8px; }
+.section .sub { margin-top: 24px; }
+
+/* Code slide */
+.code .cols { display: grid; grid-template-columns: 560px 1fr; gap: 64px; margin-top: 12px; }
+.code pre { font-size: 24px; line-height: 1.6; color: var(--ink); white-space: pre; tab-size: 4; }
+.code .cols p { font-size: 27px; margin-bottom: 28px; }
+.code .lines { counter-reset: line; }
+.code .lines > span { display: block; counter-increment: line; padding-left: 64px; position: relative; }
+.code .lines > span::before { content: counter(line); position: absolute; left: 0; width: 40px; text-align: right; color: var(--ink-3); }
+
+/* Bullets with arrow markers */
+.list ul { list-style: none; padding: 0; margin-top: 8px; max-width: 1500px; }
+.list li { position: relative; padding-left: 64px; margin-bottom: 26px; font-size: 32px; }
+.list li::before { content: '\2192'; position: absolute; left: 0; top: 0; font-family: var(--font-mono); color: var(--accent); }
+.list li code { color: var(--accent-2); background: var(--paper-2); padding: 2px 12px; border-radius: 6px; font-size: 28px; }
+
+/* Stats */
+.stats .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 16px; }
+.stat { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 16px; padding: 40px 44px 36px; }
+.stat .label { font-family: var(--font-mono); font-size: 20px; color: var(--ink-3); }
+.stat .value { font-family: var(--font-mono); font-size: 120px; font-weight: 700; line-height: 1.05; letter-spacing: -0.04em; color: var(--ink); margin: 20px 0 14px; }
+.stat .delta { font-family: var(--font-mono); font-size: 24px; color: var(--accent); }
+.stat .delta.bad { color: var(--danger); }
+.stats .lead { margin-top: 48px; font-size: 32px; color: var(--ink); max-width: 1500px; }
+
+/* Architecture boxes */
+.arch .diagram { position: absolute; left: 0; top: 220px; width: 1700px; height: 600px; }
+.arch .box { position: absolute; width: 440px; height: 220px; background: var(--paper-2); border: 1px solid var(--rule); border-radius: 16px; padding: 34px 38px; }
+.arch .box h3 { font-family: var(--font-mono); font-size: 34px; font-weight: 500; color: var(--accent-2); margin-bottom: 12px; }
+.arch .box p { font-size: 24px; line-height: 1.4; }
+.arch .box.hi { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(63,185,80,0.15); }
+.arch .box.hi h3 { color: var(--accent); }
+.arch .link { position: absolute; height: 2px; background: var(--rule); }
+.arch .link::after { content: ''; position: absolute; right: -2px; top: -7px; width: 0; height: 0; border-left: 14px solid var(--rule); border-top: 8px solid transparent; border-bottom: 8px solid transparent; }
+.arch .link.down { width: 2px; }
+.arch .link.down::after { right: -7px; top: auto; bottom: -2px; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 14px solid var(--rule); border-bottom: 0; }
+.arch .note { position: absolute; font-family: var(--font-mono); font-size: 20px; color: var(--ink-3); }
+
+/* Diff */
+.diff .window .body { padding: 0; }
+.diff pre { font-size: 26px; line-height: 1.7; color: var(--ink-2); }
+.diff pre > span { display: block; padding: 0 40px; }
+.diff pre .add { background: rgba(63,185,80,0.14); color: var(--ink); }
+.diff pre .del { background: rgba(248,81,73,0.14); color: var(--ink-3); }
+.diff pre .add::before { content: '+ '; color: var(--accent); }
+.diff pre .del::before { content: '- '; color: var(--danger); }
+.diff pre .ctx::before { content: '  '; }
+.diff .cols { display: grid; grid-template-columns: 1fr 520px; gap: 60px; margin-top: 8px; }
+.diff .cols p { font-size: 26px; margin-bottom: 24px; }
+
+/* Quote as a commit */
+.commit .content { display: flex; flex-direction: column; justify-content: center; }
+.commit .hash { font-family: var(--font-mono); font-size: 24px; color: var(--accent-4); margin-bottom: 28px; }
+.commit blockquote { max-width: 1500px; }
+.commit .who { margin-top: 36px; font-family: var(--font-mono); font-size: 24px; color: var(--ink-3); }
+.commit .who b { color: var(--accent-2); font-weight: 500; }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; }
+.closing .out { font-family: var(--font-mono); font-size: 30px; line-height: 1.8; color: var(--ink-3); margin-top: 40px; }
+.closing .out b { color: var(--accent); font-weight: 500; }
+.closing .links { display: flex; gap: 20px; margin-top: 48px; }
+
+/* ===========================================
+   DECOR - a faint dot grid on the cover and the closing slide
+   =========================================== */
+.dots { position: absolute; inset: 0; background-image: radial-gradient(rgba(177,186,196,0.14) 1.5px, transparent 1.5px); background-size: 40px 40px; pointer-events: none; }
+
+/* ===========================================
+   MASTER LAYER - a status bar (a stage child outside the slides)
+   =========================================== */
+.deck-footer {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 44px; z-index: 5; padding: 0 var(--pad-x);
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--paper-2); border-top: 1px solid var(--rule);
+    font-family: var(--font-mono); font-size: 18px; color: var(--ink-3);
+}
+.deck-footer .left { display: flex; gap: 32px; }
+.deck-footer .left b { color: var(--accent); font-weight: 500; }
+.deck-footer .num b { color: var(--ink); font-weight: 500; }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover">
+    <div class="dots"></div>
+    <div class="content">
+        <p class="prompt reveal" style="--i:0" data-edit><b>~/talks $</b> ./present --release 2.0<span class="cursor"></span></p>
+        <h1 class="reveal" style="--i:1" data-edit>Release 2.0: what changed and why</h1>
+        <p class="sub reveal" style="--i:2" data-edit>A walk through the new architecture, the numbers behind it, and the migration path</p>
+        <div class="tags reveal" style="--i:3">
+            <span class="tag" data-edit>v2.0.0</span>
+            <span class="tag" data-edit>main</span>
+            <span class="tag" data-edit>12 min</span>
+        </div>
+        <div class="status reveal" style="--i:4">
+            <span data-edit>Your Name · Platform team</span>
+            <span data-edit>2026-09-17</span>
+        </div>
+    </div>
+    <aside class="notes" hidden>Say what the release is for in one sentence before the tour.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Agenda as a file tree
+     ====================================================== -->
+<section class="slide tree" data-name="agenda">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>agenda</div>
+        <h2 class="reveal" style="--i:1" data-edit>What we will cover</h2>
+        <div class="cols" style="margin-top:48px">
+            <ul class="files" data-group>
+                <li class="reveal" style="--i:2"><span class="path">01-context/</span><span class="desc" data-edit>Why a rewrite</span></li>
+                <li class="reveal" style="--i:3"><span class="path">02-architecture/</span><span class="desc" data-edit>The new shape</span></li>
+                <li class="reveal" style="--i:4"><span class="path">03-numbers/</span><span class="desc" data-edit>Latency, cost, errors</span></li>
+                <li class="reveal" style="--i:5"><span class="path">04-migration/</span><span class="desc" data-edit>How to move</span></li>
+                <li class="reveal" style="--i:6"><span class="path">README.md</span><span class="desc" data-edit>Questions</span></li>
+            </ul>
+            <div>
+                <p class="reveal" style="--i:3" data-edit>Four short parts. The code on the slides is real and runs; the numbers are from last week's benchmark.</p>
+                <p class="caption reveal" style="--i:4; margin-top:24px" data-edit>Press O for the overview, P for the presenter view.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Section
+     ====================================================== -->
+<section class="slide section" data-name="section" data-section="Context">
+    <div class="content">
+        <div class="n reveal" style="--i:0" data-edit>01</div>
+        <h2 class="reveal" style="--i:1" data-edit>Why a rewrite</h2>
+        <p class="sub reveal" style="--i:2" data-edit>// the honest version</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Bullets
+     ====================================================== -->
+<section class="slide list" data-name="reasons">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>context</div>
+        <h2 class="reveal" style="--i:1; margin-bottom:44px" data-edit>Three problems we could not patch</h2>
+        <ul>
+            <li class="reveal" style="--i:2" data-edit>The <code>sync</code> path did every write twice; fixing it meant touching every caller.</li>
+            <li class="reveal" style="--i:3" data-edit>Config lived in four places, and <code>ENV</code> won silently over the file.</li>
+            <li class="reveal" style="--i:4" data-edit>Startup took 40 seconds on a laptop, which is where most debugging happens.</li>
+            <li class="reveal" style="--i:5" data-fragment data-edit>And one we found while rewriting: retries were unbounded on <code>503</code>.</li>
+        </ul>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Architecture
+     ====================================================== -->
+<section class="slide arch" data-name="architecture" data-section="Architecture">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>architecture</div>
+        <h2 class="reveal" style="--i:1" data-edit>The new shape</h2>
+        <div class="diagram">
+            <div class="box reveal" style="--i:2; left:0; top:120px"><h3 data-edit>gateway</h3><p data-edit>Auth, rate limits, one entry point.</p></div>
+            <div class="link reveal" style="--i:3; left:440px; top:230px; width:160px"></div>
+            <div class="box hi reveal" style="--i:3; left:600px; top:120px"><h3 data-edit>core</h3><p data-edit>Single write path. Idempotent by key.</p></div>
+            <div class="link reveal" style="--i:4; left:1040px; top:230px; width:160px"></div>
+            <div class="box reveal" style="--i:4; left:1200px; top:120px"><h3 data-edit>store</h3><p data-edit>Append-only log, snapshots hourly.</p></div>
+            <div class="link down reveal" style="--i:5; left:819px; top:340px; height:80px"></div>
+            <div class="box reveal" style="--i:5; left:600px; top:440px; height:170px"><h3 data-edit>workers</h3><p data-edit>Everything async, bounded retries.</p></div>
+            <div class="note reveal" style="--i:6; left:1200px; top:470px; width:440px" data-edit>Every box is one process and one repo. The arrows are the only network calls.</div>
+        </div>
+    </div>
+    <aside class="notes" hidden>Point at core: it is the only part that was rewritten from scratch.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Code
+     ====================================================== -->
+<section class="slide code" data-name="code">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>core/write.ts</div>
+        <h2 class="reveal" style="--i:1" data-edit>One write path</h2>
+        <div class="cols">
+            <div>
+                <p class="reveal" style="--i:2" data-edit>Every write goes through <code>commit</code>. The key makes a retry a no-op instead of a duplicate.</p>
+                <p class="reveal" style="--i:3" data-edit>Callers never see the store. They see a promise and an id.</p>
+            </div>
+            <div class="window reveal-img" style="--i:2" data-group>
+                <div class="titlebar"><i></i><i></i><i></i><span>write.ts</span></div>
+                <div class="body"><pre class="lines"><span><span class="kw">export async function</span> <span class="fn">commit</span>(key: <span class="kw">string</span>, patch: Patch) {</span><span>    <span class="kw">const</span> seen = <span class="kw">await</span> log.<span class="fn">has</span>(key);</span><span>    <span class="kw">if</span> (seen) <span class="kw">return</span> log.<span class="fn">idFor</span>(key);   <span class="cm">// idempotent</span></span><span>    <span class="kw">const</span> id = <span class="kw">await</span> log.<span class="fn">append</span>({ key, patch, at: <span class="fn">now</span>() });</span><span>    queue.<span class="fn">emit</span>(<span class="str">'written'</span>, id, { retries: <span class="num">3</span> });</span><span>    <span class="kw">return</span> id;</span><span>}</span></pre></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Stats
+     ====================================================== -->
+<section class="slide stats" data-name="numbers" data-section="Numbers">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>benchmark 2026-09-10</div>
+        <h2 class="reveal" style="--i:1; margin-bottom:44px" data-edit>Before and after</h2>
+        <div class="grid">
+            <div class="stat reveal" style="--i:2"><div class="label" data-edit>p95 latency</div><div class="value" data-edit>38ms</div><div class="delta" data-edit>-71% (was 131ms)</div></div>
+            <div class="stat reveal" style="--i:3"><div class="label" data-edit>cost per 1M writes</div><div class="value" data-edit>$0.42</div><div class="delta" data-edit>-58% (was $1.01)</div></div>
+            <div class="stat reveal" style="--i:4"><div class="label" data-edit>error rate</div><div class="value" data-edit>0.02%</div><div class="delta bad" data-edit>+0.01% (retries surface now)</div></div>
+        </div>
+        <p class="lead reveal" style="--i:5" data-edit>The error rate went up on purpose: failures that used to be swallowed are counted.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Diff
+     ====================================================== -->
+<section class="slide diff" data-name="migration" data-section="Migration">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>migration</div>
+        <h2 class="reveal" style="--i:1; margin-bottom:40px" data-edit>What a caller changes</h2>
+        <div class="cols">
+            <div class="window reveal-img" style="--i:2" data-group>
+                <div class="titlebar"><i></i><i></i><i></i><span>services/orders.ts</span></div>
+                <div class="body"><pre><span class="ctx">async function place(order: Order) {</span><span class="del">    await db.insert('orders', order);</span><span class="del">    await db.insert('audit', { ref: order.id });</span><span class="del">    await sync.push(order);</span><span class="add">    const id = await commit(order.id, { order });</span><span class="ctx">    notify(order.customer);</span><span class="add">    return id;</span><span class="ctx">}</span></pre></div>
+            </div>
+            <div>
+                <p class="reveal" style="--i:3" data-edit>Three calls become one. The audit row and the sync are side effects of the log now, not the caller's job.</p>
+                <p class="reveal" style="--i:4" data-edit>A codemod does this for 80% of call sites; the rest are listed in the migration issue.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Commit quote
+     ====================================================== -->
+<section class="slide commit" data-name="quote">
+    <div class="content">
+        <div class="hash reveal" style="--i:0" data-edit>commit 7f3a9c2 · 2026-08-30</div>
+        <blockquote class="reveal" style="--i:1" data-edit>Delete the sync layer. Nothing depended on it that we wanted to keep.</blockquote>
+        <p class="who reveal" style="--i:2" data-edit><b>Author:</b> a teammate, at 23:41, after a long week</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 10 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing">
+    <div class="dots"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>done</div>
+        <h1 class="reveal" style="--i:1" data-edit>Questions?</h1>
+        <p class="out reveal" style="--i:2" data-edit><b>✓</b> 2.0 is on main and in staging<br><b>✓</b> migration guide in docs/migrate-2.0.md<br><b>✓</b> office hours Thursday, 15:00</p>
+        <div class="links reveal" style="--i:3">
+            <span class="tag" data-edit>github.com/example/core</span>
+            <span class="tag" data-edit>#platform</span>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: a status bar shown on every slide, edited once in the editor -->
+<div class="deck-footer">
+    <span class="left"><b data-edit>main</b><span data-edit>release-2.0.md</span></span>
+    <span class="num"><b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

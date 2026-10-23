@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sample deck (test fixture)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - edit these to restyle the whole deck.
+   The editor reads the colours here for its swatches.
+   =========================================== */
+:root {
+    --ink:      #1c1c1f;   /* headings, key text        */
+    --ink-2:    #45464d;   /* body text                 */
+    --ink-3:    #8b8c94;   /* captions, secondary       */
+    --rule:     #e2e2e5;   /* hairlines                 */
+    --paper:    #ffffff;   /* slide background          */
+    --paper-2:  #f4f4f5;   /* soft panels               */
+    --accent:   #2f6fed;
+    --accent-2: #e8503f;
+    --accent-3: #1c9a94;
+
+    --stage-bg: #202124;   /* letterbox outside the 16:9 stage */
+    --slide-bg: var(--paper);
+    --font: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+
+    --pad-x: 96px;         /* layout rhythm at 1920x1080 */
+    --pad-top: 72px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur: 0.7s;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ===========================================
+   FIXED 16:9 STAGE - mandatory base styles.
+   Slides are authored at 1920x1080 and scaled as a whole.
+   =========================================== */
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--stage-bg, #000); }
+.deck-viewport { position: fixed; inset: 0; overflow: hidden; background: var(--stage-bg, #000); }
+.deck-stage {
+    position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;
+    overflow: hidden; transform-origin: 0 0; background: var(--slide-bg, #fff);
+}
+.slide {
+    position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: hidden;
+    display: block; visibility: hidden; opacity: 0; pointer-events: none;
+    background: var(--slide-bg, #fff);
+    font-family: var(--font); color: var(--ink-2);
+}
+.slide.active, .slide.visible { visibility: visible; opacity: 1; pointer-events: auto; z-index: 1; }
+img, video, canvas, svg { max-width: 100%; max-height: 100%; }
+.notes { display: none; }                 /* speaker notes: shown by the editor's presenter view only */
+.deck-controls { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 1000; display: flex; gap: 8px; }
+.deck-controls button {
+    font-family: var(--font); font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.5); color: #fff; cursor: pointer;
+}
+.deck-controls .page { color: rgba(255,255,255,0.7); font: 500 13px var(--font); align-self: center; padding: 0 6px; }
+
+/* Print: one fixed-size slide per page */
+@media print {
+    html, body { width: 1920px; height: auto; overflow: visible; background: #fff; }
+    .deck-viewport { position: static; overflow: visible; background: #fff; }
+    .deck-stage { position: static; width: auto; height: auto; transform: none !important; background: none; }
+    .slide { position: relative; display: block !important; visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; width: 1920px; height: 1080px; break-after: page; page-break-after: always; }
+    .slide:last-child { break-after: auto; page-break-after: auto; }
+    .slide .reveal, .slide .reveal-img, .slide .reveal-right { opacity: 1 !important; transform: translate(var(--dx, 0px), var(--dy, 0px)) !important; }
+    .deck-controls { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; }
+}
+
+/* ===========================================
+   REVEAL ANIMATIONS
+   Elements with .reveal / .reveal-img / .reveal-right animate in
+   when the slide becomes .visible. --dx/--dy are set by the editor
+   when an element is moved, so a moved element still animates.
+   --i staggers the delay.
+   =========================================== */
+.reveal, .reveal-img, .reveal-right {
+    opacity: 0;
+    transition: opacity var(--dur) var(--ease-out), transform var(--dur) var(--ease-out);
+    transition-delay: calc(var(--i, 0) * 0.12s);
+}
+.reveal { transform: translateY(28px); }
+.reveal-img { transform: translateY(18px) scale(0.985); }
+.reveal-right { transform: translateX(40px); }
+.slide.visible .reveal, .slide.visible .reveal-img, .slide.visible .reveal-right {
+    opacity: 1; transform: translate(var(--dx, 0px), var(--dy, 0px));
+}
+
+/* ===========================================
+   SLIDE STYLES - a small starter set.
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: var(--pad-top); }
+h1 { font-size: 104px; font-weight: 700; line-height: 1.05; letter-spacing: -0.02em; color: var(--ink); }
+h2 { font-size: 64px; font-weight: 700; line-height: 1.1; letter-spacing: -0.015em; color: var(--ink); }
+h3 { font-size: 40px; font-weight: 600; line-height: 1.2; color: var(--ink); }
+p  { font-size: 32px; line-height: 1.45; }
+.eyebrow { font-size: 22px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); margin-bottom: 24px; }
+.sub { font-size: 36px; color: var(--ink-3); margin-top: 20px; }
+.title-slide .content { top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; }
+.title-slide h1 { max-width: 1400px; }
+.body-slide h2 { margin-bottom: 40px; }
+.body-slide ul { font-size: 34px; line-height: 1.5; padding-left: 44px; }
+.body-slide li { margin-bottom: 12px; }
+.eyebrow { display: flex; align-items: center; gap: 16px; }
+.bar { display: inline-flex; gap: 6px; }
+.bar i { display: block; width: 28px; height: 6px; background: var(--accent); }
+.who { display: flex; align-items: center; gap: 14px; margin-top: 48px; font-size: 28px; }
+.who .dot { width: 18px; height: 18px; border-radius: 50%; background: var(--accent-2); }
+.dots circle { opacity: 0.8; }
+.plot { background: var(--paper-2); }
+.key { position: absolute; left: 1000px; top: 620px; display: flex; gap: 12px; font-size: 22px; }
+.key .k { display: flex; align-items: center; gap: 6px; }
+.key .k i { width: 16px; height: 16px; border-radius: 4px; display: inline-block; }
+.slide-number { position: absolute; right: var(--pad-x); bottom: 40px; font-size: 20px; color: var(--ink-3); }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Title
+     ====================================================== -->
+<section class="slide title-slide active" data-name="title">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0"><span class="bar"><i></i><i></i></span><span data-edit>Eyebrow line</span></div>
+        <h1 class="reveal" style="--i:1" data-edit>Sample deck title</h1>
+        <p class="sub reveal" style="--i:2" data-edit>Subtitle or author</p>
+        <div class="who reveal" style="--i:3"><i class="dot"></i><span data-edit>Presenter name</span></div>
+    </div>
+    <svg class="dots" data-dots="24" data-seed="3" style="position:absolute; right:60px; top:40px; width:400px; height:600px" viewBox="0 0 400 600"></svg>
+    <aside class="notes">Notes for slide one.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Chart and scheme
+     ====================================================== -->
+<section class="slide body-slide" data-name="chart">
+    <div class="content">
+        <h2 class="reveal" style="--i:0" data-edit>A chart and a scheme</h2>
+        <div class="plot reveal-img" style="--i:1; position:absolute; left:0; top:140px; width:900px; height:600px" data-fig="demo"></div>
+        <div class="scheme reveal-img" style="--i:2; position:absolute; left:1000px; top:140px; width:600px" data-svg="assets/shape.svg">
+            <img src="assets/shape.svg" alt="Two shapes">
+        </div>
+        <div class="key" id="genKey"></div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Bullets
+     ====================================================== -->
+<section class="slide body-slide" data-name="bullets">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Section</div>
+        <h2 class="reveal" style="--i:1" data-edit>Three points</h2>
+        <ul>
+            <li class="reveal" style="--i:2" data-edit>First point</li>
+            <li class="reveal" style="--i:3" data-edit>Second point</li>
+            <li class="reveal" style="--i:4" data-edit>Third point</li>
+        </ul>
+    </div>
+</section>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">3</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<script>
+/* ===========================================
+   RUNTIME CONTENT (fixture): what real decks do with charts,
+   inline SVG schemes, decorative fields and generated legends.
+   The editor must strip all of this on save.
+   =========================================== */
+function renderFigure(el) {
+    if (el.dataset.rendered) return;
+    el.dataset.edClass = el.className;                 // restored on save
+    el.classList.add('fake-chart');
+    el.dataset.rendered = '1';
+    const draw = () => {
+        el.innerHTML = '<div class="bars" data-size="' + el.clientWidth + 'x' + el.clientHeight + '" style="display:flex;align-items:flex-end;gap:12px;height:100%;padding:20px">'
+            + [40, 70, 55, 90, 30].map(h => '<div style="flex:1;height:' + h + '%;background:#2f6fed"></div>').join('') + '</div>';
+    };
+    draw();
+    el.addEventListener('deck:resize', draw);
+}
+document.querySelectorAll('[data-fig]').forEach(renderFigure);
+
+document.querySelectorAll('[data-svg]').forEach(async (host) => {
+    if (host.querySelector('svg')) return;
+    try {
+        const res = await fetch(host.dataset.svg);
+        const doc = new DOMParser().parseFromString(await res.text(), 'image/svg+xml');
+        const svg = doc.documentElement;
+        const img = host.querySelector('img'); if (img) host.dataset.alt = img.alt;
+        host.replaceChildren(svg);
+    } catch (e) { /* keep the <img> */ }
+});
+
+document.querySelectorAll('svg.dots').forEach(svg => {
+    if (svg.childElementCount) return;
+    let seed = +svg.dataset.seed || 1;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    let s = '';
+    for (let i = 0; i < (+svg.dataset.dots || 20); i++) s += '<circle cx="' + (rnd() * 400).toFixed(1) + '" cy="' + (rnd() * 600).toFixed(1) + '" r="' + (4 + rnd() * 20).toFixed(1) + '" fill="#2f6fed" style="--o:0.6"/>';
+    svg.innerHTML = s;
+});
+
+const key = document.getElementById('genKey');
+if (key) key.innerHTML = ['A', 'B', 'C'].map(k => '<div class="k"><i style="background:#2f6fed"></i><span>' + k + '</span></div>').join('');
+</script>
+
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   Scales the 1920x1080 stage into the window, navigates with the
+   keyboard, touch and wheel, and exposes the hooks the editor uses:
+   - reads --ed-panel on <html> (space reserved for a side panel)
+   - listens for deck:rescale
+   - dispatches deck:slide (detail = slide index)
+   - honours #n in the URL to show slide n
+   =========================================== */
+class SlidePresentation {
+    constructor() {
+        this.stage = document.getElementById('deckStage');
+        this.current = 0;
+        this.setupStageScale();
+        this.setupKeyboardNav();
+        this.setupTouchNav();
+        this.setupWheelNav();
+        document.getElementById('btnPrev').addEventListener('click', () => this.prev());
+        document.getElementById('btnNext').addEventListener('click', () => this.next());
+        const fromHash = () => parseInt(location.hash.replace('#', ''), 10);
+        this.showSlide(Number.isFinite(fromHash()) ? fromHash() - 1 : 0, true);
+        window.addEventListener('hashchange', () => {
+            const n = fromHash();
+            if (Number.isFinite(n) && n - 1 !== this.current) this.showSlide(n - 1);
+        });
+    }
+
+    /* Slides are read live so the editor can add and remove them. */
+    get slides() { return Array.from(this.stage.querySelectorAll('.slide')); }
+
+    setupStageScale() {
+        const scale = () => {
+            const pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ed-panel')) || 0;
+            const vw = window.innerWidth - pad, vh = window.innerHeight;
+            const factor = Math.min(vw / 1920, vh / 1080);
+            const x = (vw - 1920 * factor) / 2, y = (vh - 1080 * factor) / 2;
+            this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
+        };
+        scale();
+        window.addEventListener('resize', scale);
+        document.addEventListener('deck:rescale', scale);
+    }
+
+    setupKeyboardNav() {
+        document.addEventListener('keydown', (e) => {
+            if (e.target.getAttribute && e.target.getAttribute('contenteditable') === 'true') return;
+            switch (e.key) {
+                case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': e.preventDefault(); this.next(); break;
+                case 'ArrowLeft': case 'ArrowUp': case 'PageUp': e.preventDefault(); this.prev(); break;
+                case 'Home': e.preventDefault(); this.showSlide(0); break;
+                case 'End': e.preventDefault(); this.showSlide(this.slides.length - 1); break;
+            }
+        });
+    }
+
+    setupTouchNav() {
+        let x0 = null, y0 = null;
+        document.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+        document.addEventListener('touchend', (e) => {
+            if (x0 === null) return;
+            const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) (dx < 0 ? this.next() : this.prev());
+            x0 = y0 = null;
+        }, { passive: true });
+    }
+
+    setupWheelNav() {
+        let lock = false;
+        document.addEventListener('wheel', (e) => {
+            if (lock || Math.abs(e.deltaY) < 30) return;
+            lock = true; setTimeout(() => lock = false, 700);
+            e.deltaY > 0 ? this.next() : this.prev();
+        }, { passive: true });
+    }
+
+    next() { this.showSlide(this.current + 1); }
+    prev() { this.showSlide(this.current - 1); }
+
+    showSlide(index, initial = false) {
+        const slides = this.slides;
+        this.current = Math.max(0, Math.min(index, slides.length - 1));
+        slides.forEach((s, i) => {
+            const on = i === this.current;
+            s.classList.toggle('active', on);
+            if (on) requestAnimationFrame(() => requestAnimationFrame(() => s.classList.add('visible')));
+            else s.classList.remove('visible');
+        });
+        document.getElementById('pageNow').textContent = this.current + 1;
+        document.getElementById('pageTotal').textContent = slides.length;
+        document.dispatchEvent(new CustomEvent('deck:slide', { detail: this.current }));
+        if (!initial || location.hash) history.replaceState(null, '', '#' + (this.current + 1));
+    }
+}
+
+new SlidePresentation();
+</script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aurora</title>
+<!-- Aurora: the big-tech launch keynote. A dark base with one large soft gradient wash per slide, glass panels
+     with a light edge, Outfit headlines and Instrument Sans body. Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #ffffff;   /* headings, key text        */
+    --ink-2:    #c7c9d6;   /* body text                 */
+    --ink-3:    #7f8397;   /* captions, secondary       */
+    --rule:     #2a2d3d;   /* borders                   */
+    --paper:    #0a0b12;   /* the dark base             */
+    --paper-2:  #14162a;   /* panels                    */
+    --accent:   #7c6cff;   /* violet                    */
+    --accent-2: #2ee6c5;   /* teal                      */
+    --accent-3: #ff7ab6;   /* pink                      */
+
+    --stage-bg: #030308;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #0a0b12;
+    --font: 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+    --font-display: 'Outfit', 'Instrument Sans', Arial, sans-serif;
+
+    --pad-x: 130px;        /* layout rhythm at 1920x1080 */
+    --pad-top: 100px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* motion: the reveal's curve   */
+    --dur: 1s;                                   /* ... its duration             */
+    --stagger: 0.12s;                            /* ... the step between --i's   */
+    --reveal-y: 30px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-display); font-size: 132px; font-weight: 700; line-height: 1.0; letter-spacing: -0.04em; color: var(--ink); }
+h2 { font-family: var(--font-display); font-size: 84px; font-weight: 500; line-height: 1.06; letter-spacing: -0.035em; color: var(--ink); }
+h3 { font-family: var(--font-display); font-size: 36px; font-weight: 500; line-height: 1.2; letter-spacing: -0.015em; color: var(--ink); }
+p  { font-size: 30px; line-height: 1.5; color: var(--ink-2); }
+ul, ol { font-size: 30px; line-height: 1.5; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 14px; }
+blockquote { font-family: var(--font-display); font-size: 68px; font-weight: 300; line-height: 1.2; letter-spacing: -0.02em; color: var(--ink); }
+.eyebrow { font-size: 20px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 28px; background: linear-gradient(90deg, var(--accent-2), var(--accent), var(--accent-3)); -webkit-background-clip: text; background-clip: text; color: transparent; align-self: flex-start; }
+.sub { font-size: 38px; font-weight: 300; line-height: 1.35; color: var(--ink-3); margin-top: 28px; font-family: var(--font-display); }
+.caption { font-size: 21px; line-height: 1.45; color: var(--ink-3); }
+.glow-text { background: linear-gradient(90deg, var(--accent-2), var(--accent), var(--accent-3)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* ===========================================
+   LAYOUT - glass panels
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: var(--pad-top); }
+.glass { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-top-color: rgba(255,255,255,0.28); border-radius: 28px; padding: 44px 44px 48px; backdrop-filter: blur(20px); }
+.glass h3 { margin-bottom: 14px; }
+.glass p { font-size: 25px; }
+.pill { display: inline-flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 600; padding: 10px 22px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: var(--ink); }
+.pill i { width: 10px; height: 10px; border-radius: 50%; background: var(--accent-2); box-shadow: 0 0 12px var(--accent-2); }
+
+/* Cover */
+.cover .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.cover .eyebrow { align-self: center; }
+.cover h1 { max-width: 1400px; font-size: 150px; }
+.cover .pills { display: flex; gap: 16px; margin-top: 56px; }
+
+/* Agenda */
+.agenda .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; margin-top: 56px; }
+.agenda .glass .n { font-family: var(--font-display); font-size: 48px; font-weight: 300; color: var(--accent-2); margin-bottom: 32px; }
+
+/* Section */
+.section .content { display: flex; flex-direction: column; justify-content: center; }
+.section h2 { font-size: 150px; font-weight: 700; max-width: 1500px; }
+
+/* Feature: three glass cards */
+.features .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 56px; }
+.features .icon { width: 64px; height: 64px; border-radius: 20px; background: linear-gradient(135deg, var(--accent), var(--accent-3)); margin-bottom: 32px; box-shadow: 0 10px 30px rgba(124,108,255,0.35); }
+.features .glass:nth-child(2) .icon { background: linear-gradient(135deg, var(--accent-2), var(--accent)); box-shadow: 0 10px 30px rgba(46,230,197,0.3); }
+.features .glass:nth-child(3) .icon { background: linear-gradient(135deg, var(--accent-3), #ffb86b); box-shadow: 0 10px 30px rgba(255,122,182,0.3); }
+
+/* Picture: a device-like frame */
+.picture .frame { position: absolute; left: 0; top: 0; width: 1060px; height: 880px; border-radius: 36px; background: var(--paper-2); border: 1px solid rgba(255,255,255,0.14); border-top-color: rgba(255,255,255,0.3); box-shadow: 0 40px 100px rgba(0,0,0,0.5); }
+.picture .text { position: absolute; left: 1160px; top: 80px; width: 600px; }
+.picture .text p { margin-top: 32px; }
+
+/* Big number */
+.number .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.number .big { font-family: var(--font-display); font-size: 360px; font-weight: 700; line-height: 0.95; letter-spacing: -0.06em; }
+.number h2 { margin-top: 20px; font-size: 56px; }
+.number p { margin-top: 20px; max-width: 1100px; }
+
+/* Quote */
+.quote .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.quote .glass { max-width: 1500px; padding: 64px 80px; }
+.quote .who { margin-top: 32px; }
+
+/* Comparison */
+.compare .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 56px; }
+.compare .glass.hi { border-color: rgba(124,108,255,0.6); box-shadow: 0 0 60px rgba(124,108,255,0.25); }
+.compare ul { list-style: none; padding: 0; margin-top: 20px; }
+.compare li { position: relative; padding-left: 40px; font-size: 27px; }
+.compare li::before { content: ''; position: absolute; left: 0; top: 14px; width: 14px; height: 14px; border-radius: 50%; background: var(--ink-3); }
+.compare .hi li::before { background: var(--accent-2); box-shadow: 0 0 10px var(--accent-2); }
+
+/* Timeline */
+.timeline .track { position: relative; margin-top: 90px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--accent-2), var(--accent), var(--accent-3)); box-shadow: 0 0 24px rgba(124,108,255,0.6); }
+.timeline .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 36px; }
+.timeline .step .dot { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 16px var(--ink); margin: -46px 0 24px; }
+.timeline .step h3 { margin-bottom: 10px; }
+.timeline .step p { font-size: 24px; }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.closing .pills { display: flex; gap: 16px; margin-top: 56px; }
+
+/* ===========================================
+   DECOR - the aurora wash: one big blurred gradient per slide, never in the way of a click
+   =========================================== */
+.aurora { position: absolute; width: 1400px; height: 900px; border-radius: 50%; filter: blur(110px); opacity: 0.55; pointer-events: none;
+    background: conic-gradient(from 200deg, var(--accent-2), var(--accent), var(--accent-3), var(--accent-2)); }
+.aurora.small { width: 800px; height: 600px; opacity: 0.4; }
+.stars { position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(rgba(255,255,255,0.35) 1px, transparent 1.5px); background-size: 160px 120px; opacity: 0.5; }
+
+/* ===========================================
+   MASTER LAYER - the running footer (a stage child outside the slides)
+   =========================================== */
+.deck-footer {
+    position: absolute; left: var(--pad-x); right: var(--pad-x); bottom: 40px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font); font-size: 19px; font-weight: 500; color: var(--ink-3);
+}
+.deck-footer .num { font-variant-numeric: tabular-nums; }
+.deck-footer b { font-weight: 600; color: var(--ink); }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="stars"></div>
+    <div class="aurora" style="left:260px; top:200px"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Keynote · Autumn 2026</div>
+        <h1 class="reveal" style="--i:1" data-edit>Meet the next <span class="glow-text">generation</span></h1>
+        <p class="sub reveal" style="--i:2; max-width:1000px" data-edit>Faster where it matters, quieter everywhere else</p>
+        <div class="pills reveal" style="--i:3">
+            <span class="pill"><i></i><span data-edit>Your Name</span></span>
+            <span class="pill"><i style="background:var(--accent-3); box-shadow:0 0 12px var(--accent-3)"></i><span data-edit>Product</span></span>
+        </div>
+    </div>
+    <aside class="notes" hidden>Pause on the title. One sentence on what the next generation is.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Agenda
+     ====================================================== -->
+<section class="slide agenda" data-name="agenda">
+    <div class="aurora small" style="left:1200px; top:-300px"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Tonight</div>
+        <h2 class="reveal" style="--i:1" data-edit>Four announcements</h2>
+        <div class="cards">
+            <div class="glass reveal" style="--i:2"><div class="n">01</div><h3 data-edit>The platform</h3><p data-edit>A new foundation, built for the next decade.</p></div>
+            <div class="glass reveal" style="--i:3"><div class="n">02</div><h3 data-edit>The experience</h3><p data-edit>Three features people asked for most.</p></div>
+            <div class="glass reveal" style="--i:4"><div class="n">03</div><h3 data-edit>The numbers</h3><p data-edit>What changed, measured.</p></div>
+            <div class="glass reveal" style="--i:5"><div class="n">04</div><h3 data-edit>Availability</h3><p data-edit>When, where, and for whom.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Section
+     ====================================================== -->
+<section class="slide section" data-name="section" data-section="The platform">
+    <div class="aurora" style="left:900px; top:100px"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>01</div>
+        <h2 class="reveal" style="--i:1" data-edit>The <span class="glow-text">platform</span></h2>
+        <p class="sub reveal" style="--i:2; max-width:900px" data-edit>Rebuilt from the ground up.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Features
+     ====================================================== -->
+<section class="slide features" data-name="features" data-section="The experience">
+    <div class="aurora small" style="left:-300px; top:500px"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>02 · The experience</div>
+        <h2 class="reveal" style="--i:1" data-edit>Three things you will notice first</h2>
+        <div class="grid">
+            <div class="glass reveal" style="--i:2"><div class="icon"></div><h3 data-edit>Instant</h3><p data-edit>Opens in under a second, every time, on every device.</p></div>
+            <div class="glass reveal" style="--i:3"><div class="icon"></div><h3 data-edit>Adaptive</h3><p data-edit>The interface learns what you reach for and moves it closer.</p></div>
+            <div class="glass reveal" style="--i:4"><div class="icon"></div><h3 data-edit>Private</h3><p data-edit>Everything personal stays on the device. Nothing leaves without asking.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Picture
+     ====================================================== -->
+<section class="slide picture" data-name="picture">
+    <div class="aurora small" style="left:200px; top:300px"></div>
+    <div class="content">
+        <div class="frame reveal-img" style="--i:0"></div>
+        <div data-placeholder="image" style="display:none; position:absolute; left:0; top:0; width:1060px; height:880px; border-radius:36px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:28px; text-align:center">Double-click to choose a screenshot</div>
+        <div class="text">
+            <div class="eyebrow reveal" style="--i:1" data-edit>Instant</div>
+            <h2 class="reveal" style="--i:2; font-size:72px" data-edit>See it for yourself</h2>
+            <p class="reveal" style="--i:3" data-edit>The frame takes a screenshot or a product shot: double-click it in the editor. Dark interfaces sit best on this background.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Big number
+     ====================================================== -->
+<section class="slide number" data-name="number" data-section="The numbers">
+    <div class="aurora" style="left:260px; top:100px"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0; align-self:center" data-edit>03 · The numbers</div>
+        <div class="big glow-text reveal" style="--i:1" data-edit>3.4×</div>
+        <h2 class="reveal" style="--i:2" data-edit>faster than last year</h2>
+        <p class="reveal" style="--i:3" data-edit>Measured on the same tasks, the same devices, the same people.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Comparison
+     ====================================================== -->
+<section class="slide compare" data-name="compare">
+    <div class="aurora small" style="left:1100px; top:400px"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Before and after</div>
+        <h2 class="reveal" style="--i:1" data-edit>What changed</h2>
+        <div class="cols">
+            <div class="glass reveal" style="--i:2">
+                <h3 data-edit>Last generation</h3>
+                <ul><li data-edit>2.1 s to open</li><li data-edit>Settings buried three levels deep</li><li data-edit>Personal data synced by default</li></ul>
+            </div>
+            <div class="glass hi reveal" style="--i:3">
+                <h3 data-edit>This generation</h3>
+                <ul><li data-edit>0.6 s to open</li><li data-edit>The things you use, on the first screen</li><li data-edit>On-device by default, sync by choice</li></ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Quote
+     ====================================================== -->
+<section class="slide quote" data-name="quote">
+    <div class="aurora small" style="left:560px; top:-200px"></div>
+    <div class="content">
+        <div class="glass reveal" style="--i:0">
+            <blockquote data-edit>"It feels like the device finally got out of the way."</blockquote>
+            <p class="who caption reveal" style="--i:1" data-edit>An early tester</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Timeline
+     ====================================================== -->
+<section class="slide timeline" data-name="availability" data-section="Availability">
+    <div class="aurora small" style="left:-200px; top:-200px"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>04 · Availability</div>
+        <h2 class="reveal" style="--i:1" data-edit>Rolling out from October</h2>
+        <div class="track reveal" style="--i:2"></div>
+        <div class="steps">
+            <div class="step reveal" style="--i:2"><div class="dot"></div><h3 data-edit>October</h3><p data-edit>Developer preview.</p></div>
+            <div class="step reveal" style="--i:3"><div class="dot"></div><h3 data-edit>November</h3><p data-edit>Public beta in six countries.</p></div>
+            <div class="step reveal" style="--i:4"><div class="dot"></div><h3 data-edit>December</h3><p data-edit>General availability.</p></div>
+            <div class="step reveal" style="--i:5" data-fragment><div class="dot"></div><h3 data-edit>Spring</h3><p data-edit>Everything else. Watch this space.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 10 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing" data-no-master>
+    <div class="stars"></div>
+    <div class="aurora" style="left:260px; top:200px"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0; align-self:center" data-edit>Thank you</div>
+        <h1 class="reveal" style="--i:1" data-edit>Available <span class="glow-text">this autumn</span></h1>
+        <div class="pills reveal" style="--i:2">
+            <span class="pill"><i></i><span data-edit>example.com/next</span></span>
+            <span class="pill"><i style="background:var(--accent-3); box-shadow:0 0 12px var(--accent-3)"></i><span data-edit>@example</span></span>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: shown on every slide, edited once in the editor -->
+<div class="deck-footer">
+    <span data-edit>Keynote · Autumn 2026</span>
+    <span class="num"><b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

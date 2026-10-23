@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report</title>
+<!-- Report: a reading-first data deck. White tiles on light grey, KPI rows, CSS bar and stacked-bar charts,
+     dense tables, status pills, annotations. IBM Plex Sans with Plex Mono numbers. Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #0f172a;   /* headings, key text        */
+    --ink-2:    #334155;   /* body text                 */
+    --ink-3:    #64748b;   /* captions, secondary       */
+    --rule:     #e2e8f0;   /* hairlines, borders        */
+    --paper:    #f1f5f9;   /* light grey background     */
+    --paper-2:  #ffffff;   /* tiles                     */
+    --accent:   #2563eb;   /* blue, first series        */
+    --accent-2: #f59e0b;   /* amber, second series      */
+    --accent-3: #16a34a;   /* green, good               */
+    --accent-4: #dc2626;   /* red, bad                  */
+
+    --stage-bg: #0b1220;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #f1f5f9;
+    --font: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'IBM Plex Mono', Consolas, monospace;
+
+    --pad-x: 80px;         /* layout rhythm at 1920x1080: dense */
+    --pad-top: 64px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* motion: the reveal's curve   */
+    --dur: 0.45s;                                /* ... its duration             */
+    --stagger: 0.06s;                            /* ... the step between --i's   */
+    --reveal-y: 12px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-size: 92px; font-weight: 700; line-height: 1.08; letter-spacing: -0.03em; color: var(--ink); }
+h2 { font-size: 52px; font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; color: var(--ink); }
+h3 { font-size: 28px; font-weight: 600; line-height: 1.3; color: var(--ink); }
+p  { font-size: 26px; line-height: 1.5; color: var(--ink-2); }
+ul, ol { font-size: 26px; line-height: 1.5; padding-left: 36px; color: var(--ink-2); }
+li { margin-bottom: 10px; }
+blockquote { font-size: 48px; font-weight: 500; line-height: 1.3; color: var(--ink); }
+.eyebrow { font-size: 18px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+.sub { font-size: 32px; line-height: 1.4; color: var(--ink-3); margin-top: 20px; }
+.caption { font-size: 20px; line-height: 1.45; color: var(--ink-3); }
+.num, .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ===========================================
+   LAYOUT - a dense grid of tiles
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: 100px; }
+.slide .head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 28px; }
+.slide .head h2 { font-size: 44px; }
+.tile { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 12px; padding: 28px 32px; }
+.tile .label { font-size: 18px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
+.tile .value { font-family: var(--font-mono); font-size: 64px; font-weight: 600; line-height: 1.1; color: var(--ink); margin: 12px 0 8px; letter-spacing: -0.02em; }
+.tile .delta { font-size: 20px; font-weight: 600; }
+.up { color: var(--accent-3); } .down { color: var(--accent-4); } .flat { color: var(--ink-3); }
+.pill { display: inline-block; font-size: 18px; font-weight: 600; padding: 6px 14px; border-radius: 999px; }
+.pill.ok { background: rgba(22,163,74,0.12); color: var(--accent-3); }
+.pill.warn { background: rgba(245,158,11,0.16); color: #b45309; }
+.pill.bad { background: rgba(220,38,38,0.12); color: var(--accent-4); }
+.legend { display: flex; gap: 24px; font-size: 20px; color: var(--ink-3); }
+.legend span { display: flex; align-items: center; gap: 10px; }
+.legend i { width: 16px; height: 16px; border-radius: 4px; background: var(--accent); }
+.legend i.s2 { background: var(--accent-2); } .legend i.s3 { background: var(--ink-3); }
+
+/* Cover */
+.cover .content { display: flex; flex-direction: column; justify-content: center; }
+.cover h1 { max-width: 1300px; }
+.cover .badges { display: flex; gap: 16px; margin-top: 40px; }
+.cover .meta { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 60px; padding-top: 24px; border-top: 1px solid var(--rule); }
+.cover .meta p { font-size: 20px; color: var(--ink-3); }
+.cover .meta b { display: block; color: var(--ink); font-weight: 600; }
+
+/* Summary: KPI row and bullets */
+.summary .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.summary .findings { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+.summary .findings .tile h3 { margin-bottom: 14px; }
+.summary .findings ul { padding-left: 30px; }
+.summary .findings li { font-size: 24px; margin-bottom: 8px; }
+
+/* Section */
+.section .content { display: flex; flex-direction: column; justify-content: center; }
+.section .n { font-family: var(--font-mono); font-size: 24px; color: var(--accent); margin-bottom: 20px; }
+.section h2 { font-size: 96px; max-width: 1400px; }
+
+/* Bar chart with annotations */
+.chart .plot-tile { padding: 28px 32px 60px; position: relative; height: 620px; }
+.chart .bars { position: absolute; left: 32px; right: 32px; top: 90px; bottom: 60px; display: flex; align-items: flex-end; gap: 24px; border-bottom: 2px solid var(--rule); }
+.chart .col { flex: 1; position: relative; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+.chart .col .b { width: 70%; background: var(--accent); border-radius: 4px 4px 0 0; }
+.chart .col.lo .b { background: var(--accent-2); }
+.chart .col .v { font-family: var(--font-mono); font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+.chart .col .x { position: absolute; bottom: -34px; font-size: 18px; color: var(--ink-3); }
+.chart .note { position: absolute; background: var(--paper-2); border: 1px solid var(--accent-2); border-radius: 8px; padding: 10px 14px; font-size: 18px; color: var(--ink-2); max-width: 300px; }
+.chart .cols { display: grid; grid-template-columns: 1fr 480px; gap: 20px; }
+.chart .side .tile { margin-bottom: 20px; }
+.chart .side .tile p { font-size: 22px; }
+
+/* Stacked bars */
+.stacked .rows { display: grid; gap: 28px; padding: 16px 0; }
+.stacked .row { display: grid; grid-template-columns: 220px 1fr 120px; align-items: center; gap: 24px; }
+.stacked .row .lbl { font-size: 22px; font-weight: 600; color: var(--ink); }
+.stacked .row .bar { height: 56px; display: flex; border-radius: 6px; overflow: hidden; background: var(--rule); }
+.stacked .row .bar i { display: block; height: 100%; background: var(--accent); }
+.stacked .row .bar i.s2 { background: var(--accent-2); } .stacked .row .bar i.s3 { background: var(--ink-3); }
+.stacked .row .tot { font-family: var(--font-mono); font-size: 22px; text-align: right; color: var(--ink); }
+
+/* Dense table */
+.data table { width: 100%; border-collapse: collapse; font-size: 22px; background: var(--paper-2); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+.data th { text-align: left; font-size: 17px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); padding: 16px 22px; background: var(--paper); border-bottom: 1px solid var(--rule); }
+.data td { padding: 14px 22px; border-bottom: 1px solid var(--rule); color: var(--ink-2); }
+.data tr:last-child td { border-bottom: 0; }
+.data td:first-child { font-weight: 600; color: var(--ink); }
+.data th.num, .data td.num { text-align: right; }
+
+/* KPI grid with mini bars */
+.grid6 .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.grid6 .tile .spark { display: flex; align-items: flex-end; gap: 4px; height: 60px; margin-top: 18px; }
+.grid6 .tile .spark i { flex: 1; background: var(--rule); border-radius: 2px 2px 0 0; }
+.grid6 .tile .spark i:last-child { background: var(--accent); }
+
+/* Recommendations */
+.recs ol { list-style: none; padding: 0; display: grid; gap: 16px; }
+.recs li { display: grid; grid-template-columns: 72px 1fr 200px; align-items: center; gap: 24px; background: var(--paper-2); border: 1px solid var(--rule); border-radius: 12px; padding: 22px 28px; margin: 0; }
+.recs li .n { font-family: var(--font-mono); font-size: 32px; font-weight: 600; color: var(--accent); }
+.recs li h3 { margin-bottom: 4px; }
+.recs li p { font-size: 22px; }
+.recs li .owner { text-align: right; font-size: 20px; color: var(--ink-3); }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; }
+.closing .lines { display: flex; gap: 60px; margin-top: 44px; }
+.closing .lines p { font-size: 22px; }
+.closing .lines b { display: block; color: var(--ink); font-weight: 600; }
+
+/* ===========================================
+   MASTER LAYER - the running footer (a stage child outside the slides)
+   =========================================== */
+.deck-footer {
+    position: absolute; left: var(--pad-x); right: var(--pad-x); bottom: 30px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: center; padding-top: 14px; border-top: 1px solid var(--rule);
+    font-family: var(--font); font-size: 17px; color: var(--ink-3);
+}
+.deck-footer .left { display: flex; gap: 32px; }
+.deck-footer .num b { font-weight: 600; color: var(--ink); }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Operations report</div>
+        <h1 class="reveal" style="--i:1" data-edit>Q3 2026 performance review</h1>
+        <p class="sub reveal" style="--i:2; max-width:1100px" data-edit>Volumes, service levels, cost and the five things to fix before Q4</p>
+        <div class="badges reveal" style="--i:3">
+            <span class="pill ok" data-edit>Final</span>
+            <span class="pill warn" data-edit>Internal</span>
+        </div>
+        <div class="meta reveal" style="--i:4">
+            <p data-edit><b>Prepared by</b>Your Name, Operations Analytics</p>
+            <p data-edit><b>Period</b>1 July to 30 September 2026</p>
+            <p data-edit><b>Issued</b>17 September 2026</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Executive summary
+     ====================================================== -->
+<section class="slide summary" data-name="summary">
+    <div class="content">
+        <div class="head reveal" style="--i:0"><h2 data-edit>Executive summary</h2><span class="caption" data-edit>All figures vs Q2 2026</span></div>
+        <div class="kpis">
+            <div class="tile reveal" style="--i:1"><div class="label" data-edit>Orders</div><div class="value" data-edit>184k</div><div class="delta up" data-edit>▲ 9.2%</div></div>
+            <div class="tile reveal" style="--i:2"><div class="label" data-edit>On-time delivery</div><div class="value" data-edit>94.1%</div><div class="delta down" data-edit>▼ 1.8 pts</div></div>
+            <div class="tile reveal" style="--i:3"><div class="label" data-edit>Cost per order</div><div class="value" data-edit>€3.42</div><div class="delta up" data-edit>▼ 4.0% (better)</div></div>
+            <div class="tile reveal" style="--i:4"><div class="label" data-edit>Complaints / 1k</div><div class="value" data-edit>2.7</div><div class="delta flat" data-edit>● unchanged</div></div>
+        </div>
+        <div class="findings">
+            <div class="tile reveal" style="--i:5"><h3 data-edit>What went well</h3><ul><li data-edit>Volume grew 9% with no added headcount.</li><li data-edit>Unit cost fell for the third quarter running.</li><li data-edit>The new returns flow cut handling time by a third.</li></ul></div>
+            <div class="tile reveal" style="--i:6"><h3 data-edit>What needs attention</h3><ul><li data-edit>On-time delivery slipped in August, concentrated in one region.</li><li data-edit>Carrier B missed its SLA in eight of thirteen weeks.</li><li data-edit>Peak-week staffing was short by 12 shifts.</li></ul></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Section
+     ====================================================== -->
+<section class="slide section" data-name="section" data-section="Service levels">
+    <div class="content">
+        <div class="n reveal" style="--i:0" data-edit>SECTION 01</div>
+        <h2 class="reveal" style="--i:1" data-edit>Service levels</h2>
+        <p class="sub reveal" style="--i:2; max-width:1000px" data-edit>Where the 1.8 points went, week by week and by carrier.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Bar chart with annotations
+     ====================================================== -->
+<section class="slide chart" data-name="weekly">
+    <div class="content">
+        <div class="head reveal" style="--i:0"><h2 data-edit>On-time delivery by week</h2><div class="legend"><span><i></i>At or above target</span><span><i class="s2"></i>Below 93% target</span></div></div>
+        <div class="cols">
+            <div class="tile plot-tile reveal-img" style="--i:1" data-group>
+                <div class="bars">
+                    <div class="col"><div class="v">95.8</div><div class="b" style="height:88%"></div><div class="x">W27</div></div>
+                    <div class="col"><div class="v">95.4</div><div class="b" style="height:86%"></div><div class="x">W28</div></div>
+                    <div class="col"><div class="v">95.1</div><div class="b" style="height:85%"></div><div class="x">W29</div></div>
+                    <div class="col"><div class="v">94.6</div><div class="b" style="height:82%"></div><div class="x">W30</div></div>
+                    <div class="col"><div class="v">93.9</div><div class="b" style="height:78%"></div><div class="x">W31</div></div>
+                    <div class="col lo"><div class="v">91.2</div><div class="b" style="height:62%"></div><div class="x">W32</div></div>
+                    <div class="col lo"><div class="v">90.4</div><div class="b" style="height:57%"></div><div class="x">W33</div></div>
+                    <div class="col lo"><div class="v">92.1</div><div class="b" style="height:67%"></div><div class="x">W34</div></div>
+                    <div class="col"><div class="v">93.8</div><div class="b" style="height:77%"></div><div class="x">W35</div></div>
+                    <div class="col"><div class="v">94.7</div><div class="b" style="height:83%"></div><div class="x">W36</div></div>
+                    <div class="col"><div class="v">95.0</div><div class="b" style="height:85%"></div><div class="x">W37</div></div>
+                    <div class="col"><div class="v">95.3</div><div class="b" style="height:86%"></div><div class="x">W38</div></div>
+                    <div class="col"><div class="v">95.5</div><div class="b" style="height:87%"></div><div class="x">W39</div></div>
+                </div>
+                <div class="note" style="left:540px; top:30px" data-edit>Carrier B strike, weeks 32 to 34</div>
+            </div>
+            <div class="side">
+                <div class="tile reveal" style="--i:2"><h3 data-edit>Three bad weeks</h3><p data-edit>Weeks 32 to 34 account for the whole quarterly drop. Excluding them, on-time delivery was 95.1%, above Q2.</p></div>
+                <div class="tile reveal" style="--i:3"><h3 data-edit>Recovery</h3><p data-edit>Back above target by week 35 after volume was shifted to carrier A at a €0.11 per-order premium.</p></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Stacked bars
+     ====================================================== -->
+<section class="slide stacked" data-name="mix">
+    <div class="content">
+        <div class="head reveal" style="--i:0"><h2 data-edit>Volume by carrier and region</h2><div class="legend"><span><i></i>Carrier A</span><span><i class="s2"></i>Carrier B</span><span><i class="s3"></i>Own fleet</span></div></div>
+        <div class="tile reveal-img" style="--i:1" data-group>
+            <div class="rows">
+                <div class="row"><span class="lbl">North</span><div class="bar"><i style="width:58%"></i><i class="s2" style="width:30%"></i><i class="s3" style="width:12%"></i></div><span class="tot">61.2k</span></div>
+                <div class="row"><span class="lbl">East</span><div class="bar"><i style="width:44%"></i><i class="s2" style="width:46%"></i><i class="s3" style="width:10%"></i></div><span class="tot">48.9k</span></div>
+                <div class="row"><span class="lbl">South</span><div class="bar"><i style="width:70%"></i><i class="s2" style="width:12%"></i><i class="s3" style="width:18%"></i></div><span class="tot">39.5k</span></div>
+                <div class="row"><span class="lbl">West</span><div class="bar"><i style="width:52%"></i><i class="s2" style="width:28%"></i><i class="s3" style="width:20%"></i></div><span class="tot">34.4k</span></div>
+            </div>
+        </div>
+        <p class="reveal" style="--i:2; margin-top:24px; max-width:1500px" data-edit>East is the only region where carrier B carries close to half the volume, which is why the strike showed there first. Rebalancing East to 30% carrier B is the single largest service-level lever for Q4.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Dense table
+     ====================================================== -->
+<section class="slide data" data-name="table" data-section="Cost">
+    <div class="content">
+        <div class="head reveal" style="--i:0"><h2 data-edit>Cost per order by region</h2><span class="caption" data-edit>EUR, fully loaded</span></div>
+        <table class="reveal" style="--i:1" data-group>
+            <thead><tr><th>Region</th><th class="num">Orders</th><th class="num">Q2</th><th class="num">Q3</th><th class="num">Change</th><th>Driver</th><th>Status</th></tr></thead>
+            <tbody>
+                <tr><td>North</td><td class="num">61,200</td><td class="num">3.51</td><td class="num">3.28</td><td class="num up">-6.6%</td><td>Route density</td><td><span class="pill ok">On plan</span></td></tr>
+                <tr><td>East</td><td class="num">48,900</td><td class="num">3.62</td><td class="num">3.71</td><td class="num down">+2.5%</td><td>Carrier A premium during strike</td><td><span class="pill warn">Watch</span></td></tr>
+                <tr><td>South</td><td class="num">39,500</td><td class="num">3.44</td><td class="num">3.30</td><td class="num up">-4.1%</td><td>Own fleet share up</td><td><span class="pill ok">On plan</span></td></tr>
+                <tr><td>West</td><td class="num">34,400</td><td class="num">3.70</td><td class="num">3.39</td><td class="num up">-8.4%</td><td>Returns flow</td><td><span class="pill ok">Ahead</span></td></tr>
+                <tr><td>Total</td><td class="num">184,000</td><td class="num">3.56</td><td class="num">3.42</td><td class="num up">-4.0%</td><td></td><td><span class="pill ok">On plan</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - KPI grid
+     ====================================================== -->
+<section class="slide grid6" data-name="kpis">
+    <div class="content">
+        <div class="head reveal" style="--i:0"><h2 data-edit>Operational indicators</h2><span class="caption" data-edit>Last six months; the last bar is September</span></div>
+        <div class="grid">
+            <div class="tile reveal" style="--i:1"><div class="label" data-edit>Pick accuracy</div><div class="value" data-edit>99.6%</div><div class="spark"><i style="height:70%"></i><i style="height:74%"></i><i style="height:72%"></i><i style="height:80%"></i><i style="height:86%"></i><i style="height:92%"></i></div></div>
+            <div class="tile reveal" style="--i:2"><div class="label" data-edit>Hours per 100 orders</div><div class="value" data-edit>4.1</div><div class="spark"><i style="height:90%"></i><i style="height:84%"></i><i style="height:80%"></i><i style="height:76%"></i><i style="height:72%"></i><i style="height:66%"></i></div></div>
+            <div class="tile reveal" style="--i:3"><div class="label" data-edit>Returns rate</div><div class="value" data-edit>6.8%</div><div class="spark"><i style="height:60%"></i><i style="height:64%"></i><i style="height:70%"></i><i style="height:68%"></i><i style="height:66%"></i><i style="height:62%"></i></div></div>
+            <div class="tile reveal" style="--i:4"><div class="label" data-edit>Stock-outs</div><div class="value" data-edit>142</div><div class="spark"><i style="height:50%"></i><i style="height:58%"></i><i style="height:80%"></i><i style="height:92%"></i><i style="height:70%"></i><i style="height:54%"></i></div></div>
+            <div class="tile reveal" style="--i:5"><div class="label" data-edit>Overtime hours</div><div class="value" data-edit>1,280</div><div class="spark"><i style="height:40%"></i><i style="height:44%"></i><i style="height:52%"></i><i style="height:88%"></i><i style="height:96%"></i><i style="height:70%"></i></div></div>
+            <div class="tile reveal" style="--i:6"><div class="label" data-edit>Safety incidents</div><div class="value" data-edit>0</div><div class="spark"><i style="height:30%"></i><i style="height:0%"></i><i style="height:30%"></i><i style="height:0%"></i><i style="height:0%"></i><i style="height:0%"></i></div></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Recommendations
+     ====================================================== -->
+<section class="slide recs" data-name="recommendations" data-section="Recommendations">
+    <div class="content">
+        <div class="head reveal" style="--i:0"><h2 data-edit>Five things to fix before Q4</h2><span class="caption" data-edit>Owner and due date in the appendix</span></div>
+        <ol>
+            <li class="reveal" style="--i:1"><span class="n">01</span><div><h3 data-edit>Cap carrier B at 30% in every region</h3><p data-edit>Removes the single point of failure that cost 1.8 points in August.</p></div><span class="owner" data-edit>Logistics · Oct</span></li>
+            <li class="reveal" style="--i:2"><span class="n">02</span><div><h3 data-edit>Peak-week staffing model</h3><p data-edit>Plan 14 shifts of buffer for weeks 47 to 51 from the Q3 shortfall.</p></div><span class="owner" data-edit>Operations · Oct</span></li>
+            <li class="reveal" style="--i:3"><span class="n">03</span><div><h3 data-edit>Roll the returns flow out to North and East</h3><p data-edit>West saved 8% on cost per order with it; the other regions still run the old process.</p></div><span class="owner" data-edit>Process · Nov</span></li>
+            <li class="reveal" style="--i:4"><span class="n">04</span><div><h3 data-edit>Stock-out alerting at 3 days of cover</h3><p data-edit>The July spike had two days' warning that nobody saw.</p></div><span class="owner" data-edit>Planning · Nov</span></li>
+            <li class="reveal" style="--i:5"><span class="n">05</span><div><h3 data-edit>Renegotiate carrier B's SLA credits</h3><p data-edit>Eight missed weeks earned €0 in credits under the current contract.</p></div><span class="owner" data-edit>Procurement · Dec</span></li>
+        </ol>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Appendix and contact</div>
+        <h2 class="reveal" style="--i:1" data-edit>Data, methods and the full tables are in the appendix pack</h2>
+        <div class="lines">
+            <p class="reveal" style="--i:2" data-edit><b>Questions</b>ops-analytics@example.com</p>
+            <p class="reveal" style="--i:3" data-edit><b>Data</b>Warehouse snapshot of 15 September 2026</p>
+            <p class="reveal" style="--i:4" data-edit><b>Next report</b>Q4, 15 January 2027</p>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: shown on every slide, edited once in the editor -->
+<div class="deck-footer">
+    <span class="left"><span data-edit>Q3 2026 performance review</span><span data-edit>Operations Analytics · Internal</span></span>
+    <span class="num"><b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

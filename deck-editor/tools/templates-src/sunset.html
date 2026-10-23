@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sunset</title>
+<!-- Sunset: warm and earthy. Terracotta, sand, olive and clay, a soft rounded serif for headlines, a gentle sans
+     for the body, low horizon shapes. Fraunces (soft) and Nunito Sans. Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;1,400&family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #3b2a22;   /* dark clay: headings       */
+    --ink-2:    #5c4a3f;   /* body text                 */
+    --ink-3:    #9a8878;   /* captions, secondary       */
+    --rule:     #e6d6c4;   /* hairlines                 */
+    --paper:    #f6ede2;   /* sand                      */
+    --paper-2:  #efe1d0;   /* panels                    */
+    --accent:   #c9633a;   /* terracotta                */
+    --accent-2: #7d8a5a;   /* olive                     */
+    --accent-3: #e9a86b;   /* apricot                   */
+    --accent-4: #b06a4e;   /* clay                      */
+
+    --stage-bg: #2a1d16;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #f6ede2;
+    --font: 'Nunito Sans', 'Helvetica Neue', Arial, sans-serif;
+    --font-display: 'Fraunces', Georgia, serif;
+
+    --pad-x: 130px;        /* layout rhythm at 1920x1080 */
+    --pad-top: 100px;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);  /* motion: the reveal's curve   */
+    --dur: 1s;                                   /* ... its duration             */
+    --stagger: 0.14s;                            /* ... the step between --i's   */
+    --reveal-y: 20px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-display); font-size: 132px; font-weight: 500; line-height: 1.0; letter-spacing: -0.02em; color: var(--ink); }
+h2 { font-family: var(--font-display); font-size: 84px; font-weight: 500; line-height: 1.06; letter-spacing: -0.015em; color: var(--ink); }
+h3 { font-family: var(--font-display); font-size: 42px; font-weight: 500; line-height: 1.15; color: var(--ink); }
+p  { font-size: 30px; line-height: 1.55; color: var(--ink-2); }
+ul, ol { font-size: 30px; line-height: 1.55; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 14px; }
+blockquote { font-family: var(--font-display); font-style: italic; font-size: 76px; font-weight: 400; line-height: 1.2; color: var(--ink); }
+h1 em, h2 em { font-style: italic; font-weight: 400; color: var(--accent); }
+.eyebrow { font-size: 20px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent-2); margin-bottom: 28px; }
+.sub { font-size: 36px; line-height: 1.4; color: var(--ink-3); margin-top: 28px; }
+.caption { font-size: 22px; line-height: 1.45; color: var(--ink-3); }
+
+/* ===========================================
+   LAYOUT
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: var(--pad-top); }
+.card { background: var(--paper-2); border-radius: 32px; padding: 44px 44px 48px; }
+.card .n { font-family: var(--font-display); font-style: italic; font-size: 52px; color: var(--accent); margin-bottom: 24px; }
+.card h3 { margin-bottom: 14px; }
+.card p { font-size: 25px; }
+
+/* Cover: a low sun on the horizon */
+.cover .content { display: flex; flex-direction: column; justify-content: center; }
+.cover h1 { max-width: 1100px; }
+.cover .credit { position: absolute; left: 0; bottom: 0; }
+
+/* Statement */
+.statement .content { display: flex; flex-direction: column; justify-content: center; }
+.statement h2 { font-size: 96px; max-width: 1400px; font-weight: 400; }
+
+/* Section */
+.section .content { display: flex; flex-direction: column; justify-content: center; }
+.section .n { font-family: var(--font-display); font-style: italic; font-size: 160px; line-height: 1; color: var(--accent); margin-bottom: 20px; }
+.section h2 { font-size: 110px; max-width: 1000px; }
+
+/* Cards */
+.cards .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 56px; }
+
+/* Picture: rounded plate */
+.picture .plate { position: absolute; left: 0; top: 0; width: 820px; height: 880px; border-radius: 410px 410px 32px 32px; background: var(--paper-2); }
+.picture .text { position: absolute; left: 940px; top: 80px; width: 720px; }
+.picture .text p { margin-top: 32px; }
+
+/* Big number */
+.number .content { display: flex; flex-direction: column; justify-content: center; }
+.number .big { font-family: var(--font-display); font-size: 340px; font-weight: 400; line-height: 0.9; letter-spacing: -0.04em; color: var(--accent); }
+.number h2 { margin-top: 30px; font-size: 68px; }
+.number p { margin-top: 20px; max-width: 1100px; }
+
+/* Quote */
+.quote .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.quote blockquote { max-width: 1500px; }
+.quote .who { margin-top: 40px; }
+
+/* Steps: stones */
+.steps .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 64px; }
+.steps .stone { border-radius: 40% 60% 55% 45% / 55% 45% 55% 45%; width: 120px; height: 100px; background: var(--accent-3); margin-bottom: 28px; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-style: italic; font-size: 40px; color: var(--ink); }
+.steps .step:nth-child(2) .stone { background: var(--accent); color: var(--paper); border-radius: 55% 45% 45% 55% / 45% 55% 45% 55%; }
+.steps .step:nth-child(3) .stone { background: var(--accent-2); color: var(--paper); border-radius: 50% 50% 60% 40% / 40% 60% 40% 60%; }
+.steps .step:nth-child(4) .stone { background: var(--accent-4); color: var(--paper); }
+.steps .step h3 { margin-bottom: 10px; }
+.steps .step p { font-size: 25px; }
+
+/* Two columns */
+.pair .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 52px; }
+.pair .card.warm { background: var(--accent); } .pair .card.warm h3, .pair .card.warm li { color: var(--paper); }
+.pair .card.cool { background: var(--accent-2); } .pair .card.cool h3, .pair .card.cool li { color: var(--paper); }
+.pair ul { list-style: none; padding: 0; margin-top: 16px; }
+.pair li { position: relative; padding-left: 40px; font-size: 27px; }
+.pair li::before { content: ''; position: absolute; left: 0; top: 14px; width: 14px; height: 14px; border-radius: 50%; background: rgba(246,237,226,0.8); }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; }
+.closing .lines { display: flex; gap: 60px; margin-top: 56px; }
+.closing .lines p { font-size: 24px; font-weight: 700; color: var(--ink); }
+
+/* ===========================================
+   DECOR - a horizon, a sun, hills; real elements that can be moved
+   =========================================== */
+.sun { position: absolute; border-radius: 50%; background: linear-gradient(180deg, var(--accent-3), var(--accent)); }
+.hill { position: absolute; border-radius: 50% 50% 0 0; }
+.horizon { position: absolute; left: 0; width: 1920px; height: 2px; background: var(--rule); pointer-events: none; }
+
+/* ===========================================
+   MASTER LAYER - the running footer (a stage child outside the slides)
+   =========================================== */
+.deck-footer {
+    position: absolute; left: var(--pad-x); right: var(--pad-x); bottom: 40px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--font); font-size: 19px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
+}
+.deck-footer .num { font-family: var(--font-display); font-style: italic; font-size: 28px; letter-spacing: 0; text-transform: none; color: var(--accent); }
+.deck-footer b { font-weight: 500; }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="sun reveal-img" style="--i:1; left:1240px; top:160px; width:520px; height:520px"></div>
+    <div class="hill reveal-img" style="--i:2; left:1000px; top:560px; width:1100px; height:700px; background:var(--accent-2)"></div>
+    <div class="hill reveal-img" style="--i:3; left:1380px; top:660px; width:900px; height:600px; background:var(--accent-4)"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>A retreat · September 2026</div>
+        <h1 class="reveal" style="--i:1" data-edit>Slow down, <em>look up</em></h1>
+        <p class="sub reveal" style="--i:2; max-width:800px" data-edit>Three days on rest, attention and the work that follows</p>
+        <p class="caption credit reveal" style="--i:3" data-edit>Your Name · The Studio</p>
+    </div>
+    <aside class="notes" hidden>Let the sun sit. Say the title slowly.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Statement
+     ====================================================== -->
+<section class="slide statement" data-name="statement">
+    <div class="sun reveal-img" style="--i:1; left:1480px; top:-160px; width:400px; height:400px; opacity:0.9"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>The idea</div>
+        <h2 class="reveal" style="--i:1" data-edit>Rest is not the opposite of work. It is <em>where the work settles</em>.</h2>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Section
+     ====================================================== -->
+<section class="slide section" data-name="section" data-section="Rest" data-no-master>
+    <div class="hill reveal-img" style="--i:1; left:1100px; top:520px; width:1200px; height:800px; background:var(--accent-3)"></div>
+    <div class="content">
+        <div class="n reveal" style="--i:0" data-edit>i.</div>
+        <h2 class="reveal" style="--i:1" data-edit>Rest</h2>
+        <p class="sub reveal" style="--i:2; max-width:800px" data-edit>Day one. Nothing is due.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Cards
+     ====================================================== -->
+<section class="slide cards" data-name="three">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Three kinds of rest</div>
+        <h2 class="reveal" style="--i:1" data-edit>What we mean by resting</h2>
+        <div class="grid">
+            <div class="card reveal" style="--i:2"><div class="n">i.</div><h3 data-edit>Body</h3><p data-edit>Sleep, walks, meals that take longer than the walk to get them.</p></div>
+            <div class="card reveal" style="--i:3"><div class="n">ii.</div><h3 data-edit>Attention</h3><p data-edit>One thing at a time, and long stretches of no thing at all.</p></div>
+            <div class="card reveal" style="--i:4"><div class="n">iii.</div><h3 data-edit>Company</h3><p data-edit>Conversations without an agenda. The best ideas of the year came from those.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Picture
+     ====================================================== -->
+<section class="slide picture" data-name="picture" data-section="Attention">
+    <div class="content">
+        <div class="plate reveal-img" style="--i:0"></div>
+        <div data-placeholder="image" style="display:none; position:absolute; left:0; top:0; width:820px; height:880px; border-radius:410px 410px 32px 32px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:28px; text-align:center">Double-click to choose a picture</div>
+        <div class="text">
+            <div class="eyebrow reveal" style="--i:1" data-edit>Day two</div>
+            <h2 class="reveal" style="--i:2" data-edit>A picture in the <em>arch</em></h2>
+            <p class="reveal" style="--i:3" data-edit>The arched plate takes a photograph: double-click it in the editor. Warm light and landscapes suit it best.</p>
+            <p class="caption reveal" style="--i:4; margin-top:24px" data-edit>Caption, place and time of day</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Big number
+     ====================================================== -->
+<section class="slide number" data-name="number">
+    <div class="sun reveal-img" style="--i:1; left:1300px; top:180px; width:460px; height:460px"></div>
+    <div class="content">
+        <div class="big reveal" style="--i:0" data-edit>3</div>
+        <h2 class="reveal" style="--i:1" data-edit>days without a meeting</h2>
+        <p class="reveal" style="--i:2" data-edit>And the calendar afterwards had eleven fewer of them. Nobody asked for them back.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Quote
+     ====================================================== -->
+<section class="slide quote" data-name="quote">
+    <div class="hill reveal-img" style="--i:1; left:-200px; top:820px; width:1400px; height:500px; background:var(--paper-2)"></div>
+    <div class="content">
+        <blockquote class="reveal" style="--i:0" data-edit>"Almost everything will work again if you unplug it for a few minutes, including you."</blockquote>
+        <p class="who caption reveal" style="--i:1" data-edit>Anne Lamott</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Steps
+     ====================================================== -->
+<section class="slide steps" data-name="steps" data-section="After">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Day three · what comes after</div>
+        <h2 class="reveal" style="--i:1" data-edit>Four small habits to take home</h2>
+        <div class="row">
+            <div class="step reveal" style="--i:2"><div class="stone">1</div><h3 data-edit>A morning hour</h3><p data-edit>No messages before the first real task.</p></div>
+            <div class="step reveal" style="--i:3"><div class="stone">2</div><h3 data-edit>One walk</h3><p data-edit>Without headphones, most days.</p></div>
+            <div class="step reveal" style="--i:4"><div class="stone">3</div><h3 data-edit>Meetings end early</h3><p data-edit>Fifty minutes, then everyone goes.</p></div>
+            <div class="step reveal" style="--i:5" data-fragment><div class="stone">4</div><h3 data-edit>A quiet week</h3><p data-edit>Once a quarter, nothing new starts.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Two columns
+     ====================================================== -->
+<section class="slide pair" data-name="pair">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Before and after</div>
+        <h2 class="reveal" style="--i:1" data-edit>What we are changing</h2>
+        <div class="cols">
+            <div class="card warm reveal" style="--i:2">
+                <h3 data-edit>Less of</h3>
+                <ul><li data-edit>Status meetings</li><li data-edit>Notifications on by default</li><li data-edit>Starting three things at once</li></ul>
+            </div>
+            <div class="card cool reveal" style="--i:3">
+                <h3 data-edit>More of</h3>
+                <ul><li data-edit>Written updates</li><li data-edit>Long uninterrupted mornings</li><li data-edit>Finishing one thing</li></ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 10 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing" data-no-master>
+    <div class="sun reveal-img" style="--i:1; left:1240px; top:220px; width:480px; height:480px"></div>
+    <div class="hill reveal-img" style="--i:2; left:900px; top:620px; width:1300px; height:700px; background:var(--accent-2)"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Thank you</div>
+        <h1 class="reveal" style="--i:1; max-width:900px" data-edit>Go <em>gently</em></h1>
+        <div class="lines">
+            <p class="reveal" style="--i:2" data-edit>hello@example.com</p>
+            <p class="reveal" style="--i:3" data-edit>studio.example</p>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: shown on every slide, edited once in the editor -->
+<div class="deck-footer">
+    <span data-edit>Slow down, look up · 2026</span>
+    <span class="num"><b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

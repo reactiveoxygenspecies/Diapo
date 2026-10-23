@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio</title>
+<!-- Portfolio: photo-led slides on near-black with almost no chrome. Full-bleed pictures with a caption bar,
+     a picture grid, a before/after pair, a triptych. Instrument Serif titles, Instrument Sans captions. Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #f2f0eb;   /* headings, key text        */
+    --ink-2:    #b9b6ae;   /* body text                 */
+    --ink-3:    #77746d;   /* captions, secondary       */
+    --rule:     #2a2925;   /* hairlines                 */
+    --paper:    #0e0e0d;   /* near-black background     */
+    --paper-2:  #1b1a18;   /* picture plates            */
+    --accent:   #f2f0eb;   /* the accent is the light   */
+    --accent-2: #c9a878;   /* a warm brass for numbers  */
+
+    --stage-bg: #000000;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #0e0e0d;
+    --font: 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+    --font-display: 'Instrument Serif', Georgia, serif;
+
+    --pad-x: 100px;        /* layout rhythm at 1920x1080 */
+    --pad-top: 90px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* motion: the reveal's curve   */
+    --dur: 1.1s;                                 /* ... its duration             */
+    --stagger: 0.12s;                            /* ... the step between --i's   */
+    --reveal-y: 16px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-display); font-size: 140px; font-weight: 400; line-height: 1.0; letter-spacing: -0.01em; color: var(--ink); }
+h2 { font-family: var(--font-display); font-size: 88px; font-weight: 400; line-height: 1.05; color: var(--ink); }
+h3 { font-family: var(--font-display); font-size: 44px; font-weight: 400; line-height: 1.15; color: var(--ink); }
+p  { font-size: 28px; line-height: 1.5; color: var(--ink-2); }
+ul, ol { font-size: 28px; line-height: 1.5; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 12px; }
+blockquote { font-family: var(--font-display); font-style: italic; font-size: 84px; line-height: 1.15; color: var(--ink); }
+h1 em, h2 em, h3 em { font-style: italic; color: var(--accent-2); }
+.eyebrow { font-size: 18px; font-weight: 600; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 28px; }
+.sub { font-size: 30px; line-height: 1.4; color: var(--ink-3); margin-top: 24px; }
+.caption { font-size: 20px; line-height: 1.45; color: var(--ink-3); letter-spacing: 0.02em; }
+.caption b { color: var(--ink); font-weight: 500; }
+
+/* ===========================================
+   LAYOUT - plates are the boxes pictures fill; a placeholder sits on each
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: var(--pad-top); }
+.plate { position: absolute; background: var(--paper-2); }
+.capbar { position: absolute; left: 0; right: 0; bottom: 0; height: 96px; padding: 0 var(--pad-x); display: flex; justify-content: space-between; align-items: center; background: var(--paper); border-top: 1px solid var(--rule); }
+.capbar .n { font-family: var(--font-display); font-size: 30px; color: var(--accent-2); }
+
+/* Cover: full-bleed picture, title over it */
+.cover .plate { left: 0; top: 0; width: 1920px; height: 1080px; background: linear-gradient(180deg, #1c1b19, #0e0e0d); }
+.cover .content { display: flex; flex-direction: column; justify-content: flex-end; }
+.cover h1 { max-width: 1200px; }
+.cover .credit { position: absolute; right: 0; bottom: 0; text-align: right; }
+
+/* Statement */
+.statement .content { display: flex; flex-direction: column; justify-content: center; }
+.statement h2 { font-size: 96px; max-width: 1500px; }
+.statement p { margin-top: 36px; max-width: 1000px; }
+
+/* Full-bleed picture and caption bar */
+.full .plate { left: 0; top: 0; width: 1920px; height: 984px; }
+
+/* Grid of six */
+.gallery .grid { position: absolute; left: 0; top: 0; width: 1920px; height: 984px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: 1fr 1fr; gap: 8px; }
+.gallery .grid .plate { position: relative; }
+
+/* Picture and text */
+.pair .plate { left: 0; top: 0; width: 1240px; height: 1080px; }
+.pair .text { position: absolute; left: 1340px; top: var(--pad-top); width: 480px; }
+.pair .text .rule { width: 60px; height: 1px; background: var(--accent-2); margin: 36px 0 32px; }
+.pair .text p { font-size: 25px; }
+
+/* Before and after */
+.before .plate.l { left: 0; top: 0; width: 956px; height: 984px; }
+.before .plate.r { left: 964px; top: 0; width: 956px; height: 984px; }
+.before .tag { position: absolute; top: 40px; font-size: 18px; font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink); background: rgba(14,14,13,0.7); padding: 12px 20px; }
+
+/* Triptych */
+.triptych .plates { position: absolute; left: 0; top: 0; width: 1920px; height: 984px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.triptych .plates .plate { position: relative; }
+
+/* Quote */
+.quote .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.quote blockquote { max-width: 1500px; }
+.quote .who { margin-top: 40px; }
+
+/* Index of works */
+.index .rows { margin-top: 48px; }
+.index .row { display: grid; grid-template-columns: 120px 1fr 360px 200px; gap: 32px; align-items: baseline; padding: 24px 0; border-top: 1px solid var(--rule); }
+.index .row .n { font-family: var(--font-display); font-size: 32px; color: var(--accent-2); }
+.index .row h3 { font-size: 40px; }
+.index .row p { font-size: 22px; color: var(--ink-3); }
+.index .row .yr { text-align: right; font-size: 22px; color: var(--ink-3); }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; }
+.closing .lines { display: flex; gap: 64px; margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--rule); }
+.closing .lines p { font-size: 22px; letter-spacing: 0.04em; }
+
+/* ===========================================
+   MASTER LAYER - a page number only, kept small
+   =========================================== */
+.deck-footer {
+    position: absolute; right: var(--pad-x); top: 40px; z-index: 5;
+    font-family: var(--font); font-size: 17px; font-weight: 500; letter-spacing: 0.2em; color: var(--ink-3);
+}
+.deck-footer b { font-weight: 500; color: var(--ink); }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="plate"></div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:0; top:0; width:1920px; height:1080px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:28px; text-align:center">Double-click to choose the cover picture</div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Selected work · 2024 to 2026</div>
+        <h1 class="reveal" style="--i:1" data-edit>Light, <em>mostly</em></h1>
+        <div class="credit reveal" style="--i:2">
+            <p class="caption" data-edit><b>Your Name</b><br>Photographer, Lisbon</p>
+        </div>
+    </div>
+    <aside class="notes" hidden>Let the cover picture sit. Say your name and the period the work covers.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Statement
+     ====================================================== -->
+<section class="slide statement" data-name="statement">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>About the work</div>
+        <h2 class="reveal" style="--i:1" data-edit>Two years of looking at the same street at different hours.</h2>
+        <p class="reveal" style="--i:2" data-edit>Every picture in this set was made within a hundred metres of the front door. The subject is the light; the street is only where it lands.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Full bleed
+     ====================================================== -->
+<section class="slide full" data-name="plate-1" data-section="Morning">
+    <div class="plate"></div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:0; top:0; width:1920px; height:984px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:28px; text-align:center">Double-click to choose a picture</div>
+    <div class="capbar reveal" style="--i:0">
+        <span class="caption" data-edit><b>Seven, March.</b> The first light on the tiles opposite.</span>
+        <span class="n" data-edit>01</span>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Grid
+     ====================================================== -->
+<section class="slide gallery" data-name="grid">
+    <div class="grid">
+        <div class="plate reveal-img" style="--i:0"></div>
+        <div class="plate reveal-img" style="--i:1"></div>
+        <div class="plate reveal-img" style="--i:2"></div>
+        <div class="plate reveal-img" style="--i:3"></div>
+        <div class="plate reveal-img" style="--i:4"></div>
+        <div class="plate reveal-img" style="--i:5"></div>
+    </div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:0; top:0; width:634px; height:488px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:24px; text-align:center">Picture</div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:643px; top:0; width:634px; height:488px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:24px; text-align:center">Picture</div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:1286px; top:0; width:634px; height:488px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:24px; text-align:center">Picture</div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:0; top:496px; width:634px; height:488px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:24px; text-align:center">Picture</div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:643px; top:496px; width:634px; height:488px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:24px; text-align:center">Picture</div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:1286px; top:496px; width:634px; height:488px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:24px; text-align:center">Picture</div>
+    <div class="capbar reveal" style="--i:6">
+        <span class="caption" data-edit><b>Contact sheet.</b> Six frames from the same morning, in order.</span>
+        <span class="n" data-edit>02 to 07</span>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Picture and text
+     ====================================================== -->
+<section class="slide pair" data-name="pair" data-section="Noon">
+    <div class="plate reveal-img" style="--i:0"></div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:0; top:0; width:1240px; height:1080px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:28px; text-align:center">Double-click to choose a picture</div>
+    <div class="text">
+        <div class="eyebrow reveal" style="--i:1" data-edit>Plate 08</div>
+        <h3 class="reveal" style="--i:2" data-edit>Noon, <em>no shadows</em></h3>
+        <div class="rule reveal" style="--i:3"></div>
+        <p class="reveal" style="--i:4" data-edit>The hardest hour. Everything flat, everything the same weight. The only picture from this hour I kept is the one where the light did nothing at all.</p>
+        <p class="caption reveal" style="--i:5; margin-top:28px" data-edit>35 mm, f/8, 1/500 s</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Before and after
+     ====================================================== -->
+<section class="slide before" data-name="before-after">
+    <div class="plate l reveal-img" style="--i:0"></div>
+    <div class="plate r reveal-img" style="--i:1"></div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:0; top:0; width:956px; height:984px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:28px; text-align:center">Before</div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:964px; top:0; width:956px; height:984px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:28px; text-align:center">After</div>
+    <div class="tag reveal" style="--i:2; left:40px" data-edit>Before</div>
+    <div class="tag reveal" style="--i:3; left:1004px" data-edit>After</div>
+    <div class="capbar reveal" style="--i:4">
+        <span class="caption" data-edit><b>The same doorway,</b> March and September. Nothing moved but the sun.</span>
+        <span class="n" data-edit>09</span>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Triptych
+     ====================================================== -->
+<section class="slide triptych" data-name="triptych" data-section="Evening">
+    <div class="plates">
+        <div class="plate reveal-img" style="--i:0"></div>
+        <div class="plate reveal-img" style="--i:1"></div>
+        <div class="plate reveal-img" style="--i:2"></div>
+    </div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:0; top:0; width:634px; height:984px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:24px; text-align:center">Picture</div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:643px; top:0; width:634px; height:984px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:24px; text-align:center">Picture</div>
+    <div data-placeholder="image" style="display:none; position:absolute; left:1286px; top:0; width:634px; height:984px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:24px; text-align:center">Picture</div>
+    <div class="capbar reveal" style="--i:3">
+        <span class="caption" data-edit><b>Three portraits,</b> the neighbours who asked what I was doing.</span>
+        <span class="n" data-edit>10 to 12</span>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Quote
+     ====================================================== -->
+<section class="slide quote" data-name="quote">
+    <div class="content">
+        <blockquote class="reveal" style="--i:0" data-edit>"You don't take a photograph, you make it."</blockquote>
+        <p class="who caption reveal" style="--i:1" data-edit>Ansel Adams</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Index
+     ====================================================== -->
+<section class="slide index" data-name="index" data-section="Index">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Index of plates</div>
+        <h2 class="reveal" style="--i:1" data-edit>Twelve pictures</h2>
+        <div class="rows">
+            <div class="row reveal" style="--i:2"><span class="n">01</span><h3 data-edit>First light</h3><p data-edit>Silver gelatin, 40 x 50 cm</p><span class="yr">2024</span></div>
+            <div class="row reveal" style="--i:3"><span class="n">02 to 07</span><h3 data-edit>Contact sheet, March</h3><p data-edit>Pigment print, 30 x 40 cm</p><span class="yr">2024</span></div>
+            <div class="row reveal" style="--i:4"><span class="n">08</span><h3 data-edit>Noon, no shadows</h3><p data-edit>Pigment print, 60 x 90 cm</p><span class="yr">2025</span></div>
+            <div class="row reveal" style="--i:5"><span class="n">09</span><h3 data-edit>The doorway, twice</h3><p data-edit>Diptych, 40 x 50 cm each</p><span class="yr">2025</span></div>
+            <div class="row reveal" style="--i:6"><span class="n">10 to 12</span><h3 data-edit>Neighbours</h3><p data-edit>Silver gelatin, 50 x 60 cm</p><span class="yr">2026</span></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 10 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing" data-no-master>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Thank you</div>
+        <h1 class="reveal" style="--i:1" data-edit>Prints and <em>enquiries</em></h1>
+        <div class="lines">
+            <p class="reveal" style="--i:2" data-edit>studio@example.com</p>
+            <p class="reveal" style="--i:3" data-edit>example.com</p>
+            <p class="reveal" style="--i:4" data-edit>@yourname</p>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: a small page number, edited once in the editor -->
+<div class="deck-footer"><b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

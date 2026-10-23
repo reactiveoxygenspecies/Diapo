@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120">
+  <rect x="10" y="10" width="80" height="100" fill="#2f6fed"/>
+  <circle cx="150" cy="60" r="45" fill="#e8503f"/>
+  <text x="150" y="10" font-family="Arial" font-size="12" fill="#1c1c1f" text-anchor="middle"><tspan x="150" dy="0">Box</tspan><tspan x="150" dy="1.2em">label</tspan></text>
+</svg>

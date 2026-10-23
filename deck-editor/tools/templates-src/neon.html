@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon</title>
+<!-- Neon: sleek cyber dark. Magenta and cyan on near-black, glow lines and outlined panels, a perspective grid
+     on the cover, mono captions. Chakra Petch headlines, Barlow body, Share Tech Mono labels.
+     Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Chakra+Petch:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #f4f2ff;   /* headings, key text        */
+    --ink-2:    #b8b5cc;   /* body text                 */
+    --ink-3:    #6f6c88;   /* captions, secondary       */
+    --rule:     #2a2640;   /* borders                   */
+    --paper:    #0b0a14;   /* near-black                */
+    --paper-2:  #14122a;   /* panels                    */
+    --accent:   #ff2bd6;   /* magenta                   */
+    --accent-2: #21e6ff;   /* cyan                      */
+    --accent-3: #b3ff3b;   /* lime, third series        */
+
+    --stage-bg: #040308;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #0b0a14;
+    --font: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    --font-display: 'Chakra Petch', 'Barlow', Arial, sans-serif;
+    --font-mono: 'Share Tech Mono', Consolas, monospace;
+
+    --pad-x: 120px;        /* layout rhythm at 1920x1080 */
+    --pad-top: 96px;
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);  /* motion: the reveal's curve   */
+    --dur: 0.5s;                                 /* ... its duration             */
+    --stagger: 0.07s;                            /* ... the step between --i's   */
+    --reveal-y: 20px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-display); font-size: 140px; font-weight: 700; line-height: 0.96; letter-spacing: -0.01em; text-transform: uppercase; color: var(--ink); }
+h2 { font-family: var(--font-display); font-size: 84px; font-weight: 700; line-height: 1.02; text-transform: uppercase; color: var(--ink); }
+h3 { font-family: var(--font-display); font-size: 34px; font-weight: 600; line-height: 1.2; text-transform: uppercase; letter-spacing: 0.02em; color: var(--ink); }
+p  { font-size: 30px; line-height: 1.5; color: var(--ink-2); }
+ul, ol { font-size: 30px; line-height: 1.5; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 14px; }
+blockquote { font-family: var(--font-display); font-size: 72px; font-weight: 600; line-height: 1.08; text-transform: uppercase; color: var(--ink); }
+.eyebrow { font-family: var(--font-mono); font-size: 22px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent-2); margin-bottom: 26px; text-shadow: 0 0 12px rgba(33,230,255,0.6); }
+.sub { font-size: 36px; line-height: 1.35; color: var(--ink-3); margin-top: 28px; }
+.caption { font-family: var(--font-mono); font-size: 20px; line-height: 1.5; letter-spacing: 0.06em; color: var(--ink-3); }
+.mag { color: var(--accent); text-shadow: 0 0 20px rgba(255,43,214,0.7); }
+.cyan { color: var(--accent-2); text-shadow: 0 0 20px rgba(33,230,255,0.7); }
+h1 mark, h2 mark { background: none; color: var(--accent); text-shadow: 0 0 28px rgba(255,43,214,0.7); }
+
+/* ===========================================
+   LAYOUT - outlined panels with a glow edge
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: var(--pad-top); }
+.panel { background: rgba(20,18,42,0.7); border: 1px solid var(--rule); padding: 40px 44px 44px; position: relative; }
+.panel::before { content: ''; position: absolute; left: -1px; top: -1px; width: 60px; height: 3px; background: var(--accent-2); box-shadow: 0 0 12px var(--accent-2); }
+.panel.mag::before { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+.panel h3 { margin-bottom: 14px; }
+.panel p { font-size: 25px; }
+.glow-line { height: 2px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); box-shadow: 0 0 18px rgba(255,43,214,0.6); }
+.tag { font-family: var(--font-mono); font-size: 18px; letter-spacing: 0.14em; text-transform: uppercase; padding: 8px 14px; border: 1px solid var(--accent-2); color: var(--accent-2); display: inline-block; }
+
+/* Cover: perspective grid floor */
+.cover .floor { position: absolute; left: 0; top: 620px; width: 1920px; height: 460px; pointer-events: none; overflow: hidden;
+    background-image: linear-gradient(rgba(33,230,255,0.35) 2px, transparent 2px), linear-gradient(90deg, rgba(255,43,214,0.35) 2px, transparent 2px);
+    background-size: 100% 60px, 120px 100%; transform: perspective(600px) rotateX(58deg); transform-origin: 50% 0; }
+.cover .haze { position: absolute; left: 0; top: 560px; width: 1920px; height: 200px; background: linear-gradient(180deg, var(--paper), transparent); pointer-events: none; }
+.cover .content { display: flex; flex-direction: column; justify-content: flex-start; padding-top: 60px; }
+.cover h1 { max-width: 1500px; }
+.cover .tags { display: flex; gap: 16px; margin-top: 44px; }
+
+/* Agenda */
+.agenda .rows { margin-top: 52px; }
+.agenda .row { display: grid; grid-template-columns: 140px 1fr auto; align-items: center; gap: 32px; padding: 22px 0; border-bottom: 1px solid var(--rule); }
+.agenda .row .n { font-family: var(--font-mono); font-size: 32px; color: var(--accent); text-shadow: 0 0 14px rgba(255,43,214,0.6); }
+.agenda .row h3 { font-size: 40px; }
+
+/* Section */
+.section .content { display: flex; flex-direction: column; justify-content: center; }
+.section .n { font-family: var(--font-mono); font-size: 28px; letter-spacing: 0.3em; color: var(--accent-2); margin-bottom: 24px; }
+.section h2 { font-size: 160px; max-width: 1500px; }
+.section .glow-line { width: 600px; margin-top: 40px; }
+
+/* Cards */
+.cards .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 56px; }
+.cards .panel .n { font-family: var(--font-mono); font-size: 22px; color: var(--accent-2); margin-bottom: 28px; }
+
+/* Picture */
+.picture .frame { position: absolute; left: 0; top: 0; width: 1040px; height: 860px; background: var(--paper-2); border: 1px solid var(--rule); box-shadow: 0 0 40px rgba(33,230,255,0.15), inset 0 0 0 1px rgba(33,230,255,0.15); }
+.picture .frame .corner { position: absolute; width: 40px; height: 40px; border: 3px solid var(--accent-2); box-shadow: 0 0 10px var(--accent-2); }
+.picture .frame .corner.tl { left: -2px; top: -2px; border-right: 0; border-bottom: 0; }
+.picture .frame .corner.br { right: -2px; bottom: -2px; border-left: 0; border-top: 0; }
+.picture .text { position: absolute; left: 1140px; top: 60px; width: 620px; }
+.picture .text p { margin-top: 32px; }
+
+/* Big number */
+.number .content { display: flex; flex-direction: column; justify-content: center; }
+.number .big { font-family: var(--font-display); font-size: 400px; font-weight: 700; line-height: 0.9; letter-spacing: -0.03em; color: var(--accent-2); text-shadow: 0 0 40px rgba(33,230,255,0.6), 0 0 120px rgba(33,230,255,0.3); }
+.number h2 { margin-top: 30px; font-size: 64px; }
+.number p { margin-top: 20px; max-width: 1100px; }
+
+/* Stats bars */
+.stats .rows { margin-top: 52px; }
+.stats .row { display: grid; grid-template-columns: 320px 1fr 160px; align-items: center; gap: 32px; margin-bottom: 30px; }
+.stats .row .lbl { font-family: var(--font-display); font-size: 30px; text-transform: uppercase; color: var(--ink); }
+.stats .row .bar { height: 26px; background: var(--paper-2); border: 1px solid var(--rule); position: relative; }
+.stats .row .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); box-shadow: 0 0 16px rgba(33,230,255,0.6); }
+.stats .row .v { font-family: var(--font-mono); font-size: 28px; color: var(--accent-2); text-align: right; }
+
+/* Quote */
+.quote .content { display: flex; flex-direction: column; justify-content: center; }
+.quote blockquote { max-width: 1500px; padding-left: 48px; border-left: 3px solid var(--accent); box-shadow: -8px 0 30px -10px rgba(255,43,214,0.7); }
+.quote .who { margin: 32px 0 0 51px; }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; }
+.closing .tags { display: flex; gap: 16px; margin-top: 48px; }
+
+/* ===========================================
+   DECOR - glows and scan lines; texture never catches a click
+   =========================================== */
+.orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.45; pointer-events: none; }
+.scan { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(180deg, transparent 0 4px, rgba(0,0,0,0.18) 4px 5px); }
+
+/* ===========================================
+   MASTER LAYER - a mono status line with a glow rule
+   =========================================== */
+.deck-footer {
+    position: absolute; left: var(--pad-x); right: var(--pad-x); bottom: 40px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid var(--rule);
+    font-family: var(--font-mono); font-size: 18px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3);
+}
+.deck-footer .num b { color: var(--accent-2); font-weight: 400; text-shadow: 0 0 10px rgba(33,230,255,0.6); }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="orb" style="left:1100px; top:-200px; width:900px; height:700px; background:var(--accent)"></div>
+    <div class="orb" style="left:-300px; top:300px; width:800px; height:600px; background:var(--accent-2)"></div>
+    <div class="floor"></div>
+    <div class="haze"></div>
+    <div class="scan"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>// system online · 2026.09.17</div>
+        <h1 class="reveal" style="--i:1" data-edit>Night <mark>shift</mark></h1>
+        <p class="sub reveal" style="--i:2; max-width:900px" data-edit>A launch deck for the platform that never sleeps</p>
+        <div class="tags reveal" style="--i:3">
+            <span class="tag" data-edit>Your Name</span>
+            <span class="tag" style="border-color:var(--accent); color:var(--accent)" data-edit>v2.0</span>
+        </div>
+    </div>
+    <aside class="notes" hidden>Let the grid load. Then the title.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Agenda
+     ====================================================== -->
+<section class="slide agenda" data-name="agenda">
+    <div class="orb" style="left:1300px; top:200px; width:700px; height:700px; background:var(--accent-2)"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>// index</div>
+        <h2 class="reveal" style="--i:1" data-edit>Four sectors</h2>
+        <div class="rows">
+            <div class="row reveal" style="--i:2"><span class="n">01</span><h3 data-edit>The signal</h3><span class="caption" data-edit>Why now</span></div>
+            <div class="row reveal" style="--i:3"><span class="n">02</span><h3 data-edit>The system</h3><span class="caption" data-edit>What we built</span></div>
+            <div class="row reveal" style="--i:4"><span class="n">03</span><h3 data-edit>The numbers</h3><span class="caption" data-edit>Measured</span></div>
+            <div class="row reveal" style="--i:5"><span class="n">04</span><h3 data-edit>The drop</h3><span class="caption" data-edit>When</span></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Section
+     ====================================================== -->
+<section class="slide section" data-name="section" data-section="The signal">
+    <div class="orb" style="left:800px; top:100px; width:1000px; height:800px; background:var(--accent)"></div>
+    <div class="scan"></div>
+    <div class="content">
+        <div class="n reveal" style="--i:0" data-edit>SECTOR 01</div>
+        <h2 class="reveal" style="--i:1" data-edit>The <span class="cyan">signal</span></h2>
+        <div class="glow-line reveal" style="--i:2"></div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Cards
+     ====================================================== -->
+<section class="slide cards" data-name="system" data-section="The system">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>// sector 02</div>
+        <h2 class="reveal" style="--i:1" data-edit>Three modules</h2>
+        <div class="grid">
+            <div class="panel reveal" style="--i:2"><div class="n">MOD-01</div><h3 data-edit>Ingest</h3><p data-edit>Every event, from every source, in under a second.</p></div>
+            <div class="panel mag reveal" style="--i:3"><div class="n">MOD-02</div><h3 data-edit>Core</h3><p data-edit>One graph of everything, queried in real time.</p></div>
+            <div class="panel reveal" style="--i:4"><div class="n">MOD-03</div><h3 data-edit>Relay</h3><p data-edit>Pushes what matters to the people on shift.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Picture
+     ====================================================== -->
+<section class="slide picture" data-name="picture">
+    <div class="orb" style="left:-200px; top:200px; width:700px; height:700px; background:var(--accent-2)"></div>
+    <div class="content">
+        <div class="frame reveal-img" style="--i:0"><i class="corner tl"></i><i class="corner br"></i></div>
+        <div data-placeholder="image" style="display:none; position:absolute; left:0; top:0; width:1040px; height:860px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font-mono); font-size:24px; text-align:center">[ screenshot ]</div>
+        <div class="text">
+            <div class="eyebrow reveal" style="--i:1" data-edit>// core</div>
+            <h2 class="reveal" style="--i:2; font-size:64px" data-edit>The graph, live</h2>
+            <p class="reveal" style="--i:3" data-edit>The frame takes a screenshot: double-click it in the editor. Dark interfaces with a little colour sit best here.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Big number
+     ====================================================== -->
+<section class="slide number" data-name="number" data-section="The numbers">
+    <div class="orb" style="left:1000px; top:0; width:900px; height:900px; background:var(--accent-2)"></div>
+    <div class="content">
+        <div class="big reveal" style="--i:0" data-edit>0.4s</div>
+        <h2 class="reveal" style="--i:1" data-edit>from event to alert</h2>
+        <p class="reveal" style="--i:2" data-edit>Measured end to end across the busiest hour of the busiest night of the year.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Stats
+     ====================================================== -->
+<section class="slide stats" data-name="stats">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>// benchmark</div>
+        <h2 class="reveal" style="--i:1" data-edit>Load test, last night</h2>
+        <div class="rows">
+            <div class="row reveal" style="--i:2"><span class="lbl" data-edit>Throughput</span><div class="bar"><i style="width:92%"></i></div><span class="v">920k/s</span></div>
+            <div class="row reveal" style="--i:3"><span class="lbl" data-edit>P99 latency</span><div class="bar"><i style="width:31%"></i></div><span class="v">310ms</span></div>
+            <div class="row reveal" style="--i:4"><span class="lbl" data-edit>Error rate</span><div class="bar"><i style="width:4%"></i></div><span class="v">0.04%</span></div>
+            <div class="row reveal" style="--i:5"><span class="lbl" data-edit>Uptime</span><div class="bar"><i style="width:99.9%"></i></div><span class="v">99.99%</span></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Quote
+     ====================================================== -->
+<section class="slide quote" data-name="quote">
+    <div class="orb" style="left:1200px; top:300px; width:700px; height:700px; background:var(--accent)"></div>
+    <div class="scan"></div>
+    <div class="content">
+        <blockquote class="reveal" style="--i:0" data-edit>"The night crew stopped watching dashboards. The dashboards watch them now."</blockquote>
+        <p class="who caption reveal" style="--i:1" data-edit>Operations lead, pilot customer</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing" data-section="The drop" data-no-master>
+    <div class="orb" style="left:1100px; top:-200px; width:900px; height:700px; background:var(--accent)"></div>
+    <div class="orb" style="left:-300px; top:300px; width:800px; height:600px; background:var(--accent-2)"></div>
+    <div class="scan"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>// sector 04 · the drop</div>
+        <h1 class="reveal" style="--i:1" data-edit>Live <mark>tonight</mark></h1>
+        <p class="sub reveal" style="--i:2" data-edit>Rolling out to every region from midnight.</p>
+        <div class="tags reveal" style="--i:3">
+            <span class="tag" data-edit>example.com/night</span>
+            <span class="tag" style="border-color:var(--accent); color:var(--accent)" data-edit>@example</span>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: shown on every slide, edited once in the editor -->
+<div class="deck-footer">
+    <span data-edit>night shift · launch deck</span>
+    <span class="num"><b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

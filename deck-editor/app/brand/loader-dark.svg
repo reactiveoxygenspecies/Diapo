@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Loading">
+  <!-- Diapo loader, dark: charcoal mount, rimmed white window. Same motion as loader.svg ("Orient" B); keep the two in step. -->
+  <style>
+    .turn { transform-box: view-box; transform-origin: 50px 50px; animation: turn 2.6s cubic-bezier(.7, 0, .2, 1.3) infinite; }
+    .breathe { opacity: 0; }
+    @keyframes turn {
+      0% { transform: rotate(0); }
+      10%, 18% { transform: rotate(90deg); }
+      28%, 36% { transform: rotate(180deg); }
+      46%, 54% { transform: rotate(270deg); }
+      64%, 100% { transform: rotate(360deg); }
+    }
+    @keyframes breathe { 0%, 100% { opacity: 0; } 50% { opacity: .28; } }
+    @media (prefers-reduced-motion: reduce) {
+      .turn { animation: none; }
+      .breathe { animation: breathe 2.4s ease-in-out infinite; }
+    }
+  </style>
+  <g class="turn">
+    <rect x="2" y="2" width="96" height="96" rx="7" fill="#2A2A30"/>
+    <rect x="14" y="26" width="72" height="48" rx="1.5" fill="#F7F5EF"/>
+    <rect x="14.6" y="26.6" width="70.8" height="46.8" rx="1" fill="none" stroke="#5A5A64" stroke-width="1.2"/>
+    <rect class="breathe" x="14" y="26" width="72" height="48" rx="1.5" fill="#141418"/>
+    <circle cx="8" cy="92" r="2.6" fill="#9A9AA0"/>
+  </g>
+</svg>

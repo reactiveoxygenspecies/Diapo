@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boardroom</title>
+<!-- Boardroom: a business deck in deep navy and white with one amber accent. DM Serif Display headlines,
+     DM Sans body, KPI tiles, a CSS bar chart, a comparison table. Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #0f1f3d;   /* navy: headings, key text  */
+    --ink-2:    #3c4658;   /* body text                 */
+    --ink-3:    #7c8596;   /* captions, secondary       */
+    --rule:     #dde2ea;   /* hairlines, borders        */
+    --paper:    #ffffff;   /* slide background          */
+    --paper-2:  #f2f4f8;   /* panels, tiles             */
+    --accent:   #e0a11b;   /* amber                     */
+    --accent-2: #2f6fb5;   /* steel blue, second series */
+    --navy:     #0f1f3d;   /* the dark slide background */
+    --navy-2:   #16294d;   /* panels on navy            */
+
+    --stage-bg: #070f1f;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #ffffff;
+    --font: 'DM Sans', 'Helvetica Neue', Arial, sans-serif;
+    --font-display: 'DM Serif Display', Georgia, serif;
+
+    --pad-x: 110px;        /* layout rhythm at 1920x1080 */
+    --pad-top: 90px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* motion: the reveal's curve   */
+    --dur: 0.6s;                                 /* ... its duration             */
+    --stagger: 0.1s;                             /* ... the step between --i's   */
+    --reveal-y: 24px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-display); font-size: 120px; font-weight: 400; line-height: 1.02; letter-spacing: -0.015em; color: var(--ink); }
+h2 { font-family: var(--font-display); font-size: 72px; font-weight: 400; line-height: 1.08; letter-spacing: -0.01em; color: var(--ink); }
+h3 { font-size: 36px; font-weight: 600; line-height: 1.2; color: var(--ink); }
+p  { font-size: 30px; line-height: 1.5; color: var(--ink-2); }
+ul, ol { font-size: 30px; line-height: 1.5; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 14px; }
+blockquote { font-family: var(--font-display); font-size: 64px; line-height: 1.25; color: var(--ink); }
+.eyebrow { font-size: 20px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 24px; }
+.sub { font-size: 36px; line-height: 1.35; color: var(--ink-3); margin-top: 28px; }
+.caption { font-size: 22px; line-height: 1.4; color: var(--ink-3); }
+.lead { font-size: 34px; line-height: 1.45; color: var(--ink); }
+
+/* ===========================================
+   LAYOUT
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: var(--pad-top); }
+.slide .head { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 28px; border-bottom: 1px solid var(--rule); margin-bottom: 48px; }
+.slide .head h2 { font-size: 60px; }
+.slide .head .caption { font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; padding-bottom: 12px; }
+.bar { width: 96px; height: 8px; background: var(--accent); border-radius: 4px; }
+
+/* Dark slides */
+.slide.dark { background: var(--navy); color: #ffffff; }
+.slide.dark h1, .slide.dark h2, .slide.dark h3, .slide.dark blockquote { color: #ffffff; }
+.slide.dark p, .slide.dark li { color: rgba(255,255,255,0.78); }
+.slide.dark .sub { color: rgba(255,255,255,0.6); }
+.slide.dark .head { border-bottom-color: rgba(255,255,255,0.18); }
+.slide.dark .caption { color: rgba(255,255,255,0.55); }
+
+/* Cover */
+.cover .content { display: flex; flex-direction: column; justify-content: center; }
+.cover h1 { max-width: 1300px; margin-top: 36px; }
+.cover .meta { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 80px; padding-top: 28px; border-top: 1px solid rgba(255,255,255,0.18); }
+.cover .meta p { font-size: 22px; letter-spacing: 0.06em; }
+.cover .meta b { display: block; color: #ffffff; font-weight: 600; margin-bottom: 4px; }
+.cover .glow { position: absolute; width: 1100px; height: 1100px; border-radius: 50%; background: radial-gradient(closest-side, rgba(224,161,27,0.22), rgba(224,161,27,0)); }
+
+/* Agenda: numbered cards */
+.agenda .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; }
+.card { background: var(--paper-2); border-radius: 16px; padding: 40px 40px 44px; }
+.card .n { font-family: var(--font-display); font-size: 64px; line-height: 1; color: var(--accent); margin-bottom: 28px; }
+.card h3 { margin-bottom: 14px; }
+.card p { font-size: 25px; line-height: 1.45; }
+
+/* Section divider */
+.section .band { position: absolute; left: 0; top: 0; width: 560px; height: 1080px; background: var(--navy-2); }
+.section .big-n { position: absolute; left: 110px; top: 380px; font-family: var(--font-display); font-size: 300px; line-height: 1; color: var(--accent); }
+.section .text { position: absolute; left: 680px; top: 400px; width: 1100px; }
+.section .text h2 { font-size: 96px; }
+.section .text .bar { margin: 40px 0 32px; }
+
+/* Message + bullets */
+.message .cols { display: grid; grid-template-columns: 720px 1fr; gap: 96px; }
+.message .lead { padding-left: 32px; border-left: 8px solid var(--accent); }
+.message ul { list-style: none; padding: 0; }
+.message li { position: relative; padding-left: 44px; }
+.message li::before { content: ''; position: absolute; left: 0; top: 18px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); }
+
+/* KPI tiles */
+.kpis .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; }
+.tile { background: var(--paper-2); border-radius: 16px; padding: 40px 40px 36px; border-top: 6px solid var(--ink); }
+.tile.up { border-top-color: var(--accent); }
+.tile .label { font-size: 20px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+.tile .value { font-family: var(--font-display); font-size: 112px; line-height: 1.05; color: var(--ink); margin: 18px 0 10px; }
+.tile .delta { font-size: 24px; font-weight: 600; color: var(--accent-2); }
+.tile.up .delta { color: var(--accent); }
+.kpis .lead { margin-top: 56px; max-width: 1400px; }
+
+/* CSS bar chart: real elements, no script, so it edits and prints */
+.chart .plot { position: absolute; left: 0; top: 200px; width: 1100px; height: 640px; border-left: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.chart .bars { position: absolute; left: 40px; bottom: 0; display: flex; align-items: flex-end; gap: 60px; height: 100%; }
+.chart .col { width: 110px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+.chart .col .v { font-size: 24px; font-weight: 600; color: var(--ink); margin-bottom: 10px; }
+.chart .col .b { width: 100%; background: var(--accent-2); border-radius: 6px 6px 0 0; }
+.chart .col.hi .b { background: var(--accent); }
+.chart .col .x { font-size: 22px; color: var(--ink-3); margin-top: 16px; position: absolute; bottom: -44px; }
+.chart .col { position: relative; }
+.chart .side { position: absolute; left: 1220px; top: 200px; width: 500px; }
+.chart .side p { font-size: 27px; margin-bottom: 24px; }
+.chart .legend { display: flex; gap: 28px; margin-bottom: 36px; }
+.chart .legend span { display: flex; align-items: center; gap: 12px; font-size: 22px; color: var(--ink-3); }
+.chart .legend i { width: 20px; height: 20px; border-radius: 4px; background: var(--accent-2); }
+.chart .legend i.hi { background: var(--accent); }
+
+/* Comparison table */
+.compare table { width: 100%; border-collapse: collapse; font-size: 27px; }
+.compare th { text-align: left; font-size: 20px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); padding: 0 24px 18px; border-bottom: 2px solid var(--ink); }
+.compare td { padding: 24px; border-bottom: 1px solid var(--rule); color: var(--ink-2); vertical-align: top; }
+.compare td:first-child { font-weight: 600; color: var(--ink); }
+.compare th.pick, .compare td.pick { background: var(--paper-2); }
+.compare th.pick { color: var(--accent); }
+.compare .yes { color: var(--accent); font-weight: 600; }
+.compare .no { color: var(--ink-3); }
+
+/* Two columns of cards */
+.pair .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+.pair .col-card { background: var(--paper-2); border-radius: 16px; padding: 44px; }
+.pair .col-card h3 { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+.pair .col-card h3 i { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); }
+.pair .col-card.alt h3 i { background: var(--accent-2); }
+.pair ul { padding-left: 32px; }
+.pair li { font-size: 27px; margin-bottom: 12px; }
+
+/* Quote */
+.quote .content { display: flex; flex-direction: column; justify-content: center; }
+.quote blockquote { max-width: 1440px; }
+.quote .who { margin-top: 44px; display: flex; align-items: center; gap: 24px; }
+.quote .who .bar { width: 48px; height: 4px; }
+.quote .who p { font-size: 26px; letter-spacing: 0.04em; }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; }
+.closing h1 { max-width: 1300px; }
+.closing .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 64px; }
+.closing .steps .card { background: var(--navy-2); }
+.closing .steps .card h3 { color: #ffffff; font-size: 30px; }
+.closing .steps .card p { color: rgba(255,255,255,0.7); }
+
+/* ===========================================
+   MASTER LAYER - the running footer (a stage child outside the slides)
+   =========================================== */
+.deck-footer {
+    position: absolute; left: var(--pad-x); right: var(--pad-x); bottom: 36px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font); font-size: 18px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3);
+}
+.deck-footer .brand { display: flex; align-items: center; gap: 14px; }
+.deck-footer .brand i { width: 12px; height: 12px; background: var(--accent); border-radius: 2px; }
+.deck-footer .num { font-variant-numeric: tabular-nums; }
+.deck-footer b { font-weight: 600; color: var(--ink); }
+.deck-stage:has(> .slide.active.dark) > .deck-footer { color: rgba(255,255,255,0.55); }
+.deck-stage:has(> .slide.active.dark) > .deck-footer b { color: #ffffff; }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover dark active" data-name="cover" data-no-master>
+    <div class="glow" style="left:1100px; top:-300px"></div>
+    <div class="content">
+        <div class="bar reveal" style="--i:0"></div>
+        <h1 class="reveal" style="--i:1" data-edit>Quarterly business review</h1>
+        <p class="sub reveal" style="--i:2" data-edit>Results, outlook and the decisions we need this quarter</p>
+        <div class="meta">
+            <p class="reveal" style="--i:3" data-edit><b>Presented by</b>Your Name, Head of Operations</p>
+            <p class="reveal" style="--i:4" data-edit><b>Date</b>17 September 2026</p>
+            <p class="reveal" style="--i:5" data-edit><b>Audience</b>Executive committee</p>
+        </div>
+    </div>
+    <aside class="notes" hidden>Thirty seconds on why we are here and what we need from the room by the end.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Agenda
+     ====================================================== -->
+<section class="slide agenda" data-name="agenda">
+    <div class="content">
+        <div class="head reveal" style="--i:0">
+            <h2 data-edit>Agenda</h2>
+            <span class="caption" data-edit>45 minutes</span>
+        </div>
+        <div class="cards">
+            <div class="card reveal" style="--i:1"><div class="n">01</div><h3 data-edit>Results</h3><p data-edit>Where the quarter landed against plan.</p></div>
+            <div class="card reveal" style="--i:2"><div class="n">02</div><h3 data-edit>Drivers</h3><p data-edit>What moved the numbers, up and down.</p></div>
+            <div class="card reveal" style="--i:3"><div class="n">03</div><h3 data-edit>Options</h3><p data-edit>Three paths for next quarter, compared.</p></div>
+            <div class="card reveal" style="--i:4"><div class="n">04</div><h3 data-edit>Decisions</h3><p data-edit>What we are asking the committee to approve.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Section divider
+     ====================================================== -->
+<section class="slide section dark" data-name="section" data-section="Results">
+    <div class="band"></div>
+    <div class="big-n reveal" style="--i:0" data-edit>01</div>
+    <div class="text">
+        <div class="eyebrow reveal" style="--i:1" data-edit>Section one</div>
+        <h2 class="reveal" style="--i:2" data-edit>Results</h2>
+        <div class="bar reveal" style="--i:3"></div>
+        <p class="reveal" style="--i:4" data-edit>The quarter in four numbers, then the story behind each.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - KPI tiles
+     ====================================================== -->
+<section class="slide kpis" data-name="kpis">
+    <div class="content">
+        <div class="head reveal" style="--i:0">
+            <h2 data-edit>The quarter at a glance</h2>
+            <span class="caption" data-edit>Q3 2026 vs Q2</span>
+        </div>
+        <div class="tiles">
+            <div class="tile up reveal" style="--i:1"><div class="label" data-edit>Revenue</div><div class="value" data-edit>$4.8M</div><div class="delta" data-edit>+12% quarter on quarter</div></div>
+            <div class="tile reveal" style="--i:2"><div class="label" data-edit>Gross margin</div><div class="value" data-edit>61%</div><div class="delta" data-edit>+2 points</div></div>
+            <div class="tile reveal" style="--i:3"><div class="label" data-edit>Customers</div><div class="value" data-edit>312</div><div class="delta" data-edit>+28 net new</div></div>
+            <div class="tile up reveal" style="--i:4"><div class="label" data-edit>Retention</div><div class="value" data-edit>96%</div><div class="delta" data-edit>Best quarter to date</div></div>
+        </div>
+        <p class="lead reveal" style="--i:5" data-edit>Growth came from existing accounts expanding, not from new logos: the sales motion we planned for is not yet the one that is working.</p>
+    </div>
+    <aside class="notes" hidden>Lead with retention; it is the number the committee asked about last time.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Message and bullets
+     ====================================================== -->
+<section class="slide message" data-name="drivers" data-section="Drivers">
+    <div class="content">
+        <div class="head reveal" style="--i:0">
+            <h2 data-edit>What moved the numbers</h2>
+            <span class="caption" data-edit>Drivers</span>
+        </div>
+        <div class="cols">
+            <p class="lead reveal" style="--i:1" data-edit>Three things explain most of the change, and only one of them was planned.</p>
+            <ul>
+                <li class="reveal" style="--i:2" data-edit><b>Expansion in the top twenty accounts</b>: the account team's new cadence paid off earlier than expected.</li>
+                <li class="reveal" style="--i:3" data-edit><b>A slower new-business pipeline</b>: two enterprise deals slipped into next quarter.</li>
+                <li class="reveal" style="--i:4" data-edit><b>Lower delivery cost</b>: the platform work from Q1 removed most manual onboarding.</li>
+                <li class="reveal" style="--i:5" data-fragment data-edit><b>One risk to watch</b>: support load grew faster than the customer count.</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Chart
+     ====================================================== -->
+<section class="slide chart" data-name="chart">
+    <div class="content">
+        <div class="head reveal" style="--i:0">
+            <h2 data-edit>Revenue by quarter</h2>
+            <span class="caption" data-edit>USD, millions</span>
+        </div>
+        <div class="plot reveal-img" style="--i:1" data-group>
+            <div class="bars">
+                <div class="col"><div class="v">2.9</div><div class="b" style="height:48%"></div><div class="x">Q4 25</div></div>
+                <div class="col"><div class="v">3.4</div><div class="b" style="height:56%"></div><div class="x">Q1 26</div></div>
+                <div class="col"><div class="v">4.3</div><div class="b" style="height:71%"></div><div class="x">Q2 26</div></div>
+                <div class="col hi"><div class="v">4.8</div><div class="b" style="height:80%"></div><div class="x">Q3 26</div></div>
+                <div class="col"><div class="v">5.4</div><div class="b" style="height:90%; opacity:0.35"></div><div class="x">Q4 plan</div></div>
+            </div>
+        </div>
+        <div class="side">
+            <div class="legend reveal" style="--i:2"><span><i></i>Actual</span><span><i class="hi"></i>This quarter</span></div>
+            <p class="reveal" style="--i:3" data-edit>Four consecutive quarters of growth. The Q4 plan assumes the two slipped deals close in October.</p>
+            <p class="reveal" style="--i:4" data-edit>The bars are plain elements: click one to change its height or colour, no chart library needed.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Comparison table
+     ====================================================== -->
+<section class="slide compare" data-name="options" data-section="Options">
+    <div class="content">
+        <div class="head reveal" style="--i:0">
+            <h2 data-edit>Three paths for Q4</h2>
+            <span class="caption" data-edit>Recommendation highlighted</span>
+        </div>
+        <table class="reveal" style="--i:1" data-group>
+            <thead><tr><th>Criterion</th><th>A. Hold course</th><th class="pick">B. Invest in expansion</th><th>C. Rebuild new business</th></tr></thead>
+            <tbody>
+                <tr><td>Revenue impact in Q4</td><td>Neutral</td><td class="pick yes">+$0.4M</td><td>Neutral</td></tr>
+                <tr><td>Cost</td><td class="yes">None</td><td class="pick">Two hires</td><td>Four hires, agency</td></tr>
+                <tr><td>Time to effect</td><td>Now</td><td class="pick yes">Six weeks</td><td>Two quarters</td></tr>
+                <tr><td>Risk</td><td class="no">Pipeline keeps slipping</td><td class="pick">Concentration in top accounts</td><td class="no">Execution while hiring</td></tr>
+                <tr><td>Reversible</td><td class="yes">Yes</td><td class="pick yes">Yes</td><td class="no">Partly</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Two columns
+     ====================================================== -->
+<section class="slide pair" data-name="risks">
+    <div class="content">
+        <div class="head reveal" style="--i:0">
+            <h2 data-edit>Risks and how we handle them</h2>
+            <span class="caption" data-edit>Option B</span>
+        </div>
+        <div class="cols">
+            <div class="col-card reveal" style="--i:1">
+                <h3><i></i><span data-edit>Risks</span></h3>
+                <ul>
+                    <li data-edit>Revenue concentrated in twenty accounts</li>
+                    <li data-edit>Support load outgrowing the team</li>
+                    <li data-edit>Hiring takes longer than six weeks</li>
+                </ul>
+            </div>
+            <div class="col-card alt reveal" style="--i:2">
+                <h3><i></i><span data-edit>Mitigations</span></h3>
+                <ul>
+                    <li data-edit>Cap any single account at 8% of revenue in the plan</li>
+                    <li data-edit>Self-serve onboarding for the long tail by November</li>
+                    <li data-edit>Two candidates already in final interviews</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Quote
+     ====================================================== -->
+<section class="slide quote dark" data-name="quote">
+    <div class="content">
+        <div class="bar reveal" style="--i:0"></div>
+        <blockquote class="reveal" style="--i:1; margin-top:40px" data-edit>“Your team is the reason we renewed. Keep doing whatever changed in March.”</blockquote>
+        <div class="who reveal" style="--i:2">
+            <div class="bar"></div>
+            <p data-edit>Chief Operating Officer, a top-five account</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 10 - Decisions and closing
+     ====================================================== -->
+<section class="slide closing dark" data-name="decisions" data-section="Decisions">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>What we are asking for</div>
+        <h1 class="reveal" style="--i:1" data-edit>Three decisions today</h1>
+        <div class="steps">
+            <div class="card reveal" style="--i:2"><div class="n">1</div><h3 data-edit>Approve option B</h3><p data-edit>Two expansion hires, budget from the Q4 contingency.</p></div>
+            <div class="card reveal" style="--i:3"><div class="n">2</div><h3 data-edit>Support headcount</h3><p data-edit>One additional engineer from November.</p></div>
+            <div class="card reveal" style="--i:4"><div class="n">3</div><h3 data-edit>Review in December</h3><p data-edit>A short check on concentration and pipeline.</p></div>
+        </div>
+    </div>
+    <aside class="notes" hidden>Ask for each decision explicitly and wait for the answer before moving on.</aside>
+</section>
+
+<!-- The master layer: shown on every slide, edited once in the editor -->
+<div class="deck-footer">
+    <span class="brand"><i></i><span data-edit>Quarterly business review · Q3 2026</span></span>
+    <span class="num"><b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

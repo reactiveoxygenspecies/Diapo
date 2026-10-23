@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deco</title>
+<!-- Deco: art deco luxury. Near-black with gold hairlines, stepped frames, sunburst fans and chevrons,
+     Cinzel capitals for headlines, Cormorant Garamond body. Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #f3e9d2;   /* champagne: headings       */
+    --ink-2:    #cfc3a9;   /* body text                 */
+    --ink-3:    #8c826c;   /* captions, secondary       */
+    --rule:     #3a3327;   /* dark hairlines            */
+    --paper:    #0f0e0c;   /* near-black                */
+    --paper-2:  #191712;   /* panels                    */
+    --accent:   #d4af37;   /* gold                      */
+    --accent-2: #8a6d1f;   /* old gold, second series   */
+    --accent-3: #1f4a46;   /* deep emerald              */
+
+    --stage-bg: #050504;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #0f0e0c;
+    --font: 'Cormorant Garamond', Georgia, serif;
+    --font-display: 'Cinzel', 'Times New Roman', serif;
+
+    --pad-x: 140px;        /* layout rhythm at 1920x1080 */
+    --pad-top: 110px;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* motion: the reveal's curve   */
+    --dur: 1s;                                   /* ... its duration             */
+    --stagger: 0.14s;                            /* ... the step between --i's   */
+    --reveal-y: 18px;                            /* ... how far elements travel  */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-display); font-size: 112px; font-weight: 600; line-height: 1.08; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
+h2 { font-family: var(--font-display); font-size: 72px; font-weight: 600; line-height: 1.12; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
+h3 { font-family: var(--font-display); font-size: 32px; font-weight: 600; line-height: 1.25; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+p  { font-size: 32px; line-height: 1.5; color: var(--ink-2); }
+ul, ol { font-size: 32px; line-height: 1.5; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 12px; }
+blockquote { font-family: var(--font); font-style: italic; font-size: 76px; font-weight: 400; line-height: 1.2; color: var(--ink); }
+.eyebrow { font-family: var(--font-display); font-size: 20px; font-weight: 600; letter-spacing: 0.4em; text-transform: uppercase; color: var(--accent); margin-bottom: 28px; }
+.sub { font-style: italic; font-size: 40px; line-height: 1.35; color: var(--ink-3); margin-top: 28px; }
+.caption { font-family: var(--font-display); font-size: 18px; letter-spacing: 0.24em; text-transform: uppercase; line-height: 1.5; color: var(--ink-3); }
+
+/* ===========================================
+   LAYOUT
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: var(--pad-top); }
+.ornament { display: flex; align-items: center; gap: 18px; color: var(--accent); }
+.ornament::before, .ornament::after { content: ''; flex: 1; height: 1px; background: var(--accent); }
+.ornament i { width: 14px; height: 14px; rotate: 45deg; border: 1px solid var(--accent); }
+.ornament i.solid { background: var(--accent); }
+.gold-rule { height: 1px; background: var(--accent); }
+.frame { position: absolute; inset: 40px; border: 1px solid var(--accent); pointer-events: none; }
+.frame::before { content: ''; position: absolute; inset: 10px; border: 1px solid var(--accent-2); }
+.frame::after { content: ''; position: absolute; inset: 24px; border: 1px solid var(--rule); }
+
+/* Cover: a sunburst fan behind the title */
+.cover .fan { position: absolute; left: 460px; top: 560px; width: 1000px; height: 500px; border-radius: 500px 500px 0 0; background: repeating-conic-gradient(from 270deg at 50% 100%, var(--accent) 0 1deg, transparent 1deg 9deg); opacity: 0.35; pointer-events: none; }
+.cover .fan::after { content: ''; position: absolute; left: 50%; bottom: -6px; width: 260px; height: 130px; translate: -50% 0; border-radius: 130px 130px 0 0; background: var(--paper); border: 1px solid var(--accent); border-bottom: 0; }
+.cover .content { display: flex; flex-direction: column; justify-content: flex-start; align-items: center; text-align: center; padding-top: 90px; }
+.cover h1 { max-width: 1400px; }
+.cover .ornament { width: 700px; margin: 32px 0 8px; }
+.cover .credit { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; }
+
+/* Programme */
+.programme .rows { margin-top: 48px; max-width: 1400px; margin-left: auto; margin-right: auto; }
+.programme .row { display: grid; grid-template-columns: 120px 1fr auto; align-items: baseline; gap: 40px; padding: 26px 0; border-bottom: 1px solid var(--rule); }
+.programme .row .n { font-family: var(--font-display); font-size: 28px; color: var(--accent); letter-spacing: 0.1em; }
+.programme .row h3 { color: var(--ink); font-size: 34px; }
+.programme .row .caption { text-align: right; }
+.programme .content { text-align: center; }
+
+/* Section: a stepped frame */
+.section .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.section .step { width: 900px; padding: 60px 40px; border: 1px solid var(--accent); position: relative; }
+.section .step::before, .section .step::after { content: ''; position: absolute; left: 40px; right: 40px; height: 1px; background: var(--accent); }
+.section .step::before { top: -14px; } .section .step::after { bottom: -14px; }
+.section .step h2 { font-size: 88px; }
+.section .n { font-family: var(--font-display); font-size: 26px; letter-spacing: 0.4em; color: var(--accent); margin-bottom: 26px; }
+
+/* Three columns with chevrons */
+.trio .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; margin-top: 60px; }
+.trio .cell { text-align: center; padding: 48px 36px; border: 1px solid var(--rule); position: relative; }
+.trio .cell .chev { width: 40px; height: 40px; margin: 0 auto 32px; border-left: 2px solid var(--accent); border-bottom: 2px solid var(--accent); rotate: -45deg; }
+.trio .cell h3 { margin-bottom: 16px; }
+.trio .cell p { font-size: 27px; }
+
+/* Picture in a gold frame */
+.picture .plate { position: absolute; left: 0; top: 0; width: 820px; height: 860px; border: 1px solid var(--accent); padding: 18px; }
+.picture .plate::before { content: ''; position: absolute; inset: 18px; background: var(--paper-2); border: 1px solid var(--accent-2); }
+.picture .text { position: absolute; left: 960px; top: 60px; width: 680px; }
+.picture .text .ornament { margin: 36px 0 32px; }
+
+/* Big number */
+.number .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.number .big { font-family: var(--font-display); font-size: 300px; font-weight: 600; line-height: 1; letter-spacing: 0.04em; color: var(--accent); }
+.number h2 { margin-top: 24px; font-size: 52px; }
+.number p { margin-top: 20px; max-width: 1100px; }
+.number .ornament { width: 500px; margin: 36px 0 0; }
+
+/* Quote */
+.quote .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.quote blockquote { max-width: 1500px; }
+.quote .ornament { width: 400px; margin: 44px 0 24px; }
+
+/* Timeline of chevrons */
+.timeline .track { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 80px; }
+.timeline .step { text-align: center; padding-top: 48px; position: relative; }
+.timeline .step::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--rule); }
+.timeline .step::after { content: ''; position: absolute; left: 50%; top: -9px; width: 18px; height: 18px; translate: -50% 0; rotate: 45deg; background: var(--paper); border: 1px solid var(--accent); }
+.timeline .step .yr { font-family: var(--font-display); font-size: 40px; color: var(--accent); margin-bottom: 20px; }
+.timeline .step h3 { color: var(--ink); font-size: 28px; margin-bottom: 12px; }
+.timeline .step p { font-size: 25px; }
+
+/* Table */
+.data table { width: 100%; border-collapse: collapse; font-size: 30px; margin-top: 48px; }
+.data th { font-family: var(--font-display); font-weight: 600; font-size: 18px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); text-align: left; padding: 0 20px 20px; border-bottom: 1px solid var(--accent); }
+.data td { padding: 22px 20px; border-bottom: 1px solid var(--rule); color: var(--ink-2); }
+.data td:first-child { color: var(--ink); font-family: var(--font-display); font-size: 24px; letter-spacing: 0.06em; }
+.data th.num, .data td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.closing .lines { display: flex; gap: 64px; margin-top: 48px; }
+
+/* ===========================================
+   MASTER LAYER - the running footer (a stage child outside the slides)
+   =========================================== */
+.deck-footer {
+    position: absolute; left: var(--pad-x); right: var(--pad-x); bottom: 56px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font-display); font-size: 16px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--ink-3);
+}
+.deck-footer .num { color: var(--accent); }
+.deck-footer b { font-weight: 600; color: var(--accent); }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="frame"></div>
+    <div class="fan reveal-img" style="--i:0"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:1" data-edit>The Grand Hotel presents</div>
+        <h1 class="reveal" style="--i:2" data-edit>The Winter Gala</h1>
+        <div class="ornament reveal" style="--i:3"><i></i><i class="solid"></i><i></i></div>
+        <p class="sub reveal" style="--i:4" data-edit>An evening of music, dinner and the launch of the new season</p>
+        <div class="credit reveal" style="--i:5">
+            <span class="caption" data-edit>Saturday, 12 December 2026</span>
+            <span class="caption" data-edit>Black tie</span>
+        </div>
+    </div>
+    <aside class="notes" hidden>Let the room settle. Read the title; do not explain it.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Programme
+     ====================================================== -->
+<section class="slide programme" data-name="programme">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Programme</div>
+        <h2 class="reveal" style="--i:1" data-edit>The evening</h2>
+        <div class="rows">
+            <div class="row reveal" style="--i:2"><span class="n">I</span><h3 data-edit>Reception in the Palm Court</h3><span class="caption" data-edit>7 o'clock</span></div>
+            <div class="row reveal" style="--i:3"><span class="n">II</span><h3 data-edit>The season, announced</h3><span class="caption" data-edit>8 o'clock</span></div>
+            <div class="row reveal" style="--i:4"><span class="n">III</span><h3 data-edit>Dinner in the Ballroom</h3><span class="caption" data-edit>Half past eight</span></div>
+            <div class="row reveal" style="--i:5"><span class="n">IV</span><h3 data-edit>Dancing until late</h3><span class="caption" data-edit>From ten</span></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Section
+     ====================================================== -->
+<section class="slide section" data-name="section" data-section="The season">
+    <div class="content">
+        <div class="step reveal" style="--i:0">
+            <div class="n" data-edit>Part II</div>
+            <h2 data-edit>The New Season</h2>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Three columns
+     ====================================================== -->
+<section class="slide trio" data-name="pillars">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Three promises</div>
+        <h2 class="reveal" style="--i:1" data-edit>What the season brings</h2>
+        <div class="grid">
+            <div class="cell reveal" style="--i:2"><div class="chev"></div><h3 data-edit>The Ballroom</h3><p data-edit>Restored to its 1928 plan, with the original parquet and the mirrored bar.</p></div>
+            <div class="cell reveal" style="--i:3"><div class="chev"></div><h3 data-edit>The Kitchen</h3><p data-edit>A new chef, a shorter menu, and the Sunday lunch back on the table.</p></div>
+            <div class="cell reveal" style="--i:4"><div class="chev"></div><h3 data-edit>The Rooms</h3><p data-edit>Forty suites reopened on the upper floors, each with a view of the river.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Picture
+     ====================================================== -->
+<section class="slide picture" data-name="picture">
+    <div class="content">
+        <div class="plate reveal-img" style="--i:0"></div>
+        <div data-placeholder="image" style="display:none; position:absolute; left:18px; top:18px; width:784px; height:824px; align-items:center; justify-content:center; border:3px dashed var(--rule); color:var(--ink-3); font-family:var(--font); font-size:28px; text-align:center">Double-click to choose a picture</div>
+        <div class="text">
+            <div class="eyebrow reveal" style="--i:1" data-edit>The Ballroom</div>
+            <h2 class="reveal" style="--i:2; font-size:60px" data-edit>Restored, not replaced</h2>
+            <div class="ornament reveal" style="--i:3"><i class="solid"></i></div>
+            <p class="reveal" style="--i:4" data-edit>The gold frame takes a photograph: double-click it in the editor to choose one. A portrait crop suits the proportions.</p>
+            <p class="caption reveal" style="--i:5; margin-top:28px" data-edit>Photograph, 1928</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Big number
+     ====================================================== -->
+<section class="slide number" data-name="number">
+    <div class="content">
+        <div class="big reveal" style="--i:0" data-edit>1928</div>
+        <h2 class="reveal" style="--i:1" data-edit>The year it opened</h2>
+        <div class="ornament reveal" style="--i:2"><i></i><i class="solid"></i><i></i></div>
+        <p class="reveal" style="--i:3" data-edit>Ninety-eight years, three closures, one war, and the same doorman's family for four generations.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Quote
+     ====================================================== -->
+<section class="slide quote" data-name="quote">
+    <div class="frame"></div>
+    <div class="content">
+        <blockquote class="reveal" style="--i:0" data-edit>"A hotel is a promise kept every night."</blockquote>
+        <div class="ornament reveal" style="--i:1"><i class="solid"></i></div>
+        <p class="caption reveal" style="--i:2" data-edit>The founder, 1928</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Timeline
+     ====================================================== -->
+<section class="slide timeline" data-name="timeline" data-section="History">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>A short history</div>
+        <h2 class="reveal" style="--i:1" data-edit>Four dates</h2>
+        <div class="track">
+            <div class="step reveal" style="--i:2"><div class="yr" data-edit>1928</div><h3 data-edit>Opening</h3><p data-edit>Three hundred guests and a jazz orchestra.</p></div>
+            <div class="step reveal" style="--i:3"><div class="yr" data-edit>1954</div><h3 data-edit>The Ballroom</h3><p data-edit>Rebuilt after the fire, the mirrors saved.</p></div>
+            <div class="step reveal" style="--i:4"><div class="yr" data-edit>1999</div><h3 data-edit>Closed</h3><p data-edit>Twelve years dark, the doorman kept the keys.</p></div>
+            <div class="step reveal" style="--i:5"><div class="yr" data-edit>2026</div><h3 data-edit>Reopened</h3><p data-edit>The season we launch tonight.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Table
+     ====================================================== -->
+<section class="slide data" data-name="table">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>The menu</div>
+        <h2 class="reveal" style="--i:1" data-edit>Dinner</h2>
+        <table class="reveal" style="--i:2" data-group>
+            <thead><tr><th>Course</th><th>Dish</th><th>Wine</th><th class="num">Served</th></tr></thead>
+            <tbody>
+                <tr><td>First</td><td>Oysters, champagne mignonette</td><td>Blanc de blancs</td><td class="num">8:30</td></tr>
+                <tr><td>Second</td><td>Consommé with gold leaf</td><td>Fino</td><td class="num">8:50</td></tr>
+                <tr><td>Main</td><td>Beef Wellington, winter truffle</td><td>Pauillac 2009</td><td class="num">9:15</td></tr>
+                <tr><td>Dessert</td><td>Baked Alaska, flamed at the table</td><td>Sauternes</td><td class="num">9:50</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 10 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing" data-no-master>
+    <div class="frame"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>With our compliments</div>
+        <h1 class="reveal" style="--i:1" data-edit>Good night</h1>
+        <div class="ornament reveal" style="--i:2; width:500px"><i></i><i class="solid"></i><i></i></div>
+        <div class="lines">
+            <span class="caption reveal" style="--i:3" data-edit>grandhotel.example</span>
+            <span class="caption reveal" style="--i:4" data-edit>reservations@example.com</span>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: shown on every slide, edited once in the editor -->
+<div class="deck-footer">
+    <span data-edit>The Grand Hotel · The Winter Gala</span>
+    <span class="num"><b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>

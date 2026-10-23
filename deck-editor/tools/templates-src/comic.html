@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comic</title>
+<!-- Comic: a storyboard. Panels with thick black borders, speech bubbles, halftone dots, action bursts,
+     Bangers headlines and Patrick Hand body. Built for the deck editor's fixed 1920x1080 stage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Patrick+Hand&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME - the editor's Theme panel lists these and the properties panel
+   offers the colours as swatches.
+   =========================================== */
+:root {
+    --ink:      #111111;   /* headings, key text        */
+    --ink-2:    #222222;   /* body text                 */
+    --ink-3:    #6b6b6b;   /* captions, secondary       */
+    --rule:     #111111;   /* the panel borders         */
+    --paper:    #fffdf5;   /* off-white                 */
+    --paper-2:  #fff3b0;   /* panels: pale yellow       */
+    --accent:   #ffd400;   /* comic yellow              */
+    --accent-2: #ff3b3b;   /* red                       */
+    --accent-3: #2b6df0;   /* blue                      */
+    --accent-4: #ff8fd0;   /* pink halftone             */
+
+    --stage-bg: #1a1a1a;   /* letterbox outside the 16:9 stage */
+    --slide-bg: #fffdf5;
+    --font: 'Patrick Hand', 'Comic Sans MS', cursive;
+    --font-display: 'Bangers', Impact, sans-serif;
+
+    --pad-x: 80px;         /* layout rhythm at 1920x1080 */
+    --pad-top: 70px;
+    --ease-out: cubic-bezier(0.34, 1.56, 0.64, 1);  /* motion: a proper bounce   */
+    --dur: 0.5s;                                    /* ... its duration          */
+    --stagger: 0.09s;                               /* ... the step between --i's */
+    --reveal-y: 40px;                               /* ... how far elements travel */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* @@BASE@@ */
+
+/* ===========================================
+   TYPE - base styles on the tags, so slides added in the editor match
+   =========================================== */
+h1 { font-family: var(--font-display); font-size: 180px; font-weight: 400; line-height: 0.95; letter-spacing: 0.02em; color: var(--ink); text-shadow: 6px 6px 0 var(--accent); }
+h2 { font-family: var(--font-display); font-size: 104px; font-weight: 400; line-height: 1.0; letter-spacing: 0.02em; color: var(--ink); }
+h3 { font-family: var(--font-display); font-size: 48px; font-weight: 400; line-height: 1.1; letter-spacing: 0.02em; color: var(--ink); }
+p  { font-size: 34px; line-height: 1.35; color: var(--ink-2); }
+ul, ol { font-size: 34px; line-height: 1.35; padding-left: 40px; color: var(--ink-2); }
+li { margin-bottom: 10px; }
+blockquote { font-size: 64px; line-height: 1.15; color: var(--ink); }
+.eyebrow { font-family: var(--font-display); font-size: 30px; letter-spacing: 0.06em; color: var(--paper); background: var(--ink); display: inline-block; padding: 6px 20px; margin-bottom: 24px; rotate: -2deg; align-self: flex-start; }
+.sub { font-size: 40px; line-height: 1.3; color: var(--ink-2); margin-top: 24px; }
+.caption { font-size: 26px; line-height: 1.3; color: var(--ink-3); }
+
+/* ===========================================
+   LAYOUT - panels, bubbles, bursts
+   =========================================== */
+.slide .content { position: absolute; left: var(--pad-x); right: var(--pad-x); top: var(--pad-top); bottom: 110px; }
+.panel { background: var(--paper); border: 6px solid var(--rule); box-shadow: 10px 10px 0 var(--ink); padding: 36px 40px; position: relative; }
+.panel.yellow { background: var(--paper-2); } .panel.blue { background: #dbe8ff; } .panel.pink { background: #ffe1f2; }
+.panel .halftone { position: absolute; inset: 0; background-image: radial-gradient(var(--accent-4) 2px, transparent 2.5px); background-size: 16px 16px; opacity: 0.35; pointer-events: none; }
+.bubble { position: relative; background: #fff; border: 6px solid var(--rule); border-radius: 48px; padding: 32px 44px; font-size: 36px; line-height: 1.3; color: var(--ink); }
+.bubble::after { content: ''; position: absolute; left: 80px; bottom: -34px; width: 40px; height: 40px; background: #fff; border: 6px solid var(--rule); border-top: 0; border-left: 0; rotate: 45deg; }
+.bubble.shout { border-radius: 24px; }
+.bubble.shout::after { left: auto; right: 80px; }
+.burst { position: absolute; width: 320px; height: 320px; display: flex; align-items: center; justify-content: center; text-align: center; font-family: var(--font-display); font-size: 64px; line-height: 0.95; color: var(--ink); background: var(--accent); clip-path: polygon(50% 0%, 61% 15%, 79% 8%, 80% 27%, 98% 35%, 87% 50%, 98% 65%, 80% 73%, 79% 92%, 61% 85%, 50% 100%, 39% 85%, 21% 92%, 20% 73%, 2% 65%, 13% 50%, 2% 35%, 20% 27%, 21% 8%, 39% 15%); rotate: 8deg; padding: 60px; }
+.burst.red { background: var(--accent-2); color: #fff; }
+.caption-box { position: absolute; background: var(--paper-2); border: 4px solid var(--rule); padding: 10px 20px; font-size: 28px; color: var(--ink); }
+
+/* Cover */
+.cover .content { display: flex; flex-direction: column; justify-content: center; }
+.cover h1 { max-width: 1200px; }
+.cover .credits { display: flex; gap: 24px; margin-top: 48px; }
+.cover .credits .caption-box { position: static; }
+
+/* Contents: a comic page grid */
+.grid-page .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 40px; }
+.grid-page .panel { min-height: 300px; }
+.grid-page .panel .n { font-family: var(--font-display); font-size: 80px; color: var(--accent-2); line-height: 1; margin-bottom: 16px; }
+.grid-page .panel p { font-size: 28px; }
+
+/* Section: a splash page */
+.section .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.section h2 { font-size: 200px; text-shadow: 8px 8px 0 var(--accent-3); }
+.section .eyebrow { align-self: center; }
+
+/* Story: three panels in a row with captions */
+.story .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 32px; }
+.story .panel { height: 620px; }
+.story .panel .cap { position: absolute; left: -6px; top: -6px; background: var(--paper-2); border: 6px solid var(--rule); padding: 6px 18px; font-size: 26px; color: var(--ink); }
+.story .panel .say { position: absolute; left: 30px; right: 30px; bottom: 30px; }
+.story .panel .say.bubble { font-size: 28px; padding: 22px 28px; }
+.story .panel .say.bubble::after { bottom: auto; top: -34px; rotate: 225deg; }
+
+/* Dialogue */
+.dialogue .content { display: flex; flex-direction: column; justify-content: center; gap: 48px; }
+.dialogue .bubble { max-width: 1100px; }
+.dialogue .bubble.right { align-self: flex-end; }
+.dialogue .bubble.right::after { left: auto; right: 80px; }
+
+/* Picture panel */
+.picture .panel { position: absolute; left: 0; top: 0; width: 1040px; height: 880px; padding: 0; }
+.picture .text { position: absolute; left: 1140px; top: 40px; width: 620px; }
+.picture .text p { margin-top: 24px; }
+
+/* Big number */
+.number .content { display: flex; flex-direction: column; justify-content: center; }
+.number .big { font-family: var(--font-display); font-size: 460px; line-height: 0.9; color: var(--accent-2); text-shadow: 12px 12px 0 var(--ink); }
+.number h2 { margin-top: 30px; font-size: 80px; }
+.number p { margin-top: 16px; max-width: 1100px; }
+
+/* Steps: numbered panels with arrows */
+.steps .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 40px; margin-top: 44px; }
+.steps .panel { padding-top: 60px; }
+.steps .panel .n { position: absolute; left: -20px; top: -30px; width: 80px; height: 80px; border-radius: 50%; background: var(--accent-2); border: 6px solid var(--rule); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 44px; }
+.steps .panel h3 { margin-bottom: 10px; }
+.steps .panel p { font-size: 28px; }
+
+/* Closing */
+.closing .content { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.closing .credits { display: flex; gap: 24px; margin-top: 48px; }
+.closing .credits .caption-box { position: static; }
+
+/* ===========================================
+   DECOR - halftone corners and speed lines; texture never catches a click
+   =========================================== */
+.dots { position: absolute; pointer-events: none; background-image: radial-gradient(var(--ink) 3px, transparent 3.5px); background-size: 22px 22px; opacity: 0.12; }
+.speed { position: absolute; pointer-events: none; background: repeating-linear-gradient(90deg, var(--ink) 0 3px, transparent 3px 26px); opacity: 0.15; }
+
+/* ===========================================
+   MASTER LAYER - a caption strip with the page number
+   =========================================== */
+.deck-footer {
+    position: absolute; left: var(--pad-x); right: var(--pad-x); bottom: 34px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font); font-size: 26px; color: var(--ink-3);
+}
+.deck-footer .num { font-family: var(--font-display); font-size: 34px; letter-spacing: 0.04em; color: var(--ink); background: var(--accent); border: 4px solid var(--rule); padding: 2px 18px; box-shadow: 5px 5px 0 var(--ink); }
+.deck-footer b { font-weight: 400; }
+.deck-stage:has(> .slide.active[data-no-master]) > :not(.slide) { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ======================================================
+     SLIDE 1 - Cover
+     ====================================================== -->
+<section class="slide cover active" data-name="cover" data-no-master>
+    <div class="dots" style="left:1200px; top:0; width:720px; height:1080px"></div>
+    <div class="burst reveal-img" style="--i:3; left:1320px; top:160px" data-edit>New!</div>
+    <div class="burst red reveal-img" style="--i:4; left:1460px; top:560px; width:280px; height:280px; font-size:52px; rotate:-10deg" data-edit>Issue #1</div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>The onboarding comic</div>
+        <h1 class="reveal" style="--i:1" data-edit>Your first week</h1>
+        <p class="sub reveal" style="--i:2; max-width:1000px" data-edit>Everything you need to know, told in panels, with no meetings.</p>
+        <div class="credits reveal" style="--i:3">
+            <span class="caption-box" data-edit>Written by Your Name</span>
+            <span class="caption-box" data-edit>Art by the team</span>
+        </div>
+    </div>
+    <aside class="notes" hidden>Big energy. Read the bursts. Point out that the deck is a comic on purpose.</aside>
+</section>
+
+<!-- ======================================================
+     SLIDE 2 - Contents page
+     ====================================================== -->
+<section class="slide grid-page" data-name="contents">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>In this issue</div>
+        <h2 class="reveal" style="--i:1" data-edit>Four chapters</h2>
+        <div class="grid">
+            <div class="panel yellow reveal" style="--i:2"><div class="n">1</div><h3 data-edit>Day one</h3><p data-edit>Badges, laptops and where the coffee is.</p></div>
+            <div class="panel reveal" style="--i:3"><div class="n">2</div><h3 data-edit>The team</h3><p data-edit>Who does what, and who to ask.</p></div>
+            <div class="panel blue reveal" style="--i:4"><div class="n">3</div><h3 data-edit>The tools</h3><p data-edit>Five apps. That's it. Really.</p></div>
+            <div class="panel pink reveal" style="--i:5"><div class="halftone"></div><div class="n">4</div><h3 data-edit>Your first ship</h3><p data-edit>Something real goes out by Friday.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 3 - Splash page
+     ====================================================== -->
+<section class="slide section" data-name="section" data-section="Day one">
+    <div class="speed" style="left:0; top:0; width:1920px; height:1080px"></div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Chapter 1</div>
+        <h2 class="reveal" style="--i:1" data-edit>Day one!</h2>
+        <p class="sub reveal" style="--i:2" data-edit>Monday, 9 a.m. A desk, a badge, a lot of names.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 4 - Story panels
+     ====================================================== -->
+<section class="slide story" data-name="story">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Meanwhile, at the front desk</div>
+        <div class="row">
+            <div class="panel yellow reveal" style="--i:1"><span class="cap">9:00</span><div class="say bubble" data-edit>"Hi! You must be new. Badge, laptop, and the coffee is that way."</div></div>
+            <div class="panel reveal" style="--i:2"><span class="cap">9:30</span><div class="say bubble" data-edit>"Your buddy is Sam. Sam knows everything. Sam will deny this."</div></div>
+            <div class="panel blue reveal" style="--i:3"><span class="cap">10:00</span><div class="say bubble" data-edit>"First stand-up. You don't have to say anything. Everyone does anyway."</div></div>
+        </div>
+        <p class="caption reveal" style="--i:4; margin-top:24px" data-edit>Each panel takes a picture behind the bubble: drop one in from Insert.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 5 - Dialogue
+     ====================================================== -->
+<section class="slide dialogue" data-name="dialogue" data-section="The team">
+    <div class="dots" style="left:0; top:0; width:1920px; height:200px"></div>
+    <div class="content">
+        <div class="bubble reveal" style="--i:0" data-edit>"So who do I ask when something breaks?"</div>
+        <div class="bubble right reveal" style="--i:1" data-edit>"Depends what broke. Product: Ana. Code: Sam. Coffee machine: everyone, at once."</div>
+        <div class="bubble shout reveal" style="--i:2; align-self:center; background:var(--paper-2)" data-fragment data-edit>"And if it's the coffee machine, that IS the emergency."</div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 6 - Picture panel
+     ====================================================== -->
+<section class="slide picture" data-name="picture" data-section="The tools">
+    <div class="content">
+        <div class="panel reveal-img" style="--i:0"><div class="halftone"></div></div>
+        <div data-placeholder="image" style="display:none; position:absolute; left:6px; top:6px; width:1028px; height:868px; align-items:center; justify-content:center; border:3px dashed var(--ink-3); color:var(--ink-3); font-family:var(--font); font-size:32px; text-align:center">Double-click to choose a picture</div>
+        <div class="burst reveal-img" style="--i:2; left:800px; top:-50px; width:260px; height:260px; font-size:48px" data-edit>Pow!</div>
+        <div class="text">
+            <div class="eyebrow reveal" style="--i:1" data-edit>Chapter 3</div>
+            <h2 class="reveal" style="--i:2; font-size:80px" data-edit>The five tools</h2>
+            <p class="reveal" style="--i:3" data-edit>A screenshot goes in the big panel: double-click it in the editor. The halftone dots stay on top.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 7 - Big number
+     ====================================================== -->
+<section class="slide number" data-name="number">
+    <div class="speed" style="left:1100px; top:0; width:820px; height:1080px"></div>
+    <div class="content">
+        <div class="big reveal" style="--i:0" data-edit>5</div>
+        <h2 class="reveal" style="--i:1" data-edit>apps, and no more</h2>
+        <p class="reveal" style="--i:2" data-edit>Chat, docs, code, tickets, calendar. If someone sends you a sixth, ask why.</p>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 8 - Steps
+     ====================================================== -->
+<section class="slide steps" data-name="steps" data-section="First ship">
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>Chapter 4 · Ship something by Friday</div>
+        <h2 class="reveal" style="--i:1" data-edit>Four panels to your first ship</h2>
+        <div class="row">
+            <div class="panel yellow reveal" style="--i:2"><div class="n">1</div><h3 data-edit>Pick a tiny bug</h3><p data-edit>Sam has a list. Take the smallest one.</p></div>
+            <div class="panel reveal" style="--i:3"><div class="n">2</div><h3 data-edit>Fix it</h3><p data-edit>Ask twice, then ask again. Nobody minds.</p></div>
+            <div class="panel blue reveal" style="--i:4"><div class="n">3</div><h3 data-edit>Open the PR</h3><p data-edit>Small, with a screenshot. Reviews come fast.</p></div>
+            <div class="panel pink reveal" style="--i:5"><div class="halftone"></div><div class="n">4</div><h3 data-edit>Ship!</h3><p data-edit>Friday demo. Cake if it's your first.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ======================================================
+     SLIDE 9 - Closing
+     ====================================================== -->
+<section class="slide closing" data-name="closing" data-no-master>
+    <div class="dots" style="left:0; top:0; width:600px; height:1080px"></div>
+    <div class="burst reveal-img" style="--i:2; left:1380px; top:120px; rotate:12deg" data-edit>The end!</div>
+    <div class="content">
+        <div class="eyebrow reveal" style="--i:0" data-edit>To be continued</div>
+        <h1 class="reveal" style="--i:1" data-edit>See you Friday</h1>
+        <div class="credits reveal" style="--i:3">
+            <span class="caption-box" data-edit>#new-joiners</span>
+            <span class="caption-box" data-edit>you@example.com</span>
+        </div>
+    </div>
+</section>
+
+<!-- The master layer: a caption strip with the page number, edited once in the editor -->
+<div class="deck-footer">
+    <span data-edit>Your first week · The onboarding comic</span>
+    <span class="num"><b data-page-now>1</b> / <span data-page-total>@@SLIDES@@</span></span>
+</div>
+
+</main>
+</div>
+
+<div class="deck-controls" aria-label="Slide controls">
+    <button id="btnPrev" title="Previous">←</button>
+    <span class="page"><span id="pageNow">1</span> / <span id="pageTotal">@@SLIDES@@</span></span>
+    <button id="btnNext" title="Next">→</button>
+</div>
+
+<!-- @@SCRIPTS@@ -->
+</body>
+</html>
