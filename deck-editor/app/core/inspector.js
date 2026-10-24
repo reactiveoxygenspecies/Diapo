@@ -277,7 +277,7 @@ export class Inspector {
           </section>
         </div>`;
         this.$ = (id) => this.root.querySelector('#' + id);
-        // Tooltips say what a field does; how it is written into the file is in the README.
+        // Tooltips say what a field does; how it is written into the file is in REFERENCE.md.
         this.root.querySelectorAll('[title]').forEach(n => {
             n.title = n.title.replace(/\s*Saved as [^.]*\.|;?\s*saved as [^.;]*/g, '').trim();
         });

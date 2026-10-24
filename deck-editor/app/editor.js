@@ -1574,6 +1574,7 @@ async function boot() {
     try {
         const s = await api.status();
         app.workspace = s.workspace;
+        if (s.app) $('brandVersion').textContent = 'v' + s.app;      // the margin print carries the build number
         showStatusFolder();
     } catch (err) {
         toast('The server is not running. Start it with serve.py.', { error: true, ms: 8000 });

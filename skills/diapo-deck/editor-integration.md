@@ -5,7 +5,7 @@ deck in an iframe, lets the user select, drag, resize, restyle and retype
 anything directly on the slide, and saves the same HTML file back. It works on
 any deck that follows its file contract; this file lists what that means for a
 generated deck, and what breaks it. The full contract is in the editor's
-README ("Deck file contract"); the parts below are the ones a generator
+REFERENCE.md ("Deck file contract"); the parts below are the ones a generator
 touches.
 
 ## What the editor does to a deck (so you know what to leave room for)

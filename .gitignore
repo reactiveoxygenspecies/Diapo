@@ -5,3 +5,5 @@ workspace/*
 Thumbs.db
 .DS_Store
 __pycache__/
+# The website is kept locally for now, not published with the code
+site/

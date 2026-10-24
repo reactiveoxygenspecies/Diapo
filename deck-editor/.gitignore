@@ -12,3 +12,5 @@ tools/pptx-corpus/
 tools/pptx-export/
 tools/vendor-src/
 tests/.deck-editor-samples/
+# The roadmap is kept locally, not published
+NEXT.md

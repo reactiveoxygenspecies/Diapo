@@ -1,7 +1,7 @@
 # Diapo in ten minutes
 
 A short guide for people who make presentations with Diapo. Everything here is
-covered in more detail in the [README](README.md), which is the reference.
+covered in more detail in the [reference](REFERENCE.md).
 
 ## Start
 

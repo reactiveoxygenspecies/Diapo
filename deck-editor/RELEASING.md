@@ -21,9 +21,10 @@ This checks four things:
   changelog heading agree on the version, and the changelog's date is
   `APP_RELEASED`.
 - The generated files are current: `diapo-format/` and the skill's runtime
-  (`tools/build-format.py`), `app/known-scripts.json`
-  (`tools/build-known-scripts.py`) and the site's version line
-  (`site/build.py`). It rebuilds them; commit what changed.
+  (`tools/build-format.py`) and `app/known-scripts.json`
+  (`tools/build-known-scripts.py`), plus the site's version line
+  (`site/build.py`) when a local `site/` folder is there. It rebuilds them;
+  commit what changed.
 - The Python tests pass.
 - The browser tests pass (`--no-browser-tests` skips them).
 
@@ -52,10 +53,11 @@ Then, by hand:
   reputation). The certificate is the owner's to buy.
 - **A Mac build**, if there is one: `py -3 build-exe.py` on a Mac, then
   sign and notarise it there. The site's macOS card says "soon" until then.
-- **The site.** `site/build.py` (run by the release) lists what still holds a
-  placeholder (contact address, hosting provider, the download button's
-  link). Fill them
-  in, then upload `site/` as it is (a static site).
+- **The site**, if you keep one. The website lives in a local `site/` folder
+  that is not in the repository. `site/build.py` (run by the release when the
+  folder is there) lists what still holds a placeholder (hosting provider, the
+  download button's link). Fill them in, then upload `site/` as it is (a
+  static site).
 - **Commit and tag** with the printed commands, and push wherever the
   repository lives.
 

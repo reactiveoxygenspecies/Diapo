@@ -6,7 +6,7 @@
    (stage, slides, current slide) and navigates between slides
    without owning a copy of the deck's state.
 
-   Deck contract (see README): a .deck-stage stage of a fixed size
+   Deck contract (see REFERENCE.md): a .deck-stage stage of a fixed size
    (1920x1080 unless the deck says otherwise) with .slide sections;
    .active marks the shown slide. Everything else (deck:slide events,
    hash navigation) is optional and detected.

@@ -16,7 +16,7 @@ A release (see RELEASING.md for the whole list, signing and the site included):
      package-lock.json, and the changelog heading ("## 0.2.0 - 2026-10-05") are set;
   3. the generated files are rebuilt: diapo-format/ and the skill's copies
      (tools/build-format.py), app/known-scripts.json (tools/build-known-scripts.py),
-     the site's version line (site/build.py, which also lists the placeholders);
+     the site's version line when site/ is there (site/build.py; the site is not in the repository);
   4. the tests run (Python, then the browser tests unless --no-browser-tests);
   5. the executable is built (unless --no-exe);
   6. the commands to commit and tag are printed; nothing is committed here.
@@ -37,7 +37,8 @@ SERVE = os.path.join(EDITOR, "serve.py")
 CHANGELOG = os.path.join(EDITOR, "CHANGELOG.md")
 PACKAGE = os.path.join(EDITOR, "package.json")
 LOCK = os.path.join(EDITOR, "package-lock.json")
-GENERATED = ["diapo-format", "skills/diapo-deck/deck-runtime.js", "deck-editor/app/known-scripts.json", "site/index.html"]
+GENERATED = ["diapo-format", "skills/diapo-deck/deck-runtime.js", "deck-editor/app/known-scripts.json"]
+SITE_BUILD = os.path.join(ROOT, "site", "build.py")   # the website: kept locally, not in the repository
 PY = [sys.executable]
 NPM = shutil.which("npm") or "npm"            # npm.cmd on Windows
 NPX = shutil.which("npx") or "npx"
@@ -87,7 +88,8 @@ def rebuild_generated():
     """Bring the generated files up to date; returns the ones that changed."""
     run(PY + ["tools/build-format.py"])
     run(PY + ["tools/build-known-scripts.py"])
-    run(PY + [os.path.join(ROOT, "site", "build.py")])
+    if os.path.isfile(SITE_BUILD):
+        run(PY + [SITE_BUILD])
     changed = git("status", "--porcelain", "--", *GENERATED).splitlines()
     return [line[3:] for line in changed]
 
@@ -180,8 +182,9 @@ Release {version} is ready. Look over the changes (git diff), then:
     git -C "{ROOT}" commit -m "Release {version}"
     git -C "{ROOT}" tag v{version}
 
-Still by hand (RELEASING.md): sign deck-editor/dist/diapo.exe, upload it and the
-site (site/), and fill in the placeholders site/build.py listed above.""")
+Still by hand (RELEASING.md): sign deck-editor/dist/diapo.exe and upload it.""")
+    if os.path.isfile(SITE_BUILD):
+        print("Then fill in the placeholders site/build.py listed above and upload site/.")
     return 0
 
 

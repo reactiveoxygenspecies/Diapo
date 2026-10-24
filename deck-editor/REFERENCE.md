@@ -13,7 +13,7 @@ standalone HTML file.
   and cleaned so that a deck saved without edits is byte-identical to the original.
 
 New to Diapo? [GUIDE.md](GUIDE.md) is the ten-minute version for people making
-presentations; this README is the reference.
+presentations; this file is the reference.
 
 ## Starting
 

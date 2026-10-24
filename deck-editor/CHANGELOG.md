@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Repository housekeeping.** The editor's reference is now `deck-editor/REFERENCE.md`
+  (it was `deck-editor/README.md`, which read as a second README beside the
+  project's own). The website (`site/`) and the roadmap (`NEXT.md`) are kept
+  locally and no longer published with the code; `tools/release.py` builds the
+  site only when the folder is there.
 - **Open source.** Diapo is published under the MIT licence (`LICENSE`).
 - **Equations and chemical structures.** Insert > Equation takes LaTeX, drawn
   by MathJax as you type in the panel's Equation section, reactions included
