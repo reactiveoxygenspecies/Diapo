@@ -15,7 +15,7 @@
    the animation instead of being overwritten by it.
    ============================================================ */
 import { getOffset, setOffset, forgetVars } from './transform.js';
-import { ANIM_MARK_START, ANIM_MARK_END } from './document.js';
+import { ANIM_MARK_START, ANIM_MARK_END, animStateSelectors } from './document.js';
 
 const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)';
 
@@ -57,7 +57,7 @@ export function animationCss(names) {
         const p = PRESETS[n];
         lines.push(`@keyframes de-${n} { ${p.kf} }`);
         // Plain elements animate when the slide shows; fragments when they are revealed (or, while editing, with the slide).
-        const sel = `.slide.visible [data-anim="${n}"]:not([data-fragment]), .deck-stage [data-fragment].visible[data-anim="${n}"], html.deck-editing .slide.visible [data-fragment][data-anim="${n}"]`;
+        const sel = animStateSelectors(`[data-anim="${n}"]`).join(', ');
         lines.push(`${sel} { animation: de-${n} var(--anim-duration, ${p.dur || 0.6}s) var(--anim-ease, ${p.ease || EASE}) var(--anim-delay, 0s) ${p.loop ? 'infinite' : '1 backwards'}; }`);
     }
     lines.push(ANIM_MARK_END);

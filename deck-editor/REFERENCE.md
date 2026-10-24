@@ -588,7 +588,10 @@ you change it:
 - **Presets**: a grid of entrances (fade, fade up/down/left/right, zoom, zoom out,
   pop, bounce, drop, slide in X/Y, scale in X/Y, blur, twirl, flip, stomp) and
   loops (pulse, drift X/Y, spin, rotate, marked with an infinity sign), with
-  duration, delay and easing, and a Play button to replay the entrance. Presets
+  duration (for a loop, **Cycle**: the seconds one cycle takes, lower is
+  faster), delay and easing, and a Play button to replay the entrance. Anything
+  else (direction, repeats, the keyframes themselves) is changed for one
+  element in the Code section (below). Presets
   are pure CSS: the element gets `data-anim="name"` (plus `--anim-duration`,
   `--anim-delay`, `--anim-ease` inline when they differ from the preset's
   defaults), and the keyframes of every preset in use are written into the
@@ -644,9 +647,26 @@ scrolling sits on the span in the band) and the keyframes they use (dimmed
 until edited, and nothing of the element's while left so): what is typed there goes on the
 element (declarations, nested `&` rules), top-level @-rules (`@keyframes`,
 `@media`) stand on their own, and it applies at once.
+What the start leaves out: rules for the editor only, rules inside an `@media`
+that does not apply (print), and what rules for a state set (`.slide.visible
+.reveal { opacity: 1 }`): written on the element they would hold in every state
+and its reveal would stop. Its `transition` is there, to change.
+An element with an Animation preset gets the preset's rule in the list (marked
+**the Animation section**) and, in the box, `animation: de-spin 6s linear 0s
+infinite;` with the element's own values, and the preset's keyframes: change
+the speed, `reverse` or `alternate` it, give it a count, or rewrite the
+keyframes. Its animation declarations are written on the preset's selectors, so
+the animation still waits for the slide to show or the fragment to be revealed;
+once the box sets the animation, the Duration, Delay and easing fields no longer
+change it (the Animation section says so).
+Keyframes typed in the box are the element's own: they are written as
+`name--<data-id>` and its animations renamed with them, so changing a copy of
+`de-spin` or of a deck's keyframes changes that element and nothing else.
 Saved as `data-css` on the element (so a copy of the element takes it along,
 and undo takes it away) and written into the editor's style block on save,
-scoped to `[data-id="..."]` and, unless **Plays while editing too** is on, to
+scoped to `[data-id="..."]:not(#_)` (the `:not(#_)` counts as an id, so the
+element's own CSS outranks the deck's class rules and the presets'; what the
+panel sets inline still wins) and, unless **Plays while editing too** is on, to
 `html:not(.deck-editing)` so the canvas stays still.
 
 ## Theme panel (master styling)
