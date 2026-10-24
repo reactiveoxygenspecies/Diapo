@@ -47,20 +47,34 @@ const MASTER_CSS = MASTER_MARK_START + '\n.deck-stage:has(> .slide.active[data-n
 const SCRIPTS_MARK_START = '/* superscript and subscript (managed by the deck editor) */';
 const SCRIPTS_MARK_END = '/* end superscript and subscript */';
 const SCRIPTS_CSS = SCRIPTS_MARK_START + '\n.deck-stage .slide sup, .deck-stage .slide sub { font-size: 65%; line-height: 0; }\n' + SCRIPTS_MARK_END;
+/* When an editor preset (data-anim) plays: plain elements when the slide shows, fragments when
+   they are revealed (or, while editing, with the slide). `attr` picks the elements, all those
+   with one preset or one element. */
+export function animStateSelectors(attr) {
+    return [`.slide.visible ${attr}:not([data-fragment])`, `.deck-stage [data-fragment].visible${attr}`, `html.deck-editing .slide.visible [data-fragment]${attr}`];
+}
 /* CSS written for one element in the panel's Code section lives on the element as data-css
    (so it goes with it when copied, and is undone with it) and is regenerated into this section
    on every save: the declarations on `[data-id="..."]`, @-rules (keyframes, media) hoisted out.
-   Unless data-css-live is set, the rule only applies when the deck is not being edited. */
+   The `:not(#_)` counts as an id, so the element's own CSS outranks the deck's class rules and
+   the presets' (what the panel sets inline still wins). Keyframes of its own are renamed
+   `name--id`, its animations with them, so changing a copy of the deck's keyframes leaves the
+   other elements alone. On an element with a preset, its animation declarations go on the
+   preset's selectors: they play when the preset would (slide shown, fragment revealed).
+   Unless data-css-live is set, the rules only apply when the deck is not being edited. */
 const ELEMENT_MARK_START = '/* element styles (managed by the deck editor) */';
 const ELEMENT_MARK_END = '/* end element styles */';
+const ANIM_DECL = /^\s*animation(-[a-z-]+)?\s*:/i;
 export function elementCssOf(el) {
     const id = el.getAttribute('data-id'), text = (el.getAttribute('data-css') || '').trim();
     if (!id || !text) return '';
-    const sel = '[data-id="' + id.replace(/["\\]/g, '\\$&') + '"]';
-    const scope = el.hasAttribute('data-css-live') ? sel : 'html:not(.deck-editing) ' + sel;
+    const sel = '[data-id="' + id.replace(/["\\]/g, '\\$&') + '"]:not(#_)';
+    const live = el.hasAttribute('data-css-live');
+    const scope = live ? sel : 'html:not(.deck-editing) ' + sel;
     // Top-level @-rules stand on their own; everything else is a declaration on the element
     // (nested `&` rules inside stay with it, as CSS nesting takes them).
-    const own = [], hoisted = [];
+    const own = [];
+    let hoisted = [];
     let i = 0, depth = 0, start = 0;
     while (i < text.length) {
         const c = text[i];
@@ -75,8 +89,30 @@ export function elementCssOf(el) {
         i++;
     }
     own.push(text.slice(start));
-    const decl = own.join('').trim();
-    return [decl ? scope + ' {\n' + decl.split('\n').map(l => '    ' + l.trim()).join('\n') + '\n}' : '', ...hoisted].filter(Boolean).join('\n');
+    let decl = own.join('').trim();
+    const tag = id.replace(/[^\w-]/g, '_');
+    const names = hoisted.map(h => /^@keyframes\s+([\w-]+)/i.exec(h)).filter(Boolean).map(m => m[1]);
+    if (names.length) {
+        const word = new RegExp('(^|[\\s,])(' + names.map(n => n.replace(/[-]/g, '\\-')).join('|') + ')(?=[\\s,]|$)', 'g');
+        decl = decl.replace(/(animation(?:-name)?\s*:)([^;{}]*)/gi, (m, p, v) => p + v.replace(word, (x, a, n) => a + n + '--' + tag));
+        hoisted = hoisted.map(h => h.replace(/^(@keyframes\s+)([\w-]+)/i, (m, k, n) => k + n + '--' + tag));
+    }
+    // An element with a preset: its own top-level animation declarations go where the preset's do.
+    const anim = [];
+    if (el.hasAttribute('data-anim')) {
+        let rest = '', buf = '', d = 0;
+        for (const c of decl) {
+            buf += c;
+            if (c === '{') d++;
+            else if (c === '}') { d = Math.max(0, d - 1); if (d === 0) { rest += buf; buf = ''; } }
+            else if (c === ';' && d === 0) { if (ANIM_DECL.test(buf)) anim.push(buf.trim()); else rest += buf; buf = ''; }
+        }
+        if (ANIM_DECL.test(buf) && d === 0) anim.push(buf.trim().replace(/;?$/, ';')); else rest += buf;
+        decl = rest.trim();
+    }
+    const block = (s, body) => s + ' {\n' + body.split('\n').map(l => l.trim()).filter(Boolean).map(l => '    ' + l).join('\n') + '\n}';
+    const states = animStateSelectors(sel).filter((s, k) => live || k < 2).map(s => live ? s : 'html:not(.deck-editing) ' + s);
+    return [decl ? block(scope, decl) : '', anim.length ? block(states.join(',\n'), anim.join('\n')) : '', ...hoisted].filter(Boolean).join('\n');
 }
 function elementCss(doc) {
     const parts = Array.from(doc.querySelectorAll('.deck-stage [data-id][data-css]')).map(elementCssOf).filter(Boolean);

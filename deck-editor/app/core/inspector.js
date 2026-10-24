@@ -39,6 +39,10 @@ const LIST_MARKERS = {
 };
 const RECENT_KEY = 'deck-editor-recent-colours';
 
+/* Selectors of rules for a state (the slide shown, an element revealed, hovered): what they set changes. */
+const STATE_SEL = /\.(visible|active|current|past|future)\b|:(hover|focus|focus-within|checked)\b/;
+/* Animation declarations at the top level of an element's own CSS (nested rules and @-rules left out). */
+const OWN_ANIM = (css) => /(^|[;\s])animation(-[a-z-]+)?\s*:/i.test(css.replace(/\{[^{}]*\}/g, '').replace(/[^;{}]*\{[^{}]*\}/g, ''));
 const FOLD_KEY = 'diapo-panel-folded';
 const FOLDED_FIRST = ['timing', 'box', 'align', 'anim', 'pos', 'link'];
 
@@ -226,7 +230,7 @@ export class Inspector {
             <div class="anim-now" id="animNow"></div>
             <div class="anim-grid" id="animGrid"></div>
             <div class="anim-timing" id="animTiming">
-              <div class="insp-field" data-prop="_animDur"><label>Duration</label><input type="number" id="animDur" min="0.1" max="20" step="0.1"><span class="unit">s</span></div>
+              <div class="insp-field" data-prop="_animDur"><label id="animDurLabel">Duration</label><input type="number" id="animDur" min="0.1" max="120" step="0.1"><span class="unit">s</span></div>
               <div class="insp-field" data-prop="_animDelay"><label>Delay</label><input type="number" id="animDelay" min="0" max="20" step="0.1"><span class="unit">s</span></div>
               <div class="insp-field" data-prop="_animEase"><select id="animEase"></select></div>
             </div>
@@ -251,7 +255,7 @@ export class Inspector {
             <div class="insp-code-label">CSS for this element</div>
             <textarea id="inspCodeCss" class="insp-notes theme-css" rows="7" spellcheck="false" placeholder="Declarations for this element, and @keyframes / @media rules of their own" title="Declarations go on the element, @-rules (keyframes, media) stand on their own. Saved as data-css and written into the deck's style block on save; a copy of the element takes it along."></textarea>
             <label class="align-toslide"><input type="checkbox" id="inspCodeLive"> <span>Plays while editing too</span></label>
-            <div class="insp-hint">Starts as the deck's CSS for this element; change it and it is the element's own.</div>
+            <div class="insp-hint">Starts as the deck's CSS for this element, with its animation and keyframes; change it and it is the element's own (keyframes included: the rest of the deck keeps the originals).</div>
           </details>
           <section class="insp-section" data-fold="pos">
             <h4>Position</h4>
@@ -866,11 +870,16 @@ export class Inspector {
         // they are when presenting (the editing class off <html> for the check: a deck often keeps
         // its animations for the show, `html:not(.deck-editing) .marquee span { animation }`).
         const all = [], keyframes = {};
-        const walk = (list, where) => {
+        // `off`: inside an @media that does not apply now (print, say): listed, but not taken into the box.
+        const walk = (list, where, off) => {
             for (const r of Array.from(list)) {
-                if (r.cssRules && !r.selectorText) { if (r.name) { keyframes[r.name] = r.cssText; continue; } walk(r.cssRules, where + (r.conditionText ? ' @' + r.conditionText : '')); continue; }
+                if (r.cssRules && !r.selectorText) {
+                    if (r.name) { keyframes[r.name] = r.cssText; continue; }
+                    const media = r.media && r.conditionText ? !this.deck.win.matchMedia(r.conditionText).matches : false;
+                    walk(r.cssRules, where + (r.conditionText ? ' @' + r.conditionText : ''), off || media); continue;
+                }
                 if (!r.selectorText || /^(\*|::?[a-z-]+|\*::?[a-z-]+)(\s*,\s*(\*|::?[a-z-]+|\*::?[a-z-]+))*$/.test(r.selectorText)) continue;   // resets on everything: noise
-                all.push({ r, where });
+                all.push({ r, where, off });
             }
         };
         for (const sheet of Array.from(doc.styleSheets)) {
@@ -891,21 +900,52 @@ export class Inspector {
         const shown = matchAll();
         if (editing) root.classList.add('deck-editing');
         const tagOf = (t) => t.tagName.toLowerCase() + Array.from(t.classList).filter(c => !/^(reveal|reveal-img|reveal-right|active|visible)$/.test(c)).slice(0, 2).map(c => '.' + c).join('');
-        const declOf = (r) => { const out = []; for (const d of r.style.cssText.split(/;\s*(?=[a-z-]+\s*:|$)/)) { const m = /^\s*([a-z-]+)\s*:\s*(.+?)\s*$/i.exec(d); if (m) out.push([m[1], m[2]]); } return out; };
+        // A shorthand with var() and one of its longhands after it (`transition: opacity var(--dur)`
+        // then `transition-delay`) is serialised as empty longhands: its text is read from the sheet's source.
+        const norm = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').replace(/\s*,\s*/g, ', ');
+        const sourceOf = (r) => {
+            const out = new Map(), node = r.parentStyleSheet && r.parentStyleSheet.ownerNode;
+            if (!node || node.tagName !== 'STYLE') return out;
+            const m = new RegExp(norm(r.selectorText).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' ?\\{([^}]*)\\}').exec(norm(node.textContent));
+            if (m) for (const d of m[1].split(';')) { const kv = /^\s*([a-z-]+)\s*:\s*(.+?)\s*$/i.exec(d); if (kv) out.set(kv[1], kv[2]); }
+            return out;
+        };
+        const declOf = (r) => {
+            const out = []; let src = null;
+            for (const d of r.style.cssText.split(/;\s*(?=[a-z-]+\s*:|$)/)) {
+                const m = /^\s*([a-z-]+)\s*:\s*(.*?)\s*$/i.exec(d);
+                if (!m) continue;
+                if (m[2]) { out.push([m[1], m[2]]); continue; }
+                if (!src) src = sourceOf(r);
+                const short = m[1].split('-')[0];
+                if (src.has(short) && !out.some(([p]) => p === short)) out.push([short, src.get(short)]);
+            }
+            return out;
+        };
         const animOf = (r) => { const a = r.style.getPropertyValue('animation-name') || r.style.getPropertyValue('animation'); return a ? a.split(',').map(n => n.trim().split(/\s+/)[0]) : []; };
-        const rules = [], want = new Set(), decl = new Map(), nested = new Map();
-        all.forEach(({ r, where }, i) => {
-            if (where.startsWith('(the editor')) return;                     // the editor's own block: not the deck's
+        const rules = [], want = new Set(), decl = new Map(), nested = new Map(), changing = new Set();
+        all.forEach(({ r, where, off }, i) => {
+            // The editor's own block is not the deck's, but for the rule of the element's preset (its animation).
+            const preset = where.startsWith('(the editor') && /\[data-anim=/.test(r.selectorText);
+            if (where.startsWith('(the editor') && !preset) return;
             targets.forEach((t, j) => {
                 if (!now[i][j] && !shown[i][j]) return;
+                if (preset && j > 0) return;
                 if (j > 0 && targets.slice(0, j).some((u, k) => (now[i][k] || shown[i][k]) && tagOf(u) === tagOf(t))) return;   // the same rule on the same kind of thing, once
-                const note = [where, j > 0 ? '(on the ' + tagOf(t) + ' inside)' : '', now[i][j] && !shown[i][j] ? '(while editing only)' : !now[i][j] && shown[i][j] ? '(when presenting)' : ''].filter(Boolean).join(' ');
+                const note = [preset ? '(the Animation section)' : where, j > 0 ? '(on the ' + tagOf(t) + ' inside)' : '', now[i][j] && !shown[i][j] ? '(while editing only)' : !now[i][j] && shown[i][j] ? '(when presenting)' : ''].filter(Boolean).join(' ');
                 rules.push((note ? note + '\n' : '') + r.cssText);
                 animOf(r).forEach(n => want.add(n));
+                if (preset || off) return;                                    // a preset's animation comes into the box as values, below
                 // The element's declarations as the sheet serialises them (shorthands kept), later rules
                 // winning as in the cascade; of what is inside, the effects (animations, transitions),
-                // as nested rules on that kind of element.
-                if (j === 0) for (const [p, v] of declOf(r)) decl.set(p, v);
+                // as nested rules on that kind of element. Rules for the editor only stay out, and so
+                // do what rules for a state (the slide shown, a reveal) set: written on the element,
+                // they would hold in every state and the deck's reveal would stop.
+                if (j === 0) {
+                    if (now[i][j] && !shown[i][j]) return;
+                    if (STATE_SEL.test(r.selectorText)) { for (const [p] of declOf(r)) changing.add(p); return; }
+                    for (const [p, v] of declOf(r)) decl.set(p, v);
+                }
                 else if (/^(animation|transition)/m.test(Array.from(r.style).join('\n'))) {
                     const key = '& ' + tagOf(t);
                     if (!nested.has(key)) nested.set(key, new Map());
@@ -914,6 +954,15 @@ export class Inspector {
             });
         });
         for (const t of targets) { const a = this.deck.win.getComputedStyle(t).animationName; if (a && a !== 'none') a.split(',').forEach(n => want.add(n.trim())); }
+        for (const p of changing) decl.delete(p);
+        // A preset's animation with the element's values, to change in the box: the keyframes
+        // copied there are the element's own (renamed for it when written).
+        const a = describeAnimation(el, this.revealClasses());
+        if (a.kind === 'preset') {
+            for (const p of Array.from(decl.keys())) if (/^animation/.test(p)) decl.delete(p);
+            decl.set('animation', `de-${a.preset} ${a.duration}s ${a.ease} ${a.delay}s ${a.loop ? 'infinite' : '1 backwards'}`);
+            want.add('de-' + a.preset);
+        }
         const frames = Array.from(want).filter(n => keyframes[n]).map(n => keyframes[n]);
         $('inspCodeRules').textContent = rules.concat(frames).length ? rules.concat(frames).join('\n\n') : '(no rule of the deck\'s own matches this element; its look comes from inherited styles and inline style)';
         // The box: the element's own CSS, else the deck's declarations for it as a start (dimmed
@@ -959,8 +1008,12 @@ export class Inspector {
         $('animTiming').hidden = a.kind !== 'preset';
         $('animDeckRow').hidden = a.kind !== 'deck';
         if (a.kind === 'preset') {
-            $('animNow').textContent = PRESETS[a.preset].label + (a.loop ? ' (loops)' : ' entrance') + ', ' + a.duration + 's' + (a.delay ? ', after ' + a.delay + 's' : '');
+            const own = OWN_ANIM(el.getAttribute('data-css') || '');
+            $('animNow').textContent = PRESETS[a.preset].label + (a.loop ? ' (loops)' : ' entrance') + ', ' + a.duration + 's' + (a.loop ? ' per cycle' : '') + (a.delay ? ', after ' + a.delay + 's' : '')
+                + (own ? '. Its own CSS (Code, below) sets the animation, so these fields do not change it.' : '');
             $('animNow').dataset.short = PRESETS[a.preset].label;
+            $('animDurLabel').textContent = a.loop ? 'Cycle' : 'Duration';
+            $('animDur').parentElement.title = a.loop ? 'Seconds for one cycle: lower is faster' : '';
             $('animDur').value = a.duration; $('animDelay').value = a.delay;
             $('animEase').value = a.ease;
             if ($('animEase').value !== a.ease) { const o = document.createElement('option'); o.value = a.ease; o.textContent = a.ease; $('animEase').appendChild(o); $('animEase').value = a.ease; }

@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.1 - 2026-10-24
+
+- **Animations per element, from the Code section.** An element with an
+  Animation preset gets the preset's rule in the list and, in the CSS box, its
+  animation as values (`animation: de-spin 6s linear 0s infinite;`) with the
+  keyframes: speed, direction, repeats and the keyframes themselves are
+  changed for that element alone. Keyframes typed in the box are renamed for
+  the element (`de-spin--el-3`), so the rest of the deck keeps the originals;
+  the animation still waits for the slide or the click, as the preset's does.
+  The Duration field of a looping preset reads **Cycle** (seconds per cycle,
+  up to 120).
+- **The element's own CSS wins.** It is written on `[data-id="..."]:not(#_)`,
+  which outranks the deck's class rules and the presets'; before, a deck rule
+  such as `.tri.teal { background }` or a preset's animation could quietly
+  override what was typed.
+- **The CSS box's start text keeps reveals working.** It leaves out what
+  rules for a state set (the opacity and transform a `.reveal` moves between),
+  rules for the editor only and `@media print` rules, and shows a deck's
+  `transition` even when written with `var()` and a `transition-delay` after it
+  (the browser gave its parts as empty values).
+
 ## 1.0.0 - 2026-10-24
 
 - **Repository housekeeping.** The editor's reference is now `deck-editor/REFERENCE.md`

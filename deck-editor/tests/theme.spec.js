@@ -498,10 +498,11 @@ test('44 code: the Code section shows the markup and the rules that style the el
     await page.locator('#inspCodeCss').dispatchEvent('change');
     await page.waitForTimeout(200);
     const nestedBlock = await page.evaluate(() => window.deckEditor.deck.doc.getElementById('deck-editor-overrides').textContent);
-    expect(nestedBlock).toMatch(/html:not\(\.deck-editing\) \[data-id="el-\d+"\] \{\n    & span \{ animation: pulse 1s infinite; \}\n\}\n@keyframes pulse \{ to \{ opacity: 0\.2; \} \}/);
+    // The keyframes typed there are the element's own: renamed for it, the deck's `pulse` left alone.
+    expect(nestedBlock).toMatch(/html:not\(\.deck-editing\) \[data-id="(el-\d+)"\]:not\(#_\) \{\n    & span \{ animation: pulse--\1 1s infinite; \}\n\}\n@keyframes pulse--\1 \{ to \{ opacity: 0\.2; \} \}/);
     await page.check('#inspCodeLive');
     await page.waitForTimeout(200);
-    expect(await page.evaluate(() => { const ed = window.deckEditor; return ed.deck.win.getComputedStyle(ed.deck.doc.querySelector('.who span')).animationName; })).toBe('pulse');
+    expect(await page.evaluate(() => { const ed = window.deckEditor; return ed.deck.win.getComputedStyle(ed.deck.doc.querySelector('.who span')).animationName; })).toMatch(/^pulse--el-\d+$/);
     await page.evaluate(() => { const ed = window.deckEditor; ed.deck.doc.getElementById('tst-inside').remove(); });
     await page.keyboard.press('Control+z'); await page.keyboard.press('Control+z');
     expect(await page.evaluate(() => window.deckEditor.deck.doc.querySelector('.who').hasAttribute('data-css'))).toBe(false);
@@ -516,16 +517,16 @@ test('44 code: the Code section shows the markup and the rules that style the el
     expect(state.css).toBe(css);
     expect(state.id).toMatch(/^el-\d+$/);
     expect(state.block).toContain('/* element styles (managed by the deck editor) */');
-    expect(state.block).toContain(`html:not(.deck-editing) [data-id="${state.id}"] {\n    animation: ticker 18s linear infinite;\n}`);
-    expect(state.block).toContain('@keyframes ticker { to { translate: -50% 0; } }');
+    expect(state.block).toContain(`html:not(.deck-editing) [data-id="${state.id}"]:not(#_) {\n    animation: ticker--${state.id} 18s linear infinite;\n}`);
+    expect(state.block).toContain(`@keyframes ticker--${state.id} { to { translate: -50% 0; } }`);
     expect(state.anim).toBe('none');                                       // still while editing
     expect(state.rules).not.toContain('[data-id=');                        // the element's own CSS is in the box, not in the deck's list
     await page.check('#inspCodeLive');
     await page.waitForTimeout(200);
     const live = await page.evaluate(() => { const ed = window.deckEditor; const h = ed.deck.doc.querySelector('h1'); return { anim: ed.deck.win.getComputedStyle(h).animationName, block: ed.deck.doc.getElementById('deck-editor-overrides').textContent, rules: document.getElementById('inspCodeRules').textContent }; });
-    expect(live.anim).toBe('ticker');
+    expect(live.anim).toBe('ticker--' + state.id);
     expect(live.rules).toContain('@keyframes ticker');                    // the keyframes the running animation uses are listed
-    expect(live.block).toContain(`\n[data-id="${state.id}"] {`);
+    expect(live.block).toContain(`\n[data-id="${state.id}"]:not(#_) {`);
     expect(live.block).not.toContain('html:not(.deck-editing) [data-id=');
     await page.uncheck('#inspCodeLive');
     // Saved: the attribute on the element, the block in the head; the deck on its own runs it. Back in the editor the field shows the text.
@@ -537,7 +538,7 @@ test('44 code: the Code section shows the markup and the rules that style the el
     const deck = await context.newPage();
     await deck.goto('/deck/' + FILE);
     await deck.waitForSelector('.slide.active.visible');
-    expect(await deck.evaluate(() => getComputedStyle(document.querySelector('h1')).animationName)).toBe('ticker');
+    expect(await deck.evaluate(() => getComputedStyle(document.querySelector('h1')).animationName)).toBe('ticker--' + state.id);
     await deck.close();
     await openDeck(page);
     await page.mouse.click(c.x, c.y);
@@ -554,4 +555,53 @@ test('44 code: the Code section shows the markup and the rules that style the el
     expect(await page.evaluate(() => document.getElementById('inspCodeCss').value)).toContain('font-size: 104px;');   // back to the start text
     await save(page);
     expect(readDeck()).not.toContain('element styles');
+});
+
+test('45 code: animations are changed per element from the Code box (timing, keyframes), play when they would, and the element\'s CSS outranks the deck\'s', async ({ page, context }) => {
+    await openDeck(page);
+    const pick = (sel) => page.evaluate((s) => window.deckEditor.selection.select(window.deckEditor.deck.doc.querySelector(s)), sel);
+    const box = () => page.evaluate(() => document.getElementById('inspCodeCss').value);
+    await pick('.sub');
+    await page.waitForTimeout(200);
+    await page.click('#inspCode summary');
+    await page.waitForTimeout(100);
+    // A deck reveal: the box keeps its transition (to change) but not what the reveal changes, so the reveal still runs once edited.
+    const reveal = await box();
+    expect(reveal).toContain('font-size: 36px;');
+    expect(reveal).toContain('transition:');
+    expect(reveal).not.toMatch(/^(opacity|transform):/m);
+    // Two elements spin; the box shows the preset as values, with its keyframes, and the rule is listed.
+    await pick('h1');
+    await page.waitForTimeout(200);
+    await page.click('#animGrid [data-anim="spin"]');
+    await pick('.sub');
+    await page.waitForTimeout(200);
+    await page.click('#animGrid [data-anim="spin"]');
+    await page.waitForTimeout(200);
+    expect(await page.evaluate(() => document.getElementById('animDurLabel').textContent)).toBe('Cycle');
+    expect(await box()).toContain('animation: de-spin 6s linear 0s infinite;');
+    expect(await box()).toContain('@keyframes de-spin');
+    expect(await page.evaluate(() => document.getElementById('inspCodeRules').textContent)).toContain('(the Animation section)');
+    // Changed there: faster, backwards, half a turn, and a colour over the deck's `.sub` rule.
+    await page.fill('#inspCodeCss', 'color: rgb(255, 0, 0);\nanimation: de-spin 2s linear 0s infinite reverse;\n@keyframes de-spin { from { transform: rotate(0deg); } to { transform: rotate(180deg); } }');
+    await page.locator('#inspCodeCss').dispatchEvent('change');
+    await page.waitForTimeout(200);
+    const id = await page.evaluate(() => window.deckEditor.deck.doc.querySelector('.sub').getAttribute('data-id'));
+    const block = await page.evaluate(() => window.deckEditor.deck.doc.getElementById('deck-editor-overrides').textContent);
+    expect(block).toContain(`html:not(.deck-editing) [data-id="${id}"]:not(#_) {\n    color: rgb(255, 0, 0);\n}`);
+    expect(block).toContain(`html:not(.deck-editing) .slide.visible [data-id="${id}"]:not(#_):not([data-fragment]),\nhtml:not(.deck-editing) .deck-stage [data-fragment].visible[data-id="${id}"]:not(#_) {\n    animation: de-spin--${id} 2s linear 0s infinite reverse;\n}`);
+    expect(block).toContain(`@keyframes de-spin--${id} {`);
+    expect(await page.evaluate(() => document.getElementById('animNow').textContent)).toContain('Its own CSS');
+    await page.check('#inspCodeLive');
+    await page.waitForTimeout(200);
+    const look = await page.evaluate(() => { const ed = window.deckEditor; const cs = (s) => ed.deck.win.getComputedStyle(ed.deck.doc.querySelector(s)); const a = cs('.sub'), b = cs('h1'); return { name: a.animationName, dur: a.animationDuration, dir: a.animationDirection, color: a.color, other: b.animationName + ' ' + b.animationDuration }; });
+    expect(look).toEqual({ name: 'de-spin--' + id, dur: '2s', dir: 'reverse', color: 'rgb(255, 0, 0)', other: 'de-spin 6s' });
+    // Saved, the deck on its own plays it when the slide shows.
+    await save(page);
+    const deck = await context.newPage();
+    await deck.goto('/deck/' + FILE);
+    await deck.waitForSelector('.slide.active.visible');
+    expect(await deck.evaluate(() => { const a = getComputedStyle(document.querySelector('.sub')); return a.animationName + ' ' + a.animationDuration; })).toBe('de-spin--' + id + ' 2s');
+    expect(await deck.evaluate(() => getComputedStyle(document.querySelector('h1')).animationName)).toBe('de-spin');
+    await deck.close();
 });
