@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 - 2026-10-24
 
 - **Repository housekeeping.** The editor's reference is now `deck-editor/REFERENCE.md`
   (it was `deck-editor/README.md`, which read as a second README beside the

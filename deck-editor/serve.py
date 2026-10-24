@@ -250,8 +250,8 @@ def settings_change():
 SETTINGS = load_settings()
 
 # The build: bump APP_VERSION and APP_RELEASED with every release (tools/release.py does).
-APP_VERSION = "0.2.0"
-APP_RELEASED = "2026-10-02"
+APP_VERSION = "1.0.0"
+APP_RELEASED = "2026-10-24"
 
 
 def recent_decks():

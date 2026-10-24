@@ -7,7 +7,6 @@ Edit HTML presentations the way you edit slides.</p>
 
 ![The Diapo editor with the welcome deck open: the slide strip on the left, the cover slide in the middle, and the slide's settings and speaker notes in the panel on the right](docs/editor.webp)
 
-## Why I made Diapo
 
 Some time ago I sat down at my laptop to prepare a presentation for a lab meeting. I had some cool new results and was
 looking forward to showing them to my colleagues.

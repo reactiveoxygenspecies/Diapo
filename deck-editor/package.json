@@ -1,6 +1,6 @@
 {
   "name": "diapo",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Diapo, a standalone HTML deck editor. The app has no npm dependencies; this file pulls in Playwright for the tests and Font Awesome Free for tools/build-fa.js.",
   "scripts": {

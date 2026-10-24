@@ -7,3 +7,5 @@ Thumbs.db
 __pycache__/
 # The website is kept locally for now, not published with the code
 site/
+# Claude Code settings for this machine only
+.claude/settings.local.json
