@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.1 - 2026-10-24
 
 - **Animations per element, from the Code section.** An element with an
   Animation preset gets the preset's rule in the list and, in the CSS box, its
