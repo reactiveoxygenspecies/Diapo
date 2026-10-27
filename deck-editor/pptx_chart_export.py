@@ -244,12 +244,26 @@ def chart_part(it):
                 scaling += f'<c:{key} val="{v:g}"/>'
         step = num(va.get("step"))
         major = f'<c:majorUnit val="{step:g}"/>' if step and step > 0 and not log else ""
+        # Where each axis crosses the other: an axis' crosses is a place on the other one. The value
+        # axis through a label's point (on the tick marks, for a line or an area, as the editor draws
+        # it), the label axis at a value.
+        at = va.get("at")
+        cross_j = labels.index(at) if isinstance(at, str) and at and at in labels else -1
+        val_cross = f'<c:crossesAt val="{cross_j + 1}"/>' if cross_j >= 0 else f'<c:crosses val="{"max" if kind == "bar" else "autoZero"}"/>'
+        between = "midCat" if cross_j >= 0 and kind in ("line", "area") else "between"
+        cv = num(la.get("at"))
+        cat_cross = f'<c:crossesAt val="{cv:g}"/>' if cv is not None and (not log or cv > 0) else '<c:crosses val="autoZero"/>'
+        # Bars would cover numbers and names that went with their axis: they stay at the edge ("low" is
+        # the start of the other axis, which a bar chart turns upside down).
+        bars = kind in ("column", "bar")
+        cat_lbl = "low" if bars and "crossesAt" in cat_cross else "nextTo"
+        val_lbl = ("high" if kind == "bar" else "low") if bars and cross_j >= 0 else "nextTo"
         axes = (f'<c:catAx><c:axId val="111111111"/><c:scaling><c:orientation val="{"maxMin" if kind == "bar" else "minMax"}"/></c:scaling><c:delete val="0"/>'
-                f'<c:axPos val="{cat_pos}"/>{cat_title}<c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="{ticks}"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>'
-                f'{cat_line}{text_props(text, rot=-angle * 60000 if angle else None)}<c:crossAx val="222222222"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>'
+                f'<c:axPos val="{cat_pos}"/>{cat_title}<c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="{ticks}"/><c:minorTickMark val="none"/><c:tickLblPos val="{cat_lbl}"/>'
+                f'{cat_line}{text_props(text, rot=-angle * 60000 if angle else None)}<c:crossAx val="222222222"/>{cat_cross}<c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>'
                 f'<c:valAx><c:axId val="222222222"/><c:scaling>{scaling}</c:scaling><c:delete val="0"/><c:axPos val="{val_pos}"/>{grid}{val_title}'
-                f'<c:numFmt formatCode="{x(fmt)}" sourceLinked="0"/><c:majorTickMark val="{ticks}"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>'
-                f'{val_line}{text_props(text)}<c:crossAx val="111111111"/><c:crosses val="{"max" if kind == "bar" else "autoZero"}"/><c:crossBetween val="between"/>{major}</c:valAx>')
+                f'<c:numFmt formatCode="{x(fmt)}" sourceLinked="0"/><c:majorTickMark val="{ticks}"/><c:minorTickMark val="none"/><c:tickLblPos val="{val_lbl}"/>'
+                f'{val_line}{text_props(text)}<c:crossAx val="111111111"/>{val_cross}<c:crossBetween val="{between}"/>{major}</c:valAx>')
     title = ""
     if it.get("title"):
         title = rich_title(it["title"], text, size * 1.25) + '<c:autoTitleDeleted val="0"/>'

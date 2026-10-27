@@ -9,6 +9,10 @@
     axis' minimum, maximum and step (what falls outside is cut), a log scale
     (powers of ten; zero and negatives left out), tick marks outside or
     inside, labels turned 45 or 90 degrees, and the thickness of the axes.
+    **Crosses at** puts an axis inside the plot: the value axis through a
+    label's point (0, for a graph of 3^x), the label axis at a value. On a
+    line or an area its numbers or names go with it, as in a graph of a
+    function; on bars they stay at the edge.
   - **Chart style**: the bar width and rounded corners; the line width, point
     size and a smooth curve (monotone, so it never overshoots a point); and
     two looks in one click, **Clean** (the editor's own) and **Scientific**

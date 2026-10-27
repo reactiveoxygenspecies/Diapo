@@ -550,6 +550,14 @@ section of the properties panel edits it:
   off); for the label axis a line, a title and the labels level, turned 45
   degrees or upright; for both, tick marks (none, outside, inside) and the
   thickness of the lines. A title up the side reads from the bottom.
+  **Crosses at** is where an axis meets the other (empty: at the edge): the
+  value axis runs through the point of a label (pick 0 for a graph of x),
+  the label axis at a value (0, for negative values below it). On a line or
+  an area chart the numbers or names go with their axis, the number on the
+  other axis' line and the name the value axis runs through moved off it;
+  on a column or bar chart they stay at the edge, where the bars leave them
+  readable. A label renamed in the table keeps the value axis; the
+  PowerPoint chart crosses where the editor's does.
 - **Chart style** (not for a pie): the bar width (the share of its slot a bar
   or a group of bars fills) and rounded corners; the line width, the point
   size and a smooth curve (monotone: it never overshoots a point). **Clean**

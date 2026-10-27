@@ -1448,6 +1448,69 @@ test('73 chart error bars: a pasted Mean | SD table gives each series its ± col
     expect(readDeck()).toBe(saved);
 });
 
+test('74 chart axes crossing: the value axis through a label\'s point (0 of a graph of x), the label axis at a value, their numbers and names with them; the label keeps it when renamed', async ({ page }) => {
+    await openDeck(page);
+    await page.click('#btnInsert');
+    await page.click('[data-insert="chart"]');
+    const table = 'x\ty\n-2\t0.1\n-1\t0.3\n0\t1\n1\t3\n2\t9\n';
+    await page.focus('#chartGrid input[data-r="0"][data-c="0"]');
+    await page.evaluate((t) => {
+        const dt = new DataTransfer(); dt.setData('text/plain', t);
+        document.activeElement.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    }, table);
+    await page.click('#chartKind [data-kind="line"]');
+    await page.uncheck('#inspChart [data-opt="legend"]');               // its key has a point too
+    await page.check('#inspChartAxes [data-set="valueAxis.line"]');
+    await page.check('#inspChartAxes [data-set="labelAxis.line"]');
+    // The axis lines (vertical, horizontal), the points' centres, and the numbers up the side.
+    const fig = () => page.evaluate(() => {
+        const f = window.deckEditor.deck.doc.querySelector('figure[data-chart]');
+        const axes = Array.from(f.querySelectorAll('svg g[stroke-linecap="square"]:not([style]) line')).map(l => ['x1', 'y1', 'x2', 'y2'].map(a => +l.getAttribute(a)));
+        return { spec: JSON.parse(f.querySelector(':scope > script[data-chart-data]').textContent),
+            v: axes.find(a => a[0] === a[2]), h: axes.find(a => a[1] === a[3]),
+            points: Array.from(f.querySelectorAll('svg circle')).map(c => [+c.getAttribute('cx'), +c.getAttribute('cy')]),
+            ticks: Array.from(f.querySelectorAll('svg text[text-anchor="end"]')).map(t => [t.textContent, +t.getAttribute('x')]) };
+    });
+    let c = await fig();
+    const edge = c.v[0];
+    expect(c.v[0]).toBeLessThan(c.points[0][0]);
+    // The value axis through the point of 0: its numbers beside it; the 0 on the label axis' line left out.
+    await expect(page.locator('#chartValueAt option')).toHaveText(['Left edge', '-2', '-1', '0', '1', '2']);
+    await page.selectOption('#chartValueAt', '0');
+    c = await fig();
+    expect(c.spec.valueAxis).toEqual({ line: true, at: '0' });
+    expect(c.v[0]).toBeCloseTo(c.points[2][0], 0);
+    expect(c.v[0] - edge).toBeGreaterThan(100);
+    expect(c.ticks.length).toBeGreaterThan(1);
+    for (const [, x] of c.ticks) expect(x).toBeLessThan(c.v[0]);
+    expect(c.ticks.map(t => t[0])).not.toContain('0');
+    expect(await page.evaluate(() => window.deckEditor.history.top.label)).toBe('Chart value axis at');
+    await expect(page.locator('#inspChartAxes .insp-field[data-cfield="valueAxis.at"]')).toHaveClass(/\bset\b/);
+    // The label axis at 3: the line at that height.
+    await page.fill('#chartLabelAt', '3');
+    await page.press('#chartLabelAt', 'Enter');
+    c = await fig();
+    expect(c.spec.labelAxis).toEqual({ line: true, at: 3 });
+    expect(c.h[1]).toBeCloseTo(c.points[3][1], 0);
+    // Renamed, the label keeps the axis; undo takes each change back.
+    await page.fill('#chartGrid input[data-r="3"][data-c="0"]', 'zero');
+    await page.press('#chartGrid input[data-r="3"][data-c="0"]', 'Tab');
+    c = await fig();
+    expect(c.spec.valueAxis.at).toBe('zero');
+    await expect(page.locator('#chartValueAt')).toHaveValue('zero');
+    await page.evaluate(() => { window.deckEditor.history.undo(); window.deckEditor.history.undo(); });
+    c = await fig();
+    expect(c.spec.valueAxis.at).toBe('0');
+    expect(c.spec.labelAxis.at).toBeUndefined();
+    // Back to the edge; saved with the table.
+    await page.click('#inspChartAxes .insp-field[data-cfield="valueAxis.at"] .insp-clear');
+    c = await fig();
+    expect(c.v[0]).toBeCloseTo(edge, 0);
+    await page.selectOption('#chartValueAt', '0');
+    await save(page);
+    expect(readDeck()).toContain('"valueAxis":{"line":true,"at":"0"}');
+});
+
 /* ------------------------------------------------------------
    60. Crop
    ------------------------------------------------------------ */

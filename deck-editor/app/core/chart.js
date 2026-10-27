@@ -10,13 +10,16 @@
        is drawn from: { labels, series: [{ name, values, colour?,
        marker?, dash?, errors? }], palette, legend, values, grid, stacked, unit?,
        title?, and the look, each written only when it is not the
-       default: valueAxis { title, line, min, max, step, log },
-       labelAxis { title, line, angle }, ticks, axisWidth, decimals,
+       default: valueAxis { title, line, min, max, step, log, at },
+       labelAxis { title, line, angle, at }, ticks, axisWidth, decimals,
        legendPos, lineWidth, pointSize, smooth, barWidth, rounded,
        errorKind, errorDir, errorCaps }. A series' errors are the sizes
        of its error bars, one per label, a column of the grid of their own.
        The value axis is the one with the numbers (up the side, or
        along the bottom of a bar chart), the label axis the other.
+       Where each crosses the other: valueAxis.at a label (the axis
+       runs through its point), labelAxis.at a value; by default the
+       edge of the plot.
    The editor redraws the SVG from the table whenever the box, the
    text size or the font changes (the data-key tells), and after
    every change to the table. Colours are the deck's theme variables
@@ -94,8 +97,8 @@ function normalise(raw) {
         legend: r.legend !== false, values: !!r.values, grid: r.grid !== false, stacked: !!r.stacked,
         unit: typeof r.unit === 'string' ? r.unit.slice(0, 12) : '',
         title: typeof r.title === 'string' ? r.title.slice(0, 200) : '',
-        valueAxis: { title: str(va.title, 120), line: !!va.line, min: num(va.min, -1e15, 1e15), max: num(va.max, -1e15, 1e15), step: va.step > 0 ? num(va.step, 1e-9, 1e15) : null, log: !!va.log },
-        labelAxis: { title: str(la.title, 120), line: !!la.line, angle: [45, 90].includes(la.angle) ? la.angle : 0 },
+        valueAxis: { title: str(va.title, 120), line: !!va.line, min: num(va.min, -1e15, 1e15), max: num(va.max, -1e15, 1e15), step: va.step > 0 ? num(va.step, 1e-9, 1e15) : null, log: !!va.log, at: str(va.at, 200) },
+        labelAxis: { title: str(la.title, 120), line: !!la.line, angle: [45, 90].includes(la.angle) ? la.angle : 0, at: num(la.at, -1e15, 1e15) },
         ticks: ['out', 'in'].includes(r.ticks) ? r.ticks : 'none',
         axisWidth: num(r.axisWidth, 0.5, 20),
         decimals: Number.isInteger(r.decimals) && r.decimals >= 0 && r.decimals <= 4 ? r.decimals : null,
@@ -119,9 +122,11 @@ function specJson(spec) {
     if (va.line) v.line = true;
     for (const key of ['min', 'max', 'step']) if (va[key] != null) v[key] = va[key];
     if (va.log) v.log = true;
+    if (va.at) v.at = va.at;
     if (la.title) l.title = la.title;
     if (la.line) l.line = true;
     if (la.angle) l.angle = la.angle;
+    if (la.at != null) l.at = la.at;
     if (Object.keys(v).length) out.valueAxis = v;
     if (Object.keys(l).length) out.labelAxis = l;
     if (spec.ticks !== 'none') out.ticks = spec.ticks;
@@ -299,6 +304,18 @@ function drawAxes(kind, spec, { w, h, fs, measure, onColour, lang, top: top0 = 0
         : formatter(spec.unit, lang, Math.pow(10, -Math.max(...[scale.step, ...scale.ticks].map(decimalsOf))), spec.decimals);
     const tickW = Math.max(...scale.ticks.map(t => measure(tickFmt(t), small)));
     const valueW = spec.values ? Math.max(0, ...spec.series.flatMap(s => s.values.filter(v => v != null).map(v => measure(fmt(v), small)))) : 0;
+    const L0 = log ? Math.log10(scale.lo) : scale.lo, L1 = log ? Math.log10(scale.hi) : scale.hi;
+    const frac = (v) => ((log ? Math.log10(v) : v) - L0) / (L1 - L0);
+    const near = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+    // Where the axes cross: the value axis through a label's point, the label axis at a value (kept in
+    // the range); else at the edge. On a line or an area an axis inside the plot takes its numbers or
+    // names with it, as in a graph of a function; bars would cover them, so theirs stay at the edge.
+    const crossJ = va.at ? spec.labels.indexOf(va.at) : -1;
+    const crossV = la.at == null || (log && la.at <= 0) ? null : Math.min(scale.hi, Math.max(scale.lo, la.at));
+    const follow = kind === 'line' || kind === 'area';
+    // The room at the edge for an axis' labels, given back as far as they stay inside the plot.
+    const fromStart = (base, need, end, f) => (f >= 0.999 ? base : Math.max(base, (base + need - f * end) / (1 - f)));
+    const fromEnd = (base, need, start, f) => (f <= 0.001 ? base : Math.min(base, (base - need - start * (1 - f)) / f));
 
     // Room for the labels: category names below (or at the left for bars), ticks at the left (below),
     // an axis title outside each, and the tick marks that stand out of the plot.
@@ -317,10 +334,12 @@ function drawAxes(kind, spec, { w, h, fs, measure, onColour, lang, top: top0 = 0
         else right -= measure(tickFmt(scale.ticks[scale.ticks.length - 1]), small) / 2;
     } else {
         if (va.title) { titleAt.value = left + ts * 0.7; left += room; }
-        left += tickW + fs * 0.6 + tout;
+        const tickRoom = tickW + fs * 0.6 + tout;
+        left = follow && crossJ >= 0 ? fromStart(left, tickRoom, right, (crossJ + 0.5) / n) : left + tickRoom;
         if (spec.values) top += small * 1.4;
         else top += small * 0.6;
         if (la.title) { titleAt.label = bottom - ts * 0.7; bottom -= room; }
+        const bottomBase = bottom;
         if (angle) {
             // Turned names hang from their ticks: as long as a good part of the height allows.
             cat = cat.map(l => ellipsis(l, Math.max(fs * 3, (bottom - top) * 0.4), small, measure));
@@ -335,16 +354,22 @@ function drawAxes(kind, spec, { w, h, fs, measure, onColour, lang, top: top0 = 0
             if (widest > band * 0.92) catSize = Math.max(small * 0.75, small * band * 0.92 / widest);
             bottom -= catSize * 1.8 + tout;
         }
+        if (follow && crossV != null) bottom = fromEnd(bottomBase, bottomBase - bottom, top, 1 - frac(crossV));
     }
     if (bottom - top < fs || right - left < fs) return out.join('');
 
-    const L0 = log ? Math.log10(scale.lo) : scale.lo, L1 = log ? Math.log10(scale.hi) : scale.hi;
-    const frac = (v) => ((log ? Math.log10(v) : v) - L0) / (L1 - L0);
     const vx = (v) => left + frac(v) * (right - left);           // value -> x (bars)
     const vy = (v) => bottom - frac(v) * (bottom - top);         // value -> y (columns, lines)
     const ok = (v) => v != null && (!log || v > 0);
     const base = log ? scale.lo : Math.min(Math.max(0, scale.lo), scale.hi);   // where bars and areas start
     const band = (horizontal ? bottom - top : right - left) / n;
+    const valueAt = crossJ >= 0 ? (horizontal ? top : left) + band * (crossJ + 0.5) : horizontal ? bottom : left;
+    const labelAt = crossV != null ? (horizontal ? vx(crossV) : vy(crossV)) : horizontal ? left : bottom;
+    const valueText = follow ? valueAt : horizontal ? bottom : left, labelText = follow ? labelAt : horizontal ? left : bottom;
+    // The label axis' line would strike through the tick number where it crosses a value axis inside
+    // the plot; the value axis' line, through the name of its label when it reaches past it.
+    const struck = (t) => follow && la.line && crossJ >= 0 && near(t, crossV != null ? crossV : scale.lo);
+    const pierced = (j) => follow && va.line && j === crossJ && crossV != null && frac(crossV) > 0.001;
     // A range set by hand cuts what falls outside it.
     const clip = va.min != null || va.max != null;
     const shown = (v) => !clip || (v >= scale.lo - 1e-9 && v <= scale.hi + 1e-9);
@@ -355,25 +380,26 @@ function drawAxes(kind, spec, { w, h, fs, measure, onColour, lang, top: top0 = 0
     const zeroInside = !log && scale.lo < 0 && scale.hi > 0;
     for (const t of scale.ticks) {
         const onEdge = Math.abs(t - scale.lo) < scale.step / 1e6 || (log && t === scale.lo);
-        const gridHere = spec.grid && !(!log && t === 0) && !(la.line && onEdge);
+        const gridHere = spec.grid && !(!log && t === 0) && !(la.line && (crossV != null ? near(t, crossV) : onEdge));
+        const tickText = struck(t) ? '' : esc(tickFmt(t));
         if (horizontal) {
             const x = vx(t);
             if (gridHere) g.push(`<line x1="${r1(x)}" y1="${r1(top)}" x2="${r1(x)}" y2="${r1(bottom)}"/>`);
-            if (tl) marks0.push(`<line x1="${r1(x)}" y1="${r1(spec.ticks === 'out' ? bottom + tl : bottom - tl)}" x2="${r1(x)}" y2="${r1(bottom)}"/>`);
-            out.push(`<text x="${r1(x)}" y="${r1(bottom + tout + small * 0.9)}" text-anchor="middle" dominant-baseline="central" fill="currentColor" style="opacity:${tickOp}; font-size:${r1(small)}px">${esc(tickFmt(t))}</text>`);
+            if (tl) marks0.push(`<line x1="${r1(x)}" y1="${r1(spec.ticks === 'out' ? valueAt + tl : valueAt - tl)}" x2="${r1(x)}" y2="${r1(valueAt)}"/>`);
+            if (tickText) out.push(`<text x="${r1(x)}" y="${r1(valueText + tout + small * 0.9)}" text-anchor="middle" dominant-baseline="central" fill="currentColor" style="opacity:${tickOp}; font-size:${r1(small)}px">${tickText}</text>`);
         } else {
             const y = vy(t);
             if (gridHere) g.push(`<line x1="${r1(left)}" y1="${r1(y)}" x2="${r1(right)}" y2="${r1(y)}"/>`);
-            if (tl) marks0.push(`<line x1="${r1(spec.ticks === 'out' ? left - tl : left + tl)}" y1="${r1(y)}" x2="${r1(left)}" y2="${r1(y)}"/>`);
-            out.push(`<text x="${r1(left - tout - fs * 0.4)}" y="${r1(y)}" text-anchor="end" dominant-baseline="central" fill="currentColor" style="opacity:${tickOp}; font-size:${r1(small)}px">${esc(tickFmt(t))}</text>`);
+            if (tl) marks0.push(`<line x1="${r1(spec.ticks === 'out' ? valueAt - tl : valueAt + tl)}" y1="${r1(y)}" x2="${r1(valueAt)}" y2="${r1(y)}"/>`);
+            if (tickText) out.push(`<text x="${r1(valueText - tout - fs * 0.4)}" y="${r1(y)}" text-anchor="end" dominant-baseline="central" fill="currentColor" style="opacity:${tickOp}; font-size:${r1(small)}px">${tickText}</text>`);
         }
     }
     if (g.length) out.unshift(`<g stroke="currentColor" stroke-width="1" style="opacity:0.14">${g.join('')}</g>`);
     const marks1 = [];                                           // the label axis' tick marks, one per name
     if (tl) for (let j = 0; j < n; j++) {
         const c = (horizontal ? top : left) + band * (j + 0.5);
-        if (horizontal) marks1.push(`<line x1="${r1(spec.ticks === 'out' ? left - tl : left + tl)}" y1="${r1(c)}" x2="${r1(left)}" y2="${r1(c)}"/>`);
-        else marks1.push(`<line x1="${r1(c)}" y1="${r1(spec.ticks === 'out' ? bottom + tl : bottom - tl)}" x2="${r1(c)}" y2="${r1(bottom)}"/>`);
+        if (horizontal) marks1.push(`<line x1="${r1(spec.ticks === 'out' ? labelAt - tl : labelAt + tl)}" y1="${r1(c)}" x2="${r1(labelAt)}" y2="${r1(c)}"/>`);
+        else marks1.push(`<line x1="${r1(c)}" y1="${r1(spec.ticks === 'out' ? labelAt + tl : labelAt - tl)}" x2="${r1(c)}" y2="${r1(labelAt)}"/>`);
     }
     // The axes: a line where asked for; otherwise a faint line where the bars start, as before.
     const axes = [];
@@ -381,18 +407,19 @@ function drawAxes(kind, spec, { w, h, fs, measure, onColour, lang, top: top0 = 0
     const faint = (x1, y1, x2, y2) => `<line x1="${r1(x1)}" y1="${r1(y1)}" x2="${r1(x2)}" y2="${r1(y2)}" stroke="currentColor" stroke-width="1.5" style="opacity:0.45"/>`;
     const zero = horizontal ? vx(base) : vy(base);
     let zeroLine = '';
-    if (!la.line || zeroInside) zeroLine = horizontal ? faint(zero, top, zero, bottom) : faint(left, zero, right, zero);
-    if (va.line) axes.push(horizontal ? axisLine(left, bottom, right, bottom) : axisLine(left, top, left, bottom));
-    if (la.line) axes.push(horizontal ? axisLine(left, top, left, bottom) : axisLine(left, bottom, right, bottom));
+    if (!la.line || (zeroInside && !(crossV != null && near(crossV, base)))) zeroLine = horizontal ? faint(zero, top, zero, bottom) : faint(left, zero, right, zero);
+    if (va.line) axes.push(horizontal ? axisLine(left, valueAt, right, valueAt) : axisLine(valueAt, top, valueAt, bottom));
+    if (la.line) axes.push(horizontal ? axisLine(labelAt, top, labelAt, bottom) : axisLine(left, labelAt, right, labelAt));
     const stroke = (on) => `stroke="currentColor" stroke-width="${r1(aw)}" stroke-linecap="square" style="opacity:${on ? 1 : 0.45}"`;
     const axisMarks = (marks0.length ? `<g ${stroke(va.line)}>${marks0.join('')}</g>` : '') + (marks1.length ? `<g ${stroke(la.line)}>${marks1.join('')}</g>` : '')
         + (axes.length ? `<g stroke="currentColor" stroke-width="${r1(aw)}" stroke-linecap="square">${axes.join('')}</g>` : '');
 
     // Category names.
-    if (horizontal) cat.forEach((l, j) => out.push(`<text x="${r1(left - tout - fs * 0.5)}" y="${r1(top + band * (j + 0.5))}" text-anchor="end" dominant-baseline="central" fill="currentColor" style="font-size:${r1(small)}px">${esc(l)}</text>`));
+    // A name the value axis' line runs through moves off it: above it (bars), or to its right.
+    if (horizontal) cat.forEach((l, j) => out.push(`<text x="${r1(labelText - tout - fs * 0.5)}" y="${r1(top + band * (j + 0.5) - (pierced(j) ? small * 0.75 : 0))}" text-anchor="end" dominant-baseline="central" fill="currentColor" style="font-size:${r1(small)}px">${esc(l)}</text>`));
     else if (angle) {
         const every = Math.max(1, Math.ceil(small * 1.15 / (band * sin)));
-        const y = bottom + tout + small * 0.5;
+        const y = labelText + tout + small * 0.5;
         cat.forEach((l, j) => {
             if (j % every) return;
             const x = left + band * (j + 0.5);
@@ -402,7 +429,8 @@ function drawAxes(kind, spec, { w, h, fs, measure, onColour, lang, top: top0 = 0
         const every = Math.max(1, Math.ceil(Math.max(...cat.map(l => measure(l, catSize))) / (band * 0.95)));
         cat.forEach((l, j) => {
             if (j % every) return;
-            out.push(`<text x="${r1(left + band * (j + 0.5))}" y="${r1(bottom + tout + catSize * 0.95)}" text-anchor="middle" dominant-baseline="central" fill="currentColor" style="font-size:${r1(catSize)}px">${esc(l)}</text>`);
+            const off = pierced(j);
+            out.push(`<text x="${r1(left + band * (j + 0.5) + (off ? aw / 2 + catSize * 0.3 : 0))}" y="${r1(labelText + tout + catSize * 0.95)}" text-anchor="${off ? 'start' : 'middle'}" dominant-baseline="central" fill="currentColor" style="font-size:${r1(catSize)}px">${esc(l)}</text>`);
         });
     }
     // Axis titles: the one up the side turned to read from the bottom.
@@ -869,11 +897,13 @@ export class ChartSection {
           <div class="insp-row2" id="chartStepRow">
             <div class="insp-field" data-cfield="valueAxis.step"><label>Step</label><input type="number" step="any" min="0" data-set="valueAxis.step" placeholder="auto" title="The distance between two ticks; empty: about five round ones">${clear('valueAxis.step', 'Round ticks')}</div>
           </div>
+          <div class="insp-row"><label>Crosses at</label><div class="insp-field" data-cfield="valueAxis.at"><select data-set="valueAxis.at" id="chartValueAt" title="The label whose point the axis runs through (0, for a graph of x); its numbers go with it"></select>${clear('valueAxis.at', 'At the edge')}</div></div>
           <div class="chart-axis-head" id="chartLabelHead">X axis: the labels</div>
           <div class="chart-opts">
             <label class="align-toslide"><input type="checkbox" data-set="labelAxis.line"> <span>Axis line</span></label>
           </div>
           <div class="insp-row"><label>Title</label><div class="insp-field" data-cfield="labelAxis.title"><input type="text" data-set="labelAxis.title" placeholder="(none)" spellcheck="true" title="The name of the axis">${clear('labelAxis.title', 'No title')}</div></div>
+          <div class="insp-row"><label>Crosses at</label><div class="insp-field" data-cfield="labelAxis.at"><input type="number" step="any" data-set="labelAxis.at" id="chartLabelAt" placeholder="edge" title="The value the axis crosses the other at (0, below which values are negative); its names go with it. Empty: at the edge">${clear('labelAxis.at', 'At the edge')}</div></div>
           <div class="insp-row" id="chartAngleRow"><label>Labels</label><div class="insp-field insp-seg" id="chartAngle"><button data-set-btn="labelAxis.angle" data-v="0" title="Level">Level</button><button data-set-btn="labelAxis.angle" data-v="45" title="Turned 45 degrees, for long names">45&deg;</button><button data-set-btn="labelAxis.angle" data-v="90" title="Upright, reading from the bottom">90&deg;</button></div></div>
           <div class="chart-axis-head">Both axes</div>
           <div class="insp-row"><label>Ticks</label><div class="insp-field insp-seg" id="chartTicks"><button data-set-btn="ticks" data-v="none" title="No tick marks">None</button><button data-set-btn="ticks" data-v="out" title="Tick marks outside the plot">Outside</button><button data-set-btn="ticks" data-v="in" title="Tick marks inside the plot">Inside</button></div></div>
@@ -1106,6 +1136,13 @@ export class ChartSection {
             this.$('chartValueHead').textContent = horizontal ? 'X axis: the values' : 'Y axis: the values';
             this.$('chartLabelHead').textContent = horizontal ? 'Y axis: the labels' : 'X axis: the labels';
             this.$('chartAngleRow').hidden = horizontal;
+            // The labels the value axis can cross at (one no longer in the table says so: drawn at the edge).
+            const at = this.$('chartValueAt'), names = [...new Set(spec.labels.filter(l => l !== ''))];
+            const list = [['', horizontal ? 'Bottom edge' : 'Left edge'], ...names.map(l => [l, l])];
+            if (spec.valueAxis.at && !names.includes(spec.valueAxis.at)) list.push([spec.valueAxis.at, spec.valueAxis.at + ' (not a label)']);
+            const optsHtml = list.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('');
+            if (at.dataset.opts !== optsHtml) { at.innerHTML = optsHtml; at.dataset.opts = optsHtml; }
+            this.$('chartLabelAt').placeholder = horizontal ? 'left edge' : 'bottom edge';
         }
         if (this.styleRoot) {
             this.$('chartBarStyle').hidden = !(kind === 'column' || kind === 'bar');
@@ -1126,7 +1163,7 @@ export class ChartSection {
         }
         // Folded, the two sections say in a few words what is set.
         const va = spec.valueAxis, la = spec.labelAxis;
-        this._summary(this.axesRoot, [va.line || la.line ? 'lines' : '', spec.ticks !== 'none' ? 'ticks' : '', va.log ? 'log' : '', va.min != null || va.max != null ? 'range' : '', va.title || la.title ? 'titles' : ''].filter(Boolean).join(', '));
+        this._summary(this.axesRoot, [va.line || la.line ? 'lines' : '', spec.ticks !== 'none' ? 'ticks' : '', va.log ? 'log' : '', va.min != null || va.max != null ? 'range' : '', va.at || la.at != null ? 'crossing' : '', va.title || la.title ? 'titles' : ''].filter(Boolean).join(', '));
         this._summary(this.styleRoot, [spec.barWidth != null ? Math.round(spec.barWidth) + '% bars' : '', !spec.rounded ? 'square' : '', spec.smooth ? 'smooth' : '', spec.lineWidth != null ? spec.lineWidth + ' px lines' : '', errors && spec.errorDir === 'out' ? 'outward errors' : ''].filter(Boolean).join(', '));
     }
     _summary(sec, text) { const s = sec && sec.querySelector('.insp-sum'); if (s) s.textContent = text; }
@@ -1153,7 +1190,15 @@ function gridCols(spec) {
 /* One cell of the grid into the table (row 0: names, column 0: labels). */
 function setCell(spec, r, c, v, cols = gridCols(spec)) {
     if (r === 0 && c === 0) return;
-    if (c === 0) { if (r > 0 && r - 1 < spec.labels.length) spec.labels[r - 1] = String(v); return; }
+    if (c === 0) {
+        if (r > 0 && r - 1 < spec.labels.length) {
+            // The label the value axis crosses at keeps it when renamed.
+            const old = spec.labels[r - 1], now = String(v), va = spec.valueAxis;
+            if (va && va.at && va.at === old && now && now !== old && spec.labels.filter(l => l === old).length === 1) va.at = now;
+            spec.labels[r - 1] = now;
+        }
+        return;
+    }
     const col = cols[c], s = col && spec.series[col.s];
     if (!s) return;
     if (r === 0) { if (!col.err) s.name = String(v); return; }

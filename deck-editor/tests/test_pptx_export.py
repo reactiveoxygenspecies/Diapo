@@ -220,6 +220,18 @@ class ExportTest(unittest.TestCase):
         self.assertIn('<c:minus><c:numLit><c:formatCode>General</c:formatCode><c:ptCount val="2"/><c:pt idx="0"><c:v>0</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt>', xml)
         self.assertLess(xml.index("<c:errBars>"), xml.index("<c:cat>"))
         self.assertLess(xml.index("<c:marker>"), xml.index("<c:errBars>"))
+        # Where the axes cross: the value axis through the second label's point, the label axis at 5.
+        xml, _ = pptx_chart_export.chart_part({**base, "chart": "line", "valueAxis": {"at": "B"}, "labelAxis": {"at": 5}})
+        ET.fromstring(xml)
+        self.assertRegex(xml, r'<c:catAx>.*<c:crossesAt val="5"/>.*</c:catAx>')
+        self.assertRegex(xml, r'<c:valAx>.*<c:crossesAt val="2"/><c:crossBetween val="midCat"/>.*</c:valAx>')
+        xml, _ = pptx_chart_export.chart_part({**base, "chart": "line", "valueAxis": {"at": "no such label"}})
+        self.assertNotIn("crossesAt", xml)
+        self.assertIn('<c:crossBetween val="between"/>', xml)
+        # On bars the numbers and names stay at the edge.
+        xml, _ = pptx_chart_export.chart_part({**base, "chart": "column", "valueAxis": {"at": "B"}, "labelAxis": {"at": 5}})
+        self.assertEqual(xml.count('<c:tickLblPos val="low"/>'), 2)
+        self.assertIn('<c:crossBetween val="between"/>', xml)
 
 
 if __name__ == "__main__":
