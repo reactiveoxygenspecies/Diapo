@@ -185,6 +185,42 @@ class ExportTest(unittest.TestCase):
         ET.fromstring(s)
         self.assertIn("1 &lt; 2 &amp;  &quot;quoted&quot;", s)
 
+    def test_chart_look_carries_over(self):
+        import pptx_chart_export
+        base = {"kind": "chart", "labels": ["A", "B"], "series": [{"name": "S", "values": [1, 30], "color": "#2f6fed", "marker": "square-open", "dash": "dash"}],
+                "legend": True, "grid": False, "text": {"size": 24, "color": "#111111"}}
+        xml, _ = pptx_chart_export.chart_part({**base, "chart": "line", "valueAxis": {"title": "Count", "line": True, "log": True, "min": 0.1, "max": 100},
+                                               "labelAxis": {"title": "Group", "line": True, "angle": 45}, "ticks": "out", "smooth": True, "legendPos": "right", "decimals": 1})
+        ET.fromstring(xml)
+        for need in ('<c:logBase val="10"/>', '<c:max val="100"/>', '<c:min val="0.1"/>', '<c:majorTickMark val="out"/>', '<c:smooth val="1"/>',
+                     '<a:prstDash val="dash"/>', '<c:symbol val="square"/>', '<c:legendPos val="r"/>', '>Count</a:t>', '>Group</a:t>',
+                     'rot="-5400000"', 'rot="-2700000"', 'formatCode="#,##0.0"'):
+            self.assertIn(need, xml)
+        # A linear axis takes its step; a bar chart its width; a chart without a look is as it was.
+        xml, _ = pptx_chart_export.chart_part({**base, "chart": "column", "valueAxis": {"min": 0, "max": 50, "step": 10}, "barWidth": 50})
+        self.assertIn('<c:majorUnit val="10"/>', xml)
+        self.assertIn('<c:gapWidth val="100"/>', xml)
+        self.assertNotIn("logBase", xml)
+        xml, _ = pptx_chart_export.chart_part({**base, "chart": "column"})
+        self.assertIn('<c:majorTickMark val="none"/>', xml)
+        self.assertIn('<c:gapWidth val="80"/>', xml)
+        self.assertNotIn("errBars", xml)
+        # Error bars: their sizes point by point, before the categories (the schema's order); outward
+        # ones only away from zero, and no caps when the chart has none.
+        errs = {**base, "series": [{"name": "S", "values": [5, -4], "errors": [1.5, 2], "color": "#2f6fed"}]}
+        xml, _ = pptx_chart_export.chart_part({**errs, "chart": "column"})
+        ET.fromstring(xml)
+        self.assertRegex(xml, r'<c:errBars><c:errBarType val="both"/><c:errValType val="cust"/><c:noEndCap val="0"/>'
+                              r'<c:plus>.*<c:v>1.5</c:v>.*<c:v>2</c:v>.*</c:plus><c:minus>.*<c:v>1.5</c:v>.*<c:v>2</c:v>.*</c:minus>')
+        self.assertLess(xml.index("<c:errBars>"), xml.index("<c:cat>"))
+        xml, _ = pptx_chart_export.chart_part({**errs, "chart": "line", "errorDir": "out", "errorCaps": False})
+        ET.fromstring(xml)
+        self.assertIn('<c:noEndCap val="1"/>', xml)
+        self.assertIn('<c:plus><c:numLit><c:formatCode>General</c:formatCode><c:ptCount val="2"/><c:pt idx="0"><c:v>1.5</c:v></c:pt><c:pt idx="1"><c:v>0</c:v></c:pt>', xml)
+        self.assertIn('<c:minus><c:numLit><c:formatCode>General</c:formatCode><c:ptCount val="2"/><c:pt idx="0"><c:v>0</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt>', xml)
+        self.assertLess(xml.index("<c:errBars>"), xml.index("<c:cat>"))
+        self.assertLess(xml.index("<c:marker>"), xml.index("<c:errBars>"))
+
 
 if __name__ == "__main__":
     unittest.main()

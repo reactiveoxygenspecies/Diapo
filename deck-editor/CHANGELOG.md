@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased
+
+- **Charts get axes and a style of their own.** Two new sections under Chart
+  in the panel, which fold like the others:
+  - **Chart axes**: a line for each axis (the values, the labels), a title for
+    each (the one up the side turned to read from the bottom), the value
+    axis' minimum, maximum and step (what falls outside is cut), a log scale
+    (powers of ten; zero and negatives left out), tick marks outside or
+    inside, labels turned 45 or 90 degrees, and the thickness of the axes.
+  - **Chart style**: the bar width and rounded corners; the line width, point
+    size and a smooth curve (monotone, so it never overshoots a point); and
+    two looks in one click, **Clean** (the editor's own) and **Scientific**
+    (both axes, ticks outside, no grid, square bars, as in a journal figure).
+  - In the Chart section: each series of a line or area chart picks its points
+    (circle, square, triangle, diamond, filled or open, or none) and its line
+    (solid, dashed, dotted), and the legend shows them; the legend goes at the
+    top, the bottom or the right; **Decimals** fixes the decimals of every
+    number on the chart.
+- **Error bars.** A series of a column, bar, line or area chart gets a
+  column of error sizes beside its values (**Error bars** under its colours,
+  or paste a table whose column after a series is headed SD, SEM, CI, Error
+  or ±, as statistics programs export Mean | SD). **Error is** names what they
+  stand for (SD, SEM, 95% CI) and heads their columns; Chart style draws them
+  both ways or only away from zero, with or without caps. They count in the
+  axis range, push the values on the chart past their ends, are drawn in the
+  text colour over bars and in the series' colour on lines, and go to
+  PowerPoint as the native chart's own error bars.
+  The table keeps only what is set (`valueAxis`, `labelAxis`, `ticks`, ...),
+  so a chart made before draws exactly as it did, and Export > PowerPoint
+  carries the look over to the native chart.
+- Axis numbers with a step of 2.5 (0, 2.5, 5) were written without their
+  decimal (0, 3, 5); they keep it now.
+- The Title and Unit fields of a chart are marked when set again (the panel
+  cleared the mark straight after drawing it).
+
 ## 1.0.1 - 2026-10-24
 
 - **Animations per element, from the Code section.** An element with an

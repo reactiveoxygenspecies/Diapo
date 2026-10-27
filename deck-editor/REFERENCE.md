@@ -524,9 +524,38 @@ section of the properties panel edits it:
   first, as `var(--accent)` and the like, so a theme change recolours the
   chart); a chip beside a series name picks that series, and a swatch gives
   it a colour of its own.
-- **Options**: stacked (column, bar, area), legend, values on the chart, grid
-  lines, and a unit written with every number (`$` before it, `%` or ` kg`
-  after it).
+- **Options**: stacked (column, bar, area), legend (and where: top, bottom
+  or right; a pie picks its side when left on Automatic), values on the
+  chart, grid lines, a unit written with every number (`$` before it, `%` or
+  ` kg` after it) and the decimals of every number (Automatic: as each needs).
+- **Series look** (line and area): the series picked by its chip gets its
+  points (circle, square, triangle, diamond, each filled or open, or none)
+  and its line (solid, dashed, dotted); the legend shows both.
+- **Error bars** (column, bar, line, area): **Error bars** under the colours
+  gives the series picked by its chip a column after its values in the
+  table, the size of each bar (plus or minus; an empty cell, no bar). A table
+  pasted into the top-left cell whose column after a series is headed `SD`,
+  `SEM`, `CI`, `Error` or `±` (Mean | SD | Mean | SD) makes those columns its
+  error bars. **Error is** (SD, SEM, 95% CI, or not named) heads the columns;
+  the bars look the same whatever they stand for. Chart style draws them
+  both ways or outward (up from a positive value, down from a negative one)
+  and with or without caps. They count in the axis range and the values on
+  the chart move past their ends; over bars they are in the text colour, on
+  lines in the series' colour. A pie leaves them out (and keeps them).
+- **Chart axes** (not for a pie): for the value axis (the numbers: up the
+  side, or along the bottom of a bar chart) a line, a title, a minimum, a
+  maximum and a step (empty: from the data; what falls outside a range set
+  by hand is cut), and a log scale (powers of ten, with 2 and 5 between them
+  over a short range; zero and negative values are left out, and stacking is
+  off); for the label axis a line, a title and the labels level, turned 45
+  degrees or upright; for both, tick marks (none, outside, inside) and the
+  thickness of the lines. A title up the side reads from the bottom.
+- **Chart style** (not for a pie): the bar width (the share of its slot a bar
+  or a group of bars fills) and rounded corners; the line width, the point
+  size and a smooth curve (monotone: it never overshoots a point). **Clean**
+  and **Scientific** set the look in one click: the editor's own (grid
+  lines, no axis lines, rounded bars), or a journal figure's (both axis
+  lines, ticks outside, no grid, square bars).
 - The chart's text is the element's own font, size and colour: the Text
   fields of the panel change it. A double-click on the chart goes to its
   table.
@@ -534,7 +563,9 @@ section of the properties panel edits it:
 Every change is one undo step. The chart is saved as a
 `<figure data-chart="column">` holding a plain inline `<svg>` sized to its box
 and the table it was drawn from, as JSON in a
-`<script type="application/json" data-chart-data>`. The deck needs no library
+`<script type="application/json" data-chart-data>` (the look only where it
+differs from the default: `valueAxis`, `labelAxis`, `ticks`, `legendPos`, a
+series' `marker` and `dash`, ...). The deck needs no library
 or script to show it (in the PDF and the single-file export too), and the
 editor draws it again from the table whenever the box, the text size or the
 font changes. A chart title is drawn across the top (the Title field). Charts

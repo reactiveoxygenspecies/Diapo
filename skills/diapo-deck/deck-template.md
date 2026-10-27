@@ -250,6 +250,19 @@ section like a spreadsheet.
   recolours the chart, literal colours otherwise), `legend`, `values`
   (numbers on the chart), `grid`, `stacked` (column, bar, area), optional
   `unit` (`$` goes before the number, `%` or ` kg` after) and `title`.
+- The look, all optional (leave out what stays the default):
+  `valueAxis` (the numbers' axis) `{title, line, min, max, step, log}`,
+  `labelAxis` `{title, line, angle}` (angle `0 | 45 | 90`, not for bar),
+  `ticks` (`"none" | "out" | "in"`), `axisWidth` (px), `decimals` (0-4),
+  `legendPos` (`"top" | "bottom" | "right"`), `lineWidth` and `pointSize`
+  (px), `smooth`, `barWidth` (10-100, % of the slot), `rounded: false`;
+  per series `marker` (`circle | square | triangle | diamond`, each also
+  `-open`, or `none`) and `dash` (`dash | dot`).
+  Error bars: per series `errors`, one size (plus or minus) or `null` per
+  label, like `values`; then `errorKind` (`"SD" | "SEM" | "CI"`, names them),
+  `errorDir: "out"` (only away from zero) and `errorCaps: false`. A scientific figure:
+  `"valueAxis":{"line":true,"title":"Yield (%)"},"labelAxis":{"line":true},"ticks":"out","grid":false,"rounded":false`;
+  a log axis: `"valueAxis":{"log":true}`.
 - The chart's text takes the figure's `font-family`, `font-size` and `color`:
   set them inline or by class. Give the figure a box in stage px.
 - No `<svg>` in what you write: the editor draws it from the table when it

@@ -60,7 +60,7 @@ export class Inspector {
         const scratch = document.createElement('i');
         this.shadowKeys = Object.entries(SHADOWS).map(([k, v]) => { scratch.style.boxShadow = v; return [k, v, scratch.style.boxShadow]; });
         this._build();
-        this.chart = new ChartSection(app, this.$('inspChart'));
+        this.chart = new ChartSection(app, this.$('inspChart'), this.$('inspChartAxes'), this.$('inspChartStyle'));
         this.math = new MathSection(app, this.$('inspMath'));
         this.chem = new ChemSection(app, this.$('inspChem'));
         this._bind();
@@ -156,6 +156,8 @@ export class Inspector {
             </div>
           </section>
           <section class="insp-section" id="inspChart" hidden></section>
+          <section class="insp-section" id="inspChartAxes" data-fold="chartaxes" hidden><h4>Chart axes</h4></section>
+          <section class="insp-section" id="inspChartStyle" data-fold="chartstyle" hidden><h4>Chart style</h4></section>
           <section class="insp-section" id="inspMath" hidden></section>
           <section class="insp-section" id="inspChem" hidden></section>
 
@@ -289,7 +291,7 @@ export class Inspector {
     }
 
     /* Sections a slide tool keeps out of the way until asked (running by itself, box, align,
-       animation, position, link) fold: their heading opens and closes them and, folded, says in a few
+       animation, position, link, a chart's axes and style) fold: their heading opens and closes them and, folded, says in a few
        words what is set. What is folded is remembered per browser (none, the first time, but
        these). */
     _setupFolding() {

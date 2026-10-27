@@ -1279,6 +1279,175 @@ test('64 charts written by hand: a figure with its table and no drawing is drawn
     expect(readDeck()).toMatch(/<figure data-chart="column"[^>]*>\s*<svg [^>]*viewBox="0 0 800 400"[^>]*data-key=/);
 });
 
+test('72 chart axes and style: axis lines, titles, a range, a log scale, ticks, a series\' points, the scientific look; each one undo step, saved in the table only when set', async ({ page }) => {
+    await openDeck(page);
+    await page.click('#btnInsert');
+    await page.click('[data-insert="chart"]');
+    const fig = () => page.evaluate(() => {
+        const f = window.deckEditor.deck.doc.querySelector('figure[data-chart]');
+        return { spec: JSON.parse(f.querySelector(':scope > script[data-chart-data]').textContent), svg: f.querySelector('svg').innerHTML, text: f.querySelector('svg').textContent };
+    });
+    let c = await fig();
+    expect(c.spec.valueAxis).toBeUndefined();                           // a plain chart's table carries no look
+    await expect(page.locator('#inspChartAxes')).toBeVisible();
+    await expect(page.locator('#inspChartStyle')).toBeVisible();
+    // The value axis: its line, a title turned up the side, a range of 0 to 200 by 50.
+    await page.check('#inspChartAxes [data-set="valueAxis.line"]');
+    await page.fill('#inspChartAxes [data-set="valueAxis.title"]', 'Revenue');
+    await page.press('#inspChartAxes [data-set="valueAxis.title"]', 'Enter');
+    await page.fill('#inspChartAxes [data-set="valueAxis.max"]', '200');
+    await page.press('#inspChartAxes [data-set="valueAxis.max"]', 'Enter');
+    await page.fill('#inspChartAxes [data-set="valueAxis.step"]', '50');
+    await page.press('#inspChartAxes [data-set="valueAxis.step"]', 'Enter');
+    c = await fig();
+    expect(c.spec.valueAxis).toEqual({ title: 'Revenue', line: true, max: 200, step: 50 });
+    expect(c.svg).toMatch(/rotate\(-90\)[^>]*>Revenue</);
+    expect(c.text).toContain('200');
+    expect(c.text).toContain('150');
+    expect(c.svg).toContain('clip-path=');                              // a range set by hand cuts what is outside it
+    await expect(page.locator('#inspChartAxes .insp-field[data-cfield="valueAxis.max"]')).toHaveClass(/\bset\b/);
+    expect(await page.evaluate(() => window.deckEditor.history.top.label)).toBe('Chart value axis step');
+    // Ticks outside and a turned label axis.
+    await page.click('#chartTicks [data-v="out"]');
+    await page.click('#chartAngle [data-v="45"]');
+    c = await fig();
+    expect(c.spec.ticks).toBe('out');
+    expect(c.spec.labelAxis).toEqual({ angle: 45 });
+    expect(c.svg).toMatch(/transform="rotate\(-45 /);
+    // Undo takes back one change at a time.
+    await page.evaluate(() => window.deckEditor.history.undo());
+    c = await fig();
+    expect(c.spec.labelAxis).toBeUndefined();
+    expect(c.spec.ticks).toBe('out');
+    // A log scale: powers of ten.
+    await page.check('#inspChartAxes [data-set="valueAxis.log"]');
+    await page.click('#inspChartAxes .insp-field[data-cfield="valueAxis.max"] .insp-clear');
+    await page.click('#inspChartAxes .insp-field[data-cfield="valueAxis.step"] .insp-clear');
+    c = await fig();
+    expect(c.spec.valueAxis).toEqual({ title: 'Revenue', line: true, log: true });
+    expect(c.text).toMatch(/10.*100/);
+    // A line's points and dashes, per series, and the legend at the right.
+    await page.click('#chartKind [data-kind="line"]');
+    await expect(page.locator('#chartSeriesLook')).toBeVisible();
+    await page.click('#chartGrid .chart-chip[data-s="1"]');
+    await page.selectOption('#chartSeriesLook [data-series="marker"]', 'square-open');
+    await page.selectOption('#chartSeriesLook [data-series="dash"]', 'dash');
+    await page.selectOption('#chartLegendPosRow [data-set="legendPos"]', 'right');
+    await page.check('#inspChartStyle [data-set="smooth"]');
+    c = await fig();
+    expect(c.spec.series[1].marker).toBe('square-open');
+    expect(c.spec.series[1].dash).toBe('dash');
+    expect(c.spec.series[0].marker).toBeUndefined();
+    expect(c.spec.legendPos).toBe('right');
+    expect(c.spec.smooth).toBe(true);
+    expect(c.svg).toContain('stroke-dasharray');
+    expect(c.svg).toMatch(/<path d="M[\d. ]+C/);                         // a curve, not straight stretches
+    // The scientific look: both axes, ticks outside, no grid, square bars; Clean takes it back.
+    await page.click('#chartKind [data-kind="column"]');
+    await page.click('[data-chart-look="scientific"]');
+    c = await fig();
+    expect(c.spec.labelAxis.line && c.spec.valueAxis.line).toBe(true);
+    expect(c.spec.grid).toBe(false);
+    expect(c.spec.rounded).toBe(false);
+    expect(await page.evaluate(() => window.deckEditor.deck.doc.querySelectorAll('figure[data-chart] svg rect[rx]').length)).toBe(2);   // the legend's keys only
+    await page.click('[data-chart-look="clean"]');
+    c = await fig();
+    expect(c.spec.labelAxis).toBeUndefined();
+    expect(c.spec.ticks).toBeUndefined();
+    expect(c.spec.grid).toBe(true);
+    expect(c.spec.rounded).toBeUndefined();
+    // Saved and reopened: the same table.
+    await save(page);
+    const saved = readDeck();
+    expect(saved).toContain('"valueAxis":{"title":"Revenue","log":true}');
+    await openDeck(page);
+    await page.evaluate(() => window.deckEditor.history.forceDirty());
+    await save(page);
+    expect(readDeck()).toBe(saved);
+});
+
+test('73 chart error bars: a pasted Mean | SD table gives each series its ± column; a series gets one by its switch; the bars are drawn, take the range, go outward, and are saved with the table', async ({ page }) => {
+    await openDeck(page);
+    await page.click('#btnInsert');
+    await page.click('[data-insert="chart"]');
+    const fig = () => page.evaluate(() => {
+        const f = window.deckEditor.deck.doc.querySelector('figure[data-chart]');
+        const errs = Array.from(f.querySelectorAll('svg path[stroke="currentColor"], svg path[fill="none"][style*="stroke"]')).filter(p => !p.getAttribute('stroke-linejoin'));
+        return { spec: JSON.parse(f.querySelector(':scope > script[data-chart-data]').textContent), text: f.querySelector('svg').textContent,
+            err: errs.map(p => p.getAttribute('d')).join('') };
+    });
+    // A table as a statistics program exports it: each mean followed by its SD.
+    const table = 'Group\tControl\tSD\tTreated\tSD\nDay 1\t10\t2\t12\t3\nDay 7\t11\t1.5\t30\t6\n';
+    if (test.info().project.name === 'firefox') {
+        await page.evaluate((t) => { const a = document.createElement('textarea'); a.id = 'pasteSrc'; a.value = t; document.body.appendChild(a); a.select(); }, table);
+        await page.keyboard.press('Control+c');
+        await page.evaluate(() => document.getElementById('pasteSrc').remove());
+        await page.focus('#chartGrid input[data-r="0"][data-c="0"]');
+        await page.keyboard.press('Control+v');
+    } else {
+        await page.focus('#chartGrid input[data-r="0"][data-c="0"]');
+        await page.evaluate((t) => {
+            const dt = new DataTransfer(); dt.setData('text/plain', t);
+            document.activeElement.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+        }, table);
+    }
+    let c = await fig();
+    expect(c.spec.series.map(s => [s.name, s.values, s.errors])).toEqual([['Control', [10, 11], [2, 1.5]], ['Treated', [12, 30], [3, 6]]]);
+    expect(c.spec.errorKind).toBe('SD');
+    await expect(page.locator('#chartGrid .chart-err-head')).toHaveText(['± SD', '± SD']);
+    expect(await page.locator('#chartGrid input[data-r="2"][data-c="4"]').inputValue()).toBe('6');
+    expect((c.err.match(/M/g) || []).length).toBe(4 * 3);                // four bars, each a line and two caps
+    expect(c.text).toContain('40');                                      // the axis reaches past 30 + 6 (to 30 without the bars)
+    await expect(page.locator('#chartErrStyle')).toBeVisible();
+    // A typed error is one undo step and redraws.
+    await page.fill('#chartGrid input[data-r="1"][data-c="2"]', '4');
+    await page.press('#chartGrid input[data-r="1"][data-c="2"]', 'Enter');
+    c = await fig();
+    expect(c.spec.series[0].errors).toEqual([4, 1.5]);
+    expect(await page.evaluate(() => window.deckEditor.history.top.label)).toBe('Chart data');
+    // Outward, without caps: one line per bar, from the value away from zero.
+    await page.click('#chartErrDir [data-v="out"]');
+    await page.uncheck('#inspChartStyle [data-set="errorCaps"]');
+    c = await fig();
+    expect(c.spec.errorDir).toBe('out');
+    expect(c.spec.errorCaps).toBe(false);
+    expect((c.err.match(/M/g) || []).length).toBe(4);
+    // A series' switch takes its column away, and gives it back empty, the cursor in its first cell.
+    await page.click('#chartGrid .chart-chip[data-s="1"]');
+    await page.uncheck('#chartErrRow [data-series-err]');
+    c = await fig();
+    expect(c.spec.series[1].errors).toBeUndefined();
+    await expect(page.locator('#chartGrid .chart-err-head')).toHaveCount(1);
+    await page.check('#chartErrRow [data-series-err]');
+    c = await fig();
+    expect(c.spec.series[1].errors).toEqual([null, null]);
+    expect(await page.evaluate(() => document.activeElement.matches('#chartGrid input[data-r="1"][data-c="4"]'))).toBe(true);
+    await page.keyboard.type('2');
+    await page.keyboard.press('Enter');
+    c = await fig();
+    expect(c.spec.series[1].errors).toEqual([2, null]);
+    // Lines carry them in the series' colour; a pie leaves them out but keeps them in the table.
+    await page.click('#chartKind [data-kind="line"]');
+    c = await fig();
+    expect(c.err).toMatch(/M/);
+    await page.click('#chartKind [data-kind="pie"]');
+    await expect(page.locator('#chartErrKindRow')).toBeHidden();
+    c = await fig();
+    expect(c.spec.series[0].errors).toEqual([4, 1.5]);
+    await page.click('#chartKind [data-kind="column"]');
+    await page.selectOption('#chartErrKindRow [data-set="errorKind"]', 'SEM');
+    await expect(page.locator('#chartGrid .chart-err-head').first()).toHaveText('± SEM');
+    // Saved with the table, and back the same.
+    await save(page);
+    const saved = readDeck();
+    expect(saved).toContain('"errors":[4,1.5]');
+    expect(saved).toContain('"errorKind":"SEM","errorDir":"out","errorCaps":false');
+    await openDeck(page);
+    await page.evaluate(() => window.deckEditor.history.forceDirty());
+    await save(page);
+    expect(readDeck()).toBe(saved);
+});
+
 /* ------------------------------------------------------------
    60. Crop
    ------------------------------------------------------------ */

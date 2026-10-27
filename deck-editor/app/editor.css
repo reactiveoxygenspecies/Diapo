@@ -654,6 +654,14 @@ select option { background: var(--bg-2); color: var(--ink); }
 .chart-auto { background: repeating-linear-gradient(135deg, var(--line-2) 0 4px, transparent 4px 8px); }
 .chart-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; margin: 8px 0 4px; }
 .chart-opts .align-toslide { margin: 0; }
+/* Chart axes and style: a small heading over each axis' fields; a series' points and line under its colours. */
+.chart-axis-head { font-size: 12px; font-weight: 600; color: var(--ink-2); margin: 10px 0 2px; }
+.chart-axis-head:first-of-type { margin-top: 0; }
+#chartSeriesLook { margin-top: 8px; }
+#chartSeriesLook select { padding-left: 2px; }
+/* A series' error bars: a column after its values, headed with what they stand for (± SD). */
+.chart-grid .chart-err-head { padding: 0 6px; font-weight: 600; color: var(--ink-3); text-align: right; white-space: nowrap; }
+.chart-grid td.chart-err input { color: var(--ink-2); width: 52px; }
 .insp-colour { display: flex; align-items: center; gap: 6px; margin-top: 8px; padding: 3px; border-radius: var(--radius-sm); border: 1px solid transparent; }
 .insp-colour.set { border-color: var(--accent); background: var(--accent-soft); }
 .insp-colour input[type=color] { width: 32px; height: 26px; padding: 0; border: 1px solid var(--line-2); border-radius: 5px; background: var(--bg-2); cursor: pointer; }
