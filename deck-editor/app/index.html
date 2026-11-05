@@ -78,7 +78,9 @@
             <button data-insert="shape:chevron">Chevron</button>
             <button data-insert="shape:bubble">Speech bubble</button>
             <button data-insert="line">Line</button>
-            <button data-insert="arrow">Arrow</button>
+            <button data-insert="arrow" title="Drag on the slide to draw it">Arrow</button>
+            <button data-insert="curved" title="Drag on the slide; drag the dot in the middle to bend it">Curved arrow</button>
+            <button data-insert="double">Double arrow</button>
           </div>
         </div>
         <hr>
@@ -133,6 +135,8 @@
     </div>
     <button class="tb-btn primary" id="btnSave" title="Save (Ctrl+S)" disabled>Save</button>
   </div>
+  <!-- One tab per open deck (core/tabs.js); only the active one is live in the editor. -->
+  <div class="deck-tabs" id="deckTabs" role="tablist" aria-label="Open decks" hidden></div>
 </header>
 
 <!-- ======================================================

@@ -16,6 +16,7 @@ import { isEditableText, textBlocks, isShape } from './dom.js';
 import { highlightCode, setListKind } from './insert.js';
 import { chartOf } from './chart.js';
 import { canCrop } from './crop.js';
+import { cleanPastedHtml } from './richpaste.js';
 
 const BAR_ITEMS = [
     ['bold', 'B', 'Bold (Ctrl+B)'], ['italic', 'I', 'Italic (Ctrl+I)'], ['underline', 'U', 'Underline (Ctrl+U)'],
@@ -364,8 +365,8 @@ export class TextEditor extends EventTarget {
             case 'italic': doc.execCommand('italic'); break;
             case 'underline': doc.execCommand('underline'); break;
             case 'strike': doc.execCommand('strikeThrough'); break;
-            case 'sup': doc.execCommand('superscript'); this.deck.refreshAnimations(); break;      // refreshes the managed blocks: the sup/sub rule appears with the first script
-            case 'sub': doc.execCommand('subscript'); this.deck.refreshAnimations(); break;
+            case 'sup': this._toggleScript('sup', 'sub'); this.deck.refreshAnimations(); break;      // refreshes the managed blocks: the sup/sub rule appears with the first script
+            case 'sub': this._toggleScript('sub', 'sup'); this.deck.refreshAnimations(); break;
             case 'code': this._toggleInline('code'); break;
             case 'clear': doc.execCommand('removeFormat'); doc.execCommand('unlink'); this._unwrapInline(['code', 'sup', 'sub']); break;
             // A whole list is the element being edited, and execCommand cannot replace the
@@ -491,6 +492,101 @@ export class TextEditor extends EventTarget {
         sel.removeAllRanges();
         const r = doc.createRange(); r.selectNodeContents(wrap); sel.addRange(r);
     }
+    /* Superscript / subscript. The browser's own command decides "already superscript" from the
+       computed vertical-align, which a deck's reset CSS (sup { vertical-align: baseline }) or a
+       selection reaching a space past the word defeats: the toggle then only ever applies. Done
+       here on the elements instead, as Word does: a selection that is all inside <tag> takes it
+       off (splitting the element when it covers only part), anything else gets it (taking the
+       other kind off that part first, so super on sub swaps). A caret inside <tag> steps out of
+       it for what is typed next; a caret elsewhere leaves it to the browser's typing style. */
+    _scriptState(tag) {
+        const sel = this.deck.win.getSelection();
+        if (!this.el || !sel || !sel.rangeCount) return false;
+        const r = sel.getRangeAt(0);
+        if (!this.el.contains(r.commonAncestorContainer)) return false;
+        if (r.collapsed) return !!this._inlineAncestor(tag);
+        const texts = this._textsIn(r);
+        return texts.length > 0 && texts.every(t => { const a = t.parentElement && t.parentElement.closest(tag); return a && this.el.contains(a) && a !== this.el; });
+    }
+    _textsIn(range) {
+        const out = [], w = this.deck.doc.createTreeWalker(this.el, 4 /* text */);
+        let n;
+        while ((n = w.nextNode())) {
+            if (!range.intersectsNode(n)) continue;
+            const s = n.data.slice(n === range.startContainer ? range.startOffset : 0, n === range.endContainer ? range.endOffset : n.length);
+            if (s) out.push(n);
+        }
+        return out;
+    }
+    _toggleScript(tag, other) {
+        const win = this.deck.win, doc = this.deck.doc, sel = win.getSelection();
+        if (!sel || !sel.rangeCount || !this.el.contains(sel.getRangeAt(0).commonAncestorContainer)) return;
+        const range = sel.getRangeAt(0);
+        const nativeCmd = { sup: 'superscript', sub: 'subscript' };
+        if (range.collapsed) {
+            const inside = this._inlineAncestor(tag) || this._inlineAncestor(other);
+            if (inside) {
+                const gap = this._stepOut(inside);
+                const r = doc.createRange(); r.setStart(gap, 1); r.collapse(true);
+                sel.removeAllRanges(); sel.addRange(r);
+                if (inside.localName === other) doc.execCommand(nativeCmd[tag]);       // super on sub: a swap
+            } else doc.execCommand(nativeCmd[tag]);
+            return;
+        }
+        // Markers keep the selection's ends while elements are split and unwrapped round it.
+        const mark = (atEnd) => { const m = doc.createTextNode(''); const c = range.cloneRange(); c.collapse(!atEnd); c.insertNode(m); return m; };
+        const endMark = mark(true), startMark = mark(false);
+        // The region between the markers, taken afresh each time: moving nodes about collapses a live range.
+        const region = () => { const g = doc.createRange(); g.setStartAfter(startMark); g.setEndBefore(endMark); return g; };
+        const reg = region();
+        const active = this._textsIn(reg).length > 0 && this._textsIn(reg).every(t => { const a = t.parentElement.closest(tag); return a && this.el.contains(a) && a !== this.el; });
+        // Take `name` off the selected part of every element of that kind that touches it.
+        const strip = (name) => {
+            for (const e of Array.from(this.el.querySelectorAll(name))) {
+                if (!region().intersectsNode(e)) continue;
+                if (e.contains(startMark)) this._splitOff(e, startMark, true);
+                if (e.contains(endMark)) this._splitOff(e, endMark, false);
+                while (e.firstChild) e.parentNode.insertBefore(e.firstChild, e);      // not _unwrap: its normalize() would drop the markers
+                e.remove();
+            }
+        };
+        if (active) strip(tag);
+        else {
+            strip(other); strip(tag);
+            const wrap = doc.createElement(tag);
+            const g = region();
+            wrap.appendChild(g.extractContents());
+            g.insertNode(wrap);
+        }
+        const r = doc.createRange(); r.setStartAfter(startMark); r.setEndBefore(endMark);
+        startMark.remove(); endMark.remove();
+        sel.removeAllRanges(); sel.addRange(r);
+        this._lastRange = r.cloneRange();
+    }
+    /* Cut `el` in two at `marker` (inside it): what lies before it (or after it) goes into a copy
+       of `el` of its own, left next to it; nothing is made for an empty half. */
+    _splitOff(el, marker, before) {
+        const r = el.ownerDocument.createRange();
+        if (before) { r.setStart(el, 0); r.setEndBefore(marker); } else { r.setStartAfter(marker); r.setEnd(el, el.childNodes.length); }
+        const frag = r.extractContents();
+        if (!frag.textContent && !frag.querySelector(KEEP_EMPTY)) return;
+        const part = el.cloneNode(false);
+        part.appendChild(frag);
+        el.parentNode.insertBefore(part, before ? el : el.nextSibling);
+    }
+    /* Move the caret out of the inline element it is in, without losing its place in the text:
+       the element is split there and an empty text node sits between the halves. */
+    _stepOut(el) {
+        const doc = this.deck.doc, sel = this.deck.win.getSelection();
+        const m = doc.createTextNode(''); sel.getRangeAt(0).insertNode(m);
+        this._splitOff(el, m, true);                 // what came before the caret stays in a copy of el
+        el.parentNode.insertBefore(m, el);
+        if (!el.textContent && !el.querySelector(KEEP_EMPTY)) el.remove();
+        // The browser puts a caret in an empty text node back into the neighbouring element, so the
+        // gap holds a zero-width space (tidy() removes them when the edit ends).
+        m.data = '​';
+        return m;
+    }
     _unwrapInline(tags) {
         for (const t of tags) { let el; let guard = 0; while ((el = this._inlineAncestor(t)) && guard++ < 10) this._unwrap(el); }
     }
@@ -525,7 +621,7 @@ export class TextEditor extends EventTarget {
             try {
                 if (cmd === 'bold' || cmd === 'italic' || cmd === 'underline') on = doc.queryCommandState(cmd);
                 else if (cmd === 'strike') on = doc.queryCommandState('strikeThrough');
-                else if (cmd === 'sup' || cmd === 'sub') on = doc.queryCommandState(cmd === 'sup' ? 'superscript' : 'subscript');
+                else if (cmd === 'sup' || cmd === 'sub') on = this._scriptState(cmd) || doc.queryCommandState(cmd === 'sup' ? 'superscript' : 'subscript');
                 else if (cmd === 'code') on = !!this._inlineAncestor('code');
                 else if (cmd === 'list') on = doc.queryCommandState('insertUnorderedList');
                 else if (cmd === 'olist') on = doc.queryCommandState('insertOrderedList');
@@ -585,11 +681,20 @@ export class TextEditor extends EventTarget {
                 this.dispatchEvent(new CustomEvent('selection', { detail: src }));
             });
             doc.addEventListener('input', () => { if (this.el) this._positionBar(); });
-            // Plain-text paste: no foreign markup enters the deck. In code, newlines stay text.
+            // Paste keeps the look that matters (colour, bold, links, scripts, line breaks) and
+            // nothing else: the clipboard's HTML is rebuilt from a whitelist (richpaste.js).
+            // Ctrl+Shift+V, and code, take the plain text. In code, newlines stay text.
             doc.addEventListener('paste', (e) => {
                 if (!this.el) return;
                 e.preventDefault();
-                const text = (e.clipboardData || win.clipboardData).getData('text/plain');
+                const data = e.clipboardData || win.clipboardData;
+                const plainOnly = this._plainPaste || this.el.matches('code');
+                this._plainPaste = false;
+                if (!plainOnly) {
+                    const clean = cleanPastedHtml(data.getData('text/html'), doc, this.el);
+                    if (clean) { doc.execCommand('insertHTML', false, clean); return; }
+                }
+                const text = data.getData('text/plain');
                 if (this.el.matches('code')) insertTextNode(win, text, this.el); else doc.execCommand('insertText', false, text);
             });
             // Keys inside the text: Enter = line break (a new item in a list, a newline in code),
@@ -613,6 +718,7 @@ export class TextEditor extends EventTarget {
                 if (e.key === 'Backspace' && this._inlineAncestor('li')) { if (this.joinListItem()) { e.preventDefault(); return; } }
                 if (e.key === 'Enter' && !e.shiftKey && !this.el.matches('li, ul, ol')) { e.preventDefault(); insertLineBreak(this.deck.win, this.el); return; }
                 const ctrl = e.ctrlKey || e.metaKey;
+                this._plainPaste = ctrl && e.shiftKey && e.key.toLowerCase() === 'v';     // the paste event that follows takes plain text
                 if (ctrl && e.key.toLowerCase() === 'b') { e.preventDefault(); this.exec('bold'); }
                 else if (ctrl && e.key.toLowerCase() === 'i') { e.preventDefault(); this.exec('italic'); }
                 else if (ctrl && e.key.toLowerCase() === 'u') { e.preventDefault(); this.exec('underline'); }
@@ -691,6 +797,8 @@ function dropEmptyInline(el) {
 const KEEP_EMPTY = 'br, img, video, svg, canvas, iframe, picture, object, input';
 
 function tidy(el) {
+    // Zero-width spaces left by stepping out of a superscript / subscript.
+    for (const w = el.ownerDocument.createTreeWalker(el, 4); w.nextNode();) if (w.currentNode.data.includes('​')) w.currentNode.data = w.currentNode.data.replace(/​/g, '');
     while (el.lastChild && (el.lastChild.nodeName === 'BR' || (el.lastChild.nodeType === 3 && !el.lastChild.textContent.trim() && el.lastChild.previousSibling && el.lastChild.previousSibling.nodeName === 'BR'))) {
         el.lastChild.remove();
     }

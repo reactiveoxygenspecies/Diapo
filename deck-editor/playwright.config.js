@@ -4,8 +4,9 @@
 const { defineConfig } = require('@playwright/test');
 const path = require('path');
 
-const PORT = 8811;
-const WORKSPACE = path.join(__dirname, 'tests', '.tmp-workspace');
+// DIAPO_TEST_PORT / DIAPO_TEST_WS let two runs work side by side (each its own server and workspace).
+const PORT = +process.env.DIAPO_TEST_PORT || 8811;
+const WORKSPACE = process.env.DIAPO_TEST_WS || path.join(__dirname, 'tests', '.tmp-workspace');
 
 // The server starts before globalSetup would run, so the workspace is prepared here.
 require('./tests/global-setup.js').prepare();

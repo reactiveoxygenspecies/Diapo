@@ -193,6 +193,7 @@ export function describe(el) {
         : el.hasAttribute('data-math') ? 'equation'
         : el.hasAttribute('data-chem') ? 'structure'
         : el.hasAttribute('data-fa') ? 'icon ' + el.getAttribute('data-fa')
+        : el.hasAttribute('data-line') ? 'line'
         : el.hasAttribute('data-svg') ? 'inline SVG'
         : el.hasAttribute('data-crop') ? 'image, cropped'
         : tag === 'img' ? 'image'

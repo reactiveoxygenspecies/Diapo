@@ -204,6 +204,28 @@ svg { display: block; }
 .tb-btn.primary:hover, #topbar .tb-btn.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
 .tb-btn.primary:disabled, #topbar .tb-btn.primary:disabled { background: var(--primary-bg); color: var(--primary-ink); border-color: var(--primary-bg); opacity: 0.35; }
 
+/* Deck tabs: a second row of the top bar, one tab per open deck. The row exists while a deck is
+   open, and the bar grows by its height (--topbar-h) so everything below it moves down with it. */
+body.has-tabs { --topbar-h: 82px; }
+#topbar { grid-template-rows: 48px 1fr; }
+body.has-tabs .tb-file { display: none; }           /* the active tab names the deck */
+.deck-tabs { grid-column: 1 / -1; grid-row: 2; align-self: stretch; display: flex; align-items: flex-end; gap: 2px; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; margin: 0 -12px; padding: 0 12px; }
+.deck-tabs::-webkit-scrollbar { display: none; }
+.deck-tab { position: relative; display: flex; align-items: center; gap: 6px; flex: 0 1 200px; min-width: 96px; max-width: 220px; height: 30px; padding: 0 4px 0 11px; border-radius: 7px 7px 0 0; color: var(--tb-ink); opacity: 0.72; cursor: pointer; font-size: 12.5px; white-space: nowrap; }
+.deck-tab:hover { background: var(--tb-hover); opacity: 1; }
+.deck-tab.active { background: var(--tb-active); opacity: 1; font-weight: 600; box-shadow: inset 0 2px 0 var(--tb-on-line); }
+.deck-tab.dragging { opacity: 0.4; }
+.deck-tab.drop-before::before, .deck-tab.drop-after::after { content: ""; position: absolute; top: 4px; bottom: 4px; width: 2px; border-radius: 1px; background: var(--tb-on-line); }
+.deck-tab.drop-before::before { left: -2px; }
+.deck-tab.drop-after::after { right: -2px; }
+.deck-tab .tab-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.deck-tab .tab-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dirty); box-shadow: 0 0 0 2px var(--dirty-glow); flex: none; }
+.deck-tab .tab-close, .deck-tabs .tab-new { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: inherit; font: inherit; font-size: 15px; line-height: 1; cursor: pointer; opacity: 0.6; }
+.deck-tab .tab-close:hover, .deck-tabs .tab-new:hover { background: var(--tb-hover-line); opacity: 1; }
+.deck-tabs .tab-new { align-self: center; margin-left: 4px; color: var(--tb-ink); }
+.deck-tab:focus-visible, .tab-close:focus-visible, .tab-new:focus-visible { outline: 2px solid var(--tb-on-line); outline-offset: -2px; }
+.tab-close-dialog .row { display: flex; gap: 8px; margin-top: 16px; }
+.tab-close-dialog .spacer { flex: 1; }
 .tb-file { display: flex; align-items: center; gap: 8px; min-width: 0; margin-left: 6px; }
 .tb-filename { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dirty-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dirty); box-shadow: 0 0 0 3px var(--dirty-glow); flex: none; }
@@ -258,6 +280,8 @@ body.no-deck #strip, body.no-deck #inspector { display: none; }
 }
 .strip-item.current .thumb { outline: 2px solid var(--current); outline-offset: 1px; box-shadow: 0 0 0 5px var(--current-glow); }
 .strip-item:hover:not(.current) .thumb { border-color: var(--ink-3); }
+.strip-item.picked .thumb { outline: 2px solid var(--current); outline-offset: 1px; }
+.strip-item.picked:not(.current) .thumb { outline-style: dashed; }
 
 /* Canvas */
 #canvas {
@@ -543,6 +567,21 @@ body.preview #overlay { display: none; }
     pointer-events: auto; cursor: alias; box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 .ov-rot::before { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 10px; background: var(--accent); }
+/* Lines and arrows (lines.js): the end handles are round, the bend handle a dot on the line itself. */
+.ov-main[data-mode="line"] { outline: none; }
+.ov-main[data-mode="line"] .ov-h, .ov-main[data-mode="line"] .ov-rot { display: none; }
+.ov-box.line { outline: none; }
+.ov-lines { inset: 0; pointer-events: none; }
+.ov-line-path { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.ov-line-path path { fill: none; stroke: var(--accent); stroke-width: 1.5px; vector-effect: non-scaling-stroke; opacity: 0.8; }
+.ov-lh {
+    position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; box-sizing: border-box;
+    background: #fff; border: 1.5px solid var(--accent); border-radius: 50%;
+    pointer-events: auto; cursor: crosshair; box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+}
+.ov-lh[data-lh="c"] { width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; background: var(--accent); border-color: #fff; cursor: move; }
+.ov-lh:hover { transform: scale(1.25); }
+#overlay.drawing-line, #overlay.drawing-line * { cursor: crosshair; }
 .ov-guides { inset: 0; pointer-events: none; }
 .ov-guide { position: absolute; background: #ff3d8b; pointer-events: none; }
 .ov-guide.v { width: 1px; }
@@ -877,6 +916,9 @@ body.theme-mode.panel-collapsed #workspace { grid-template-columns: var(--strip-
 .insp-code-pre:focus { outline: none; border-color: var(--accent); }
 .insp-code-pre { margin: 0; padding: 6px 8px; max-height: 180px; overflow: auto; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--bg-2); font: 11px/1.45 var(--ui-mono); color: var(--ink-2); white-space: pre-wrap; word-break: break-all; user-select: text; cursor: text; }
 .insp-code .insp-notes { margin-top: 0; }
+.th-deckcss { white-space: pre; overflow: auto; tab-size: 4; min-height: 110px; max-height: 70vh; resize: vertical; }
+.th-deckcss-n { font-size: 11px; color: var(--ink-3); }
+.th-deckcss-n.warn { color: var(--accent-2, #c0392b); }
 .insp-code-start { color: var(--ink-3); }
 
 /* ------------------------------------------------------------

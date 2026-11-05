@@ -30,6 +30,7 @@ import { Problems } from './core/problems.js';
 import { readableText } from './core/dom.js';
 import { deckName, DeckPreviews } from './core/previews.js';
 import { loader } from './core/loader.js';
+import { DeckTabs } from './core/tabs.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -85,11 +86,42 @@ $('statusBusy').innerHTML = loader();
 $('canvasLoading').innerHTML = loader({ word: true });
 
 /* ------------------------------------------------------------
+   Deck tabs (core/tabs.js): what the tab strip needs from the editor.
+   ------------------------------------------------------------ */
+const tabs = new DeckTabs({
+    app, api, el: $('deckTabs'),
+    host: {
+        load: (file, opts) => loadDeck(file, opts),
+        toast: (m, o) => toast(m, o),
+        nameOf: (file, title) => deckName(file, title),
+        pathOf: (t) => t.file.startsWith('@diapo/') ? 'The Diapo tour: a copy of its own, outside your folders' : fullPathOf(t.ws || app.workspace, t.file),
+        showDrawer: () => showDrawer(true),
+        setWorkspace: (ws) => switchWorkspace(ws),
+        // The live deck's unsaved edits go to its draft before another deck takes the iframe.
+        flush: async () => {
+            clearTimeout(draftTimer); draftTimer = null;
+            await api.draftWrite(app.file, serialize());
+            draftWritten = true;
+        },
+        save: () => saveDeck(),
+        discardDraft: async (file) => {
+            if (file === app.file) { clearTimeout(draftTimer); draftTimer = null; draftWritten = false; }
+            await api.draftDelete(file).catch(() => {});
+        },
+        getView: () => ({ zoomMode: app.zoomMode, scroll: [$('canvas').scrollLeft, $('canvas').scrollTop] }),
+        setView: (t) => { setZoom(t.zoomMode); if (t.zoomMode !== 'fit' && t.scroll) { $('canvas').scrollLeft = t.scroll[0]; $('canvas').scrollTop = t.scroll[1]; } },
+        unload: () => unloadDeck(),
+    },
+});
+app.tabs = tabs;
+
+/* ------------------------------------------------------------
    Dirty state: the top-bar dot, Save button and the unload guard
    ------------------------------------------------------------ */
 function refreshDirty() {
     const v = app.history.isDirty && !!app.file;
     app.dirty = v;
+    tabs.refresh();
     $('dirtyDot').hidden = !v;
     $('btnSave').disabled = !v;
     $('btnUndo').disabled = !app.history.canUndo;
@@ -184,10 +216,11 @@ async function offerDraft(file) {
    says so and lets the user trust the deck; the choice is kept per deck and lapses when
    its scripts change. The deck is then opened again so the scripts run from the start
    (unsaved edits go through the draft, so nothing is lost). */
+const keptPaused = new Set();      // "Keep paused" holds for the session: a tab switch does not ask again
 function offerTrust(file) {
     document.querySelectorAll('.bar.trust-bar').forEach(b => b.remove());
     const t = app.deck.trust;
-    if (!t || t.trusted || !t.scripts) return;
+    if (!t || t.trusted || !t.scripts || keptPaused.has(file)) return;
     const bar = document.createElement('div');
     bar.className = 'bar trust-bar';
     bar.innerHTML = `This deck has ${t.scripts === 1 ? 'a script' : t.scripts + ' scripts'} of its own, paused: a deck's script could read and change files on this computer. `
@@ -199,6 +232,7 @@ function offerTrust(file) {
     bar.addEventListener('click', async (e) => {
         const a = e.target.dataset.a; if (!a) return;
         bar.remove();
+        if (a === 'later') keptPaused.add(file);
         if (a === 'trust') await setDeckTrust(file, true);
     });
 }
@@ -394,8 +428,36 @@ setHints(savedHints === '1');
 /* ------------------------------------------------------------
    Opening a deck
    ------------------------------------------------------------ */
-export async function openDeck(file, { draft = false, discard = false, sameSession = false } = {}) {
-    if (app.dirty && !draft && !discard && !confirm('Discard unsaved changes and open another deck?')) return false;
+/* openDeck brings a deck to the front: its tab if it has one, else a new tab (the deck being
+   edited stays open in its own tab, unsaved edits and all). Reloading the live deck itself
+   ({draft}, {discard}, {sameSession}) replaces it in place. loadDeck does the loading.
+   viaTab: the load is a tab switch, so no "draft restored" toast; version: the disk version
+   the deck was opened at, which its draft must keep (so the save conflict check is unchanged);
+   noOffer: the deck was open earlier in this session, so no offer of its draft. */
+export function openDeck(file, opts = {}) { return tabs.open(file, opts); }
+
+/* The editor shows no deck (the last tab was closed). */
+function unloadDeck() {
+    clearTimeout(draftTimer); draftTimer = null; draftWritten = false;
+    if (app.selection) app.selection.clear();
+    document.querySelectorAll('.bar').forEach(b => b.remove());
+    app.deck.dispose();
+    $('deckFrame').src = 'about:blank';
+    app.file = null; app.deckName = '';
+    app.history.clear();
+    document.body.classList.add('no-deck');
+    document.querySelectorAll('[data-needs-deck]').forEach(b => { b.disabled = true; });
+    $('fileName').textContent = 'No deck open'; $('fileName').title = '';
+    showStatusFolder();
+    refreshDirty();
+    const url = new URL(location.href);
+    url.searchParams.delete('file');
+    history.replaceState(null, '', url);
+    status('');
+}
+
+async function loadDeck(file, { draft = false, discard = false, sameSession = false, viaTab = false, version = '', noOffer = false } = {}) {
+    if (app.dirty && !draft && !discard && !viaTab && !confirm('Discard unsaved changes and open another deck?')) return false;
     document.querySelectorAll('.bar').forEach(b => b.remove());
     clearTimeout(draftTimer);
     status('Loading ' + file);
@@ -413,20 +475,23 @@ export async function openDeck(file, { draft = false, discard = false, sameSessi
         return false;
     }
     if (keepVersion) app.deck.diskVersion = keepVersion;
+    else if (version && draft) app.deck.diskVersion = version;
     app.file = file;
     app.history.clear();
     // Before anything can print or export: whether the deck's own scripts run (see offerTrust).
     try { app.deck.trust = await api.trust(file, draft); } catch (err) { app.deck.trust = { trusted: false, scripts: 0, known: [] }; }
     document.body.classList.remove('opening');
     draftWritten = draft;          // a restored draft is on disk until it is saved or discarded
-    if (draft) { app.history.forceDirty(); toast('Draft restored. Save to write it into the file.', { ms: 3500 }); }
+    if (draft) { app.history.forceDirty(); if (!viaTab) toast('Draft restored. Save to write it into the file.', { ms: 3500 }); }
+    // After no-deck goes: the strip changes the canvas's height, and the resize it causes must not measure a hidden stage.
     document.body.classList.remove('no-deck');
+    tabs.loaded(file);
     document.querySelectorAll('[data-needs-deck]').forEach(b => { b.disabled = false; });
     showDeckName();
     refreshDirty();
     api.recent(file).catch(() => {});
     offerTrust(file);
-    if (!draft) offerDraft(file);
+    if (!draft && !noOffer) offerDraft(file);
     const url = new URL(location.href);
     url.searchParams.set('file', file);
     history.replaceState(null, '', url);
@@ -528,6 +593,7 @@ async function withDialogFallback(run, ask) {
 /* Switch the served folder, then list it. */
 async function switchWorkspace(path) {
     try {
+        await tabs.beforeWorkspaceChange();         // the live deck's draft can only be written in its own workspace
         const r = await api.setWorkspace(path);
         app.workspace = r.workspace;
         await refreshFiles();
@@ -660,6 +726,7 @@ $('drawerList').addEventListener('click', async (e) => {
         if (!name || name === path.split('/').pop()) return;
         try {
             const r = await api.rename(path, name);
+            tabs.renamed(path, r.file);
             if (app.file === path) { app.file = r.file; app.deck.file = r.file; showDeckName(); const u = new URL(location.href); u.searchParams.set('file', r.file); history.replaceState(null, '', u); }
             toast('Renamed to ' + r.file);
             refreshFiles();
@@ -859,7 +926,7 @@ async function showVersions() {
                 const r = await api.restoreVersion(app.file, version);
                 h.remove();
                 await api.draftDelete(app.file).catch(() => {});
-                if (await openDeck(r.file)) toast('Restored that version; the one before is now the newest previous version.', { ms: 4000 });
+                if (await openDeck(r.file, { discard: true })) toast('Restored that version; the one before is now the newest previous version.', { ms: 4000 });
             }
         } catch (err) { toast('Could not do that: ' + err.message, { error: true, ms: 5000 }); }
     });
@@ -934,6 +1001,13 @@ function onKey(e) {
     if (ctrl && k === '0') { stop(e); setZoom('fit'); return; }
     if (ctrl && e.code === 'Backslash') { stop(e); const on = !(panels.strip || panels.inspector); togglePanel('strip', on); togglePanel('inspector', on); return; }
     if (!app.deck.isOpen) return;
+    // The slide strip was the last thing clicked and nothing is picked on the canvas: whole slides.
+    if (app.strip.isContext()) {
+        const kl = k.toLowerCase();
+        if (ctrl && !e.altKey && kl === 'c') { stop(e); app.strip.clip.copy(); return; }
+        if (ctrl && !e.altKey && kl === 'x') { stop(e); app.strip.clip.cut(); return; }
+        if (!ctrl && !e.altKey && !e.shiftKey && (k === 'Delete' || k === 'Backspace')) { stop(e); app.strip.deleteSelected(); return; }
+    }
     if (k === 'Enter' && app.selection.primary) { stop(e); if (canCrop(app.selection.primary)) app.cropper.start(app.selection.primary); else app.textEdit.start(app.selection.primary); return; }
     if (ctrl && k.toLowerCase() === 'm') { stop(e); if (e.shiftKey) app.strip.addSlide(); else app.strip.showLayoutPicker(); return; }
     if (ctrl && k.toLowerCase() === 't') { stop(e); setThemeMode(!app.themeMode); return; }
@@ -1256,7 +1330,7 @@ function paletteEntries() {
         // Every layout of the picker, straight in: "new slide quote", "layout two columns".
         for (const l of LAYOUTS) out.push({ group: 'Slide', label: 'New slide: ' + l.label, keywords: 'layout add', quiet: true, run: () => app.strip.addSlide(app.deck.current, l.id) });
         out.push({ group: 'Slide', label: 'Auto-animate to the next slide (on / off)', run: () => { const s = app.deck.currentSlide; if (s) { sel.clear(); $('inspAutoAnimate').checked = !s.hasAttribute('data-auto-animate'); $('inspAutoAnimate').dispatchEvent(new Event('change')); } } });
-        for (const [kind, label] of [['text', 'Text box'], ['list', 'Bullet list'], ['olist', 'Numbered list'], ['table', 'Table'], ['chart', 'Chart'], ['code', 'Code block'], ['image', 'Image from file...'], ['image-url', 'Image from URL...'], ['placeholder', 'Image placeholder'], ['video', 'Video from file...'], ['embed', 'Embed web page or video...'], ['rect', 'Rectangle'], ['rounded', 'Rounded rectangle'], ['ellipse', 'Ellipse'], ['shape:triangle', 'Triangle'], ['shape:diamond', 'Diamond'], ['shape:hexagon', 'Hexagon'], ['shape:star', 'Star'], ['shape:block-arrow', 'Block arrow'], ['shape:chevron', 'Chevron'], ['shape:bubble', 'Speech bubble'], ['line', 'Line'], ['arrow', 'Arrow'], ['master-footer', 'Footer on every slide']]) out.push(insert(kind, label));
+        for (const [kind, label] of [['text', 'Text box'], ['list', 'Bullet list'], ['olist', 'Numbered list'], ['table', 'Table'], ['chart', 'Chart'], ['code', 'Code block'], ['image', 'Image from file...'], ['image-url', 'Image from URL...'], ['placeholder', 'Image placeholder'], ['video', 'Video from file...'], ['embed', 'Embed web page or video...'], ['rect', 'Rectangle'], ['rounded', 'Rounded rectangle'], ['ellipse', 'Ellipse'], ['shape:triangle', 'Triangle'], ['shape:diamond', 'Diamond'], ['shape:hexagon', 'Hexagon'], ['shape:star', 'Star'], ['shape:block-arrow', 'Block arrow'], ['shape:chevron', 'Chevron'], ['shape:bubble', 'Speech bubble'], ['line', 'Line'], ['arrow', 'Arrow'], ['curved', 'Curved arrow'], ['double', 'Double arrow'], ['master-footer', 'Footer on every slide']]) out.push(insert(kind, label));
         out.push({ group: 'Insert', label: 'Equation', keywords: 'math maths latex formula tex', run: click('[data-insert="equation"]') });
         out.push({ group: 'Insert', label: 'Chemical structure', keywords: 'chemistry molecule smiles compound', run: click('[data-insert="structure"]') });
         out.push({ group: 'Insert', label: 'Font Awesome icon...', keywords: 'icons fa', run: (q) => { app.iconPicker.open($('btnInsert')); const words = q.replace(/\b(font awesome|icon|icons|fa)\b/gi, '').trim(); if (words && app.iconPicker.search) { app.iconPicker.search.value = words; app.iconPicker.search.dispatchEvent(new Event('input')); } } });
@@ -1373,8 +1447,7 @@ $('insertMenu').addEventListener('click', async (e) => {
         case 'rect': app.insert.rect(false); break;
         case 'rounded': app.insert.rect(false, 28); break;
         case 'ellipse': app.insert.rect(true); break;
-        case 'line': app.insert.line(false); break;
-        case 'arrow': app.insert.line(true); break;
+        case 'line': case 'arrow': case 'curved': case 'double': app.insert.drawLine(kind); break;
     }
 });
 
@@ -1580,6 +1653,7 @@ async function boot() {
         toast('The server is not running. Start it with serve.py.', { error: true, ms: 8000 });
     }
     const file = new URLSearchParams(location.search).get('file');
+    if (file) await tabs.restore(file);                  // the tabs of the last session, around the deck of the address
     if (file && await openDeck(file)) return;
     showDrawer(true);
 }

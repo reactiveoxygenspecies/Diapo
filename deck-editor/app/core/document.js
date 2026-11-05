@@ -160,8 +160,11 @@ export class Deck extends EventTarget {
     _measure() {
         let w = 0, h = 0;
         if (this.stage) { w = this.stage.offsetWidth; h = this.stage.offsetHeight; }
-        this._size = { w: w > 100 ? w : STAGE_W, h: h > 100 ? h : STAGE_H };
-        return this._size;
+        const size = { w: w > 100 ? w : STAGE_W, h: h > 100 ? h : STAGE_H };
+        // A stage measured while hidden (the editor's canvas is not shown yet) reads 0: the default
+        // answers, but is not remembered, or a 4:3 deck would stay 16:9 until the next load.
+        if (w > 100 && h > 100) this._size = size;
+        return size;
     }
     /* The zoom the editor shows the deck at; the host CSS applies it to the stage. */
     setZoom(z) {
@@ -237,6 +240,7 @@ export class Deck extends EventTarget {
         this.setEditing(true);
         this._loadOverrides();
         this._loadFonts();
+        this._bindDeckStyles();
         this._size = null;
 
         // Slide changes made by the deck itself (or by us) are all noticed here.
@@ -269,6 +273,7 @@ export class Deck extends EventTarget {
         if (this.observer) this.observer.disconnect();
         this.observer = null;
         this.win = this.doc = this.stage = null;
+        this._deckStyles = null;
         this.file = null;
         this._size = null;
     }
@@ -282,6 +287,8 @@ export class Deck extends EventTarget {
        resurrect. */
     setSource(text, { reparse = true } = {}) {
         this.source = repairStrayScriptTails(text || '');
+        // What the file now says is the baseline the deck's style blocks are compared with on the next save.
+        if (this._deckStyles) for (const b of this._deckStyles) b.base = normCss(b.el.textContent);
         if (!reparse) return;
         const parsed = new DOMParser().parseFromString(this.source, 'text/html');
         this.sourceStage = parsed.querySelector('.deck-stage');
@@ -495,7 +502,7 @@ export class Deck extends EventTarget {
         const head = root.querySelector('head');
         if (fontsCss) { const st = root.ownerDocument.createElement('style'); st.id = FONTS_ID; st.textContent = fontsCss; head.appendChild(st); }
         if (overridesCss) { const st = root.ownerDocument.createElement('style'); st.id = OVERRIDES_ID; st.textContent = overridesCss; head.appendChild(st); }
-        const spliced = spliceBody(this.source, body.outerHTML);
+        const spliced = spliceBody(this.sourceWithDeckStyles(), body.outerHTML);
         if (!spliced) return '<!DOCTYPE html>\n' + root.outerHTML + '\n';
         let text = spliceHeadStyle(spliced, OVERRIDES_ID, overridesCss);
         text = spliceHeadStyle(text, FONTS_ID, fontsCss, new RegExp(`[ \\t]*<style id="${OVERRIDES_ID}">|<\\/head\\s*>`, 'i'));
@@ -546,6 +553,52 @@ export class Deck extends EventTarget {
         // Trailing whitespace is re-added by spliceBody from the source text (the parser
         // folds the newlines after </body> and </html> into the body, so the DOM is no guide).
         while (body.lastChild && body.lastChild.nodeType === 3 && !body.lastChild.textContent.trim()) body.lastChild.remove();
+    }
+
+    /* ------------------------------------------------------------
+       The deck's own style blocks (Theme > Deck CSS): the <style> elements of the file's
+       head that the editor does not manage. Each is paired once, at load, with its live
+       element (by text: styles a script adds at run time are not in the file, so they
+       never pair). Edits go to the live element; on save the file's own text of that block
+       is replaced in place, so a block is written exactly once and the rest of the head
+       stays byte for byte.
+       ------------------------------------------------------------ */
+    _bindDeckStyles() {
+        const live = Array.from(this.doc.head.querySelectorAll('style')).filter(st => !(st.id || '').startsWith('deck-editor'));
+        const claimed = new Set();
+        this._deckStyles = [];
+        headStyleBlocks(this.source).forEach((b, index) => {
+            const el = live.find(st => !claimed.has(st) && normCss(st.textContent) === normCss(b.text));
+            if (!el) return;
+            claimed.add(el);
+            this._deckStyles.push({ index, el, base: normCss(el.textContent) });
+        });
+    }
+    /* [{ index, el, css }] in file order. */
+    deckStyles() {
+        return (this._deckStyles || []).filter(b => b.el.isConnected).map(b => ({ index: b.index, el: b.el, css: b.el.textContent }));
+    }
+    setDeckStyle(index, css) {
+        const b = (this._deckStyles || []).find(x => x.index === index);
+        if (!b) return;
+        if (b.el.textContent !== css) b.el.textContent = css;
+        this._size = null;
+        this.dispatchEvent(new CustomEvent('deckcss'));
+    }
+    /* The file text with the edited style blocks written in. */
+    sourceWithDeckStyles() {
+        const src = this.source;
+        if (!src || !this._deckStyles) return src;
+        const blocks = headStyleBlocks(src);
+        const eol = (/\r?\n/.exec(src) || ['\n'])[0];
+        let out = src;
+        for (const b of this._deckStyles.slice().sort((a, c) => c.index - a.index)) {
+            const at = blocks[b.index];
+            if (!at || !b.el.isConnected || normCss(b.el.textContent) === b.base) continue;
+            const text = b.el.textContent.replace(/<\/style/gi, '<\\/style').replace(/\r?\n/g, eol);
+            out = out.slice(0, at.start) + text + out.slice(at.end);
+        }
+        return out;
     }
 
     /* Custom properties the deck defines on :root (the theme), for the inspector.
@@ -687,6 +740,30 @@ function repairStrayScriptTails(text) {
         lastTagEnd = last;
     }
     return out + text.slice(last);
+}
+
+/* Line endings do not count when a style block is compared with the file's text. */
+function normCss(t) { return String(t || '').replace(/\r\n?/g, '\n'); }
+
+/* The <style> elements of the file's head that are not the editor's own, as ranges of the
+   text between their tags. Scripts and comments are skipped over, so a "<style" inside one
+   does not count. */
+function headStyleBlocks(source) {
+    const open = /<head(?=[\s>])[^>]*>/i.exec(source || '');
+    if (!open) return [];
+    const from = open.index + open[0].length;
+    const end = /<\/head\s*>/i.exec(source.slice(from));
+    const to = end ? from + end.index : source.length;
+    const out = [];
+    const re = /<script\b[\s\S]*?<\/script\s*>|<!--[\s\S]*?-->|(<style\b[^>]*>)([\s\S]*?)<\/style\s*>/gi;
+    const region = source.slice(from, to);
+    for (const m of region.matchAll(re)) {
+        if (!m[1]) continue;
+        if (/\bid\s*=\s*["']?deck-editor/i.test(m[1])) continue;
+        const start = from + m.index + m[1].length;
+        out.push({ start, end: start + m[2].length, text: m[2] });
+    }
+    return out;
 }
 
 /* Replace the <body>...</body> part of the original file text with the new body markup.

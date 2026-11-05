@@ -134,7 +134,16 @@ export class ThemePanel {
           <h4>Custom CSS</h4>
           <textarea id="thCss" class="insp-notes theme-css" rows="8" spellcheck="false" placeholder=".slide h2 { text-transform: uppercase; }"></textarea>
           <div class="insp-hint">Applied after a pause; saved in the same block.</div>
-        </section>`;
+        </section>
+        <details class="insp-section insp-code" id="thCode">
+          <summary><h4>Deck CSS</h4></summary>
+          <div class="insp-hint">The deck's own stylesheet, as written in its file: colours, sizes and fonts that the fields above do not show. The variables and styles set above are written after it and win over it.</div>
+          <div id="thCodeBody"></div>
+          <div class="theme-row">
+            <button class="mini-btn" data-act="codeApply" title="Apply the changes (also on leaving the box, or Ctrl+Enter)">Apply</button>
+            <span class="insp-hint" id="thCodeState" style="margin:0"></span>
+          </div>
+        </details>`;
         this.$ = (id) => this.root.querySelector('#' + id);
     }
 
@@ -149,7 +158,71 @@ export class ThemePanel {
         this._renderBase();
         this._renderFonts();
         this._syncCss();
+        this._renderCode();
         this._renderPresets();
+    }
+
+    /* ---- Deck CSS ---------------------------------------------- */
+    /* One box per <style> block of the deck's own file (the editor's blocks are not among them),
+       then the local stylesheets the deck links, read-only: the editor saves the deck file only.
+       The boxes are not rebuilt while one has the focus, so typing is never interrupted. */
+    _renderCode() {
+        const det = this.$('thCode'), body = this.$('thCodeBody');
+        if (!det.open) return;
+        const blocks = this.deck.deckStyles();
+        const boxes = Array.from(body.querySelectorAll('.th-deckcss'));
+        const same = boxes.length === blocks.length && boxes.every((ta, i) => +ta.dataset.i === blocks[i].index);
+        if (!same) {
+            body.innerHTML = blocks.map((b, n) => `
+                <div class="insp-code-label"><span>${blocks.length > 1 ? `Style block ${n + 1} of ${blocks.length}` : 'Style block'}</span><span class="th-deckcss-n" data-i="${b.index}"></span></div>
+                <textarea class="insp-notes theme-css th-deckcss" data-i="${b.index}" wrap="off" spellcheck="false" aria-label="The deck's CSS, block ${n + 1}"></textarea>`).join('') + '<div id="thCodeLinks"></div>';
+            if (!blocks.length) body.insertAdjacentHTML('afterbegin', '<div class="insp-hint">This deck has no style block of its own in its head.</div>');
+        }
+        blocks.forEach((b, n) => {
+            const ta = body.querySelectorAll('.th-deckcss')[n];
+            // Not while the box holds text that has not been applied yet; a box left as it was applied follows undo and redo even when focused.
+            if (ta.value !== b.css && (document.activeElement !== ta || ta.value === ta.dataset.applied)) ta.value = b.css;
+            ta.dataset.applied = b.css;
+            if (!same) ta.rows = Math.max(8, Math.min(26, b.css.split('\n').length + 1));
+            const note = body.querySelector(`.th-deckcss-n[data-i="${b.index}"]`);
+            const h = cssHealth(b.css, b.el.sheet);
+            note.textContent = h.text;
+            note.classList.toggle('warn', h.warn);
+        });
+        this._renderLinks();
+    }
+    async _renderLinks() {
+        const box = this.$('thCodeLinks');
+        if (!box) return;
+        const hrefs = Array.from(this.deck.doc.head.querySelectorAll('link[rel~=stylesheet]')).map(l => l.getAttribute('href') || '')
+            .filter(h => h && !/^(https?:)?\/\/|^data:/i.test(h));
+        if (!hrefs.length) { box.innerHTML = ''; return; }
+        const token = this._linksToken = (this._linksToken || 0) + 1;
+        const parts = [];
+        for (const h of hrefs) {
+            let text = '';
+            try { const r = await fetch(new URL(h, this.deck.doc.baseURI).href, { cache: 'no-store' }); text = r.ok ? await r.text() : '(could not be read)'; } catch (e) { text = '(could not be read)'; }
+            parts.push(`<div class="insp-code-label"><span>${esc(h)}</span><span>read-only</span></div><pre class="insp-code-pre">${esc(text)}</pre>`);
+        }
+        if (token !== this._linksToken || !this.$('thCodeLinks')) return;
+        box.innerHTML = parts.join('') + '<div class="insp-hint">Linked stylesheets are separate files; the editor saves the deck file only, so edit these in a text editor. To change them here, copy the rules into the deck CSS above.</div>';
+    }
+    /* Apply every box that differs from the deck as one undo step. */
+    _applyCode() {
+        const now = new Map(this.deck.deckStyles().map(b => [b.index, b.css]));
+        const changes = [];
+        for (const ta of this.root.querySelectorAll('.th-deckcss')) {
+            const i = +ta.dataset.i;
+            if (now.has(i) && now.get(i) !== ta.value) changes.push({ i, before: now.get(i), after: ta.value });
+        }
+        if (!changes.length) return false;
+        const deck = this.deck;
+        const run = (key) => deck.withoutTransitions(() => { for (const c of changes) deck.setDeckStyle(c.i, c[key]); });
+        run('after');
+        this.history.push({ label: 'Deck CSS', undo() { run('before'); }, redo() { run('after'); } });
+        this.$('thCodeState').textContent = 'Applied.';
+        this.render();
+        return true;
     }
 
     /* ---- Motion ------------------------------------------------ */
@@ -490,6 +563,30 @@ export class ThemePanel {
         this.$('thCss').addEventListener('input', () => { clearTimeout(cssTimer); cssTimer = setTimeout(() => this._preview((o) => { o.css = this.$('thCss').value; }), 400); });
         this.$('thCss').addEventListener('keydown', (e) => e.stopPropagation());
 
+        // Deck CSS: folded until asked for (remembered), applied on leaving a box, Ctrl+Enter or the button.
+        const code = this.$('thCode');
+        try { code.open = localStorage.getItem(CODE_OPEN_KEY) === '1'; } catch (err) { /* private window */ }
+        code.addEventListener('toggle', () => {
+            try { localStorage.setItem(CODE_OPEN_KEY, code.open ? '1' : '0'); } catch (err) { /* private window */ }
+            if (code.open) this._renderCode();
+        });
+        const codeBox = (e) => e.target.classList && e.target.classList.contains('th-deckcss');
+        r.addEventListener('change', (e) => { if (codeBox(e)) this._applyCode(); });
+        r.addEventListener('input', (e) => { if (codeBox(e)) this.$('thCodeState').textContent = ''; });
+        r.addEventListener('keydown', (e) => {
+            if (!codeBox(e)) return;
+            const ta = e.target;
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.stopPropagation(); this._applyCode(); return; }
+            if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                e.preventDefault();
+                indentSelection(ta, e.shiftKey);
+                return;
+            }
+            if (!((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S'))) e.stopPropagation();   // typing and the box's own undo stay here; Save still works
+        });
+        window.addEventListener('editor:before-save', () => { if (this.deck.isOpen) this._applyCode(); });
+        this.deck.addEventListener('deckcss', () => { if (!r.hidden) this._renderCode(); });
+
         r.addEventListener('click', async (e) => {
             const clear = e.target.closest('.theme-var .insp-clear');
             if (clear) { const row = clear.closest('.theme-var'); this._change('Clear ' + row.dataset.var, (o) => { delete o.vars[row.dataset.var]; }); return; }
@@ -580,6 +677,54 @@ export class ThemePanel {
 }
 
 /* --- helpers ------------------------------------------------------ */
+const CODE_OPEN_KEY = 'diapo-theme-code-open';
+
+/* Tab indents by four spaces (every selected line when the selection spans lines), Shift+Tab takes
+   one level off. Done with execCommand so the box's own undo keeps working. */
+function indentSelection(ta, back) {
+    const v = ta.value, a = ta.selectionStart, b = ta.selectionEnd;
+    const put = (from, to, text, selFrom, selTo) => {
+        ta.setSelectionRange(from, to);
+        if (!document.execCommand('insertText', false, text)) { ta.setRangeText(text, from, to, 'end'); ta.dispatchEvent(new Event('input', { bubbles: true })); }
+        ta.setSelectionRange(selFrom, selTo);
+    };
+    if (a === b && !back) { put(a, b, '    ', a + 4, a + 4); return; }
+    const start = v.lastIndexOf('\n', a - 1) + 1;
+    const lines = v.slice(start, b).split('\n');
+    let removedFirst = 0, removedAll = 0;
+    const out = lines.map((ln, i) => {
+        if (!back) return '    ' + ln;
+        const m = /^( {1,4}|\t)/.exec(ln), n = m ? m[0].length : 0;
+        if (i === 0) removedFirst = n;
+        removedAll += n;
+        return ln.slice(n);
+    });
+    const text = out.join('\n');
+    put(start, b, text, back ? Math.max(start, a - removedFirst) : a + 4, start + text.length);
+}
+
+/* How much of a block the browser understood: its top-level rules counted in the text (comments and
+   strings left out) against those in the parsed sheet, and whether the braces pair up. Bad CSS is
+   kept as typed; the browser skips what it cannot read. */
+function cssHealth(text, sheet) {
+    let depth = 0, rules = 0, i = 0, bad = false;
+    const n = text.length;
+    while (i < n) {
+        const c = text[i];
+        if (c === '/' && text[i + 1] === '*') { const e = text.indexOf('*/', i + 2); i = e < 0 ? n : e + 2; continue; }
+        if (c === '"' || c === "'") { i++; while (i < n && text[i] !== c && text[i] !== '\n') { if (text[i] === '\\') i++; i++; } i++; continue; }
+        if (c === '{') depth++;
+        else if (c === '}') { depth--; if (depth < 0) { bad = true; depth = 0; } else if (depth === 0) rules++; }
+        else if (c === ';' && depth === 0) rules++;
+        i++;
+    }
+    if (depth !== 0) bad = true;
+    let parsed = 0;
+    try { parsed = sheet ? sheet.cssRules.length : 0; } catch (e) { parsed = rules; }
+    if (bad) return { warn: true, text: 'braces do not pair up' };
+    if (parsed < rules) return { warn: true, text: `${parsed} of ${rules} rules read; check the rest` };
+    return { warn: false, text: `${parsed} ${parsed === 1 ? 'rule' : 'rules'}` };
+}
 function kindOf(name, value, lookup) {
     // var(--other): the kind of what it points at (slide-bg: var(--paper) is a colour)
     for (let n = 0; n < 5 && lookup; n++) { const m = /^var\(--([\w-]+)\)$/.exec(String(value).trim()); if (!m) break; const v = lookup(m[1]); if (v == null) break; value = v; }

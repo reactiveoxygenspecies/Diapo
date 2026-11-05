@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'sample-deck', 'index.html');
-const DECK_DIR = path.join(__dirname, '.tmp-workspace', 'sample');
+const DECK_DIR = path.join(process.env.DIAPO_TEST_WS || path.join(__dirname, '.tmp-workspace'), 'sample');
 const DECK = path.join(DECK_DIR, 'index.html');
 const FILE = 'sample/index.html';
 
@@ -77,8 +77,8 @@ async function save(page) {
 const scale = (page) => page.evaluate(() => window.deckEditor.deck.scale);
 const goTo = async (page, i) => { await page.evaluate((i) => window.deckEditor.deck.goTo(i), i); await page.waitForTimeout(1000); };
 const IMPORT_DIR = path.join(__dirname, 'fixtures', 'import');
-const WS = path.join(__dirname, '.tmp-workspace');
-const own = { Origin: 'http://127.0.0.1:8811' };
+const WS = process.env.DIAPO_TEST_WS || path.join(__dirname, '.tmp-workspace');
+const own = { Origin: 'http://127.0.0.1:' + (+process.env.DIAPO_TEST_PORT || 8811) };
 
 /* Every test starts from the fixture deck as it is on disk, with every panel section open
    (a new user sees some folded; test 63 checks that). */

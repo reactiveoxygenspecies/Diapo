@@ -17,6 +17,7 @@ import { setListKind, clearMarker } from './insert.js';
 import { ChartSection, chartOf } from './chart.js';
 import { MathSection, mathOf } from './math.js';
 import { ChemSection, chemOf } from './chem.js';
+import { LineSection, isLine } from './lines.js';
 import { canCrop, cropBoxOf, pictureOf } from './crop.js';
 
 const ALL_WEIGHTS = [100, 200, 300, 400, 500, 600, 700, 800, 900];
@@ -63,6 +64,7 @@ export class Inspector {
         this.chart = new ChartSection(app, this.$('inspChart'), this.$('inspChartAxes'), this.$('inspChartStyle'));
         this.math = new MathSection(app, this.$('inspMath'));
         this.chem = new ChemSection(app, this.$('inspChem'));
+        this.arrow = new LineSection(app, this.$('inspArrow'));
         this._bind();
     }
 
@@ -160,6 +162,7 @@ export class Inspector {
           <section class="insp-section" id="inspChartStyle" data-fold="chartstyle" hidden><h4>Chart style</h4></section>
           <section class="insp-section" id="inspMath" hidden></section>
           <section class="insp-section" id="inspChem" hidden></section>
+          <section class="insp-section" id="inspArrow" hidden></section>
 
           <section class="insp-section" id="inspColour">
             <h4>Colour</h4>
@@ -1254,6 +1257,11 @@ export class Inspector {
         this.chart.sync(el);
         this.math.sync(el);
         this.chem.sync(el);
+        this.arrow.sync(el);
+        // A line has no box to size, no border or shadow: its look is the Line section and the colour below.
+        const isLn = isLine(el);
+        ['inspW', 'inspPad', 'inspBorder'].forEach(id => { $(id).closest('.insp-row2').hidden = isLn; });
+        if (isLn) this.colourTarget = 'text';
         const list = this._list();
         $('inspList').hidden = !list;
         if (list) {
@@ -1280,8 +1288,9 @@ export class Inspector {
         const shape = isShape(el);
         this.root.querySelectorAll('#inspColourTarget button').forEach(b => {
             b.classList.toggle('on', b.dataset.t === this.colourTarget);
-            b.hidden = shape && b.dataset.t === 'border';
+            b.hidden = (shape && b.dataset.t === 'border') || (isLn && b.dataset.t !== 'text');
             if (shape) b.textContent = b.dataset.t === 'text' ? 'Fill' : 'Stroke';
+            else if (isLn) b.textContent = 'Line';
             else b.textContent = b.dataset.t === 'text' ? 'Text' : b.dataset.t === 'fill' ? 'Fill' : 'Border';
         });
         if (shape && this.colourTarget === 'border') this.colourTarget = 'fill';

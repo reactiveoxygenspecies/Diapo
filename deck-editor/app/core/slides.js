@@ -13,6 +13,7 @@
    ============================================================ */
 import { LAYOUTS, layoutById, buildSlide, sketchHtml, applyTypeFallback } from './layouts.js';
 import { Deck } from './document.js';
+import { SlideClip, cleanSlideClone } from './slideclip.js';
 
 const LAST_LAYOUT_KEY = 'deck-editor-last-layout';
 
@@ -38,6 +39,33 @@ export function absoluteUrls(root, base) {
         }).join(', '));
     });
     return root;
+}
+
+/* Stylesheets from other origins (Google Fonts above all) block a frame's first paint until the
+   other server answers: with a slow or blocked network every thumbnail stayed blank (white) for as
+   long as that took, or for good. They are taken out of the copy of the head (links, and @import
+   rules in its <style> blocks) and their addresses returned; addExternalCss() puts them back once
+   the frame has drawn, where they only change the fonts when they arrive. */
+export function takeExternalCss(root) {
+    const urls = [];
+    const external = (v) => { try { return new URL(v, location.href).origin !== location.origin && /^https?:/i.test(new URL(v, location.href).protocol); } catch { return false; } };
+    root.querySelectorAll('link[rel~="stylesheet"][href]').forEach(l => {
+        const h = l.getAttribute('href');
+        if (external(h)) { urls.push(h); l.remove(); }
+    });
+    root.querySelectorAll('style').forEach(st => {
+        st.textContent = st.textContent.replace(/@import\s+(?:url\(\s*)?["']?(https?:[^"')\s;]+)["']?\s*\)?[^;]*;/gi, (m, u) => { urls.push(u); return ''; });
+    });
+    return urls;
+}
+export function addExternalCss(doc, urls) {
+    if (!doc || !doc.head) return;
+    for (const u of urls) {
+        if ([...doc.head.querySelectorAll('link[data-ext]')].some(l => l.getAttribute('href') === u)) continue;
+        const l = doc.createElement('link');
+        l.rel = 'stylesheet'; l.href = u; l.setAttribute('data-ext', '');
+        doc.head.appendChild(l);
+    }
 }
 
 export const THUMB_CSS = `
@@ -68,6 +96,9 @@ export class SlideStrip extends EventTarget {
         this.thumbW = 180;
         this.observer = null;
         this._refreshTimer = 0;
+        this.sel = new Set();          // slides picked in the strip (Ctrl / Shift + click); empty = the current slide alone
+        this.ctx = false;              // the strip, not the canvas, was last clicked: it owns Delete, Ctrl+C / X / V
+        this.clip = new SlideClip(this);
         this._bind();
     }
 
@@ -76,28 +107,39 @@ export class SlideStrip extends EventTarget {
        ------------------------------------------------------------ */
     _bind() {
         this.deck.addEventListener('ready', () => this.rebuild());
+        this.deck.addEventListener('deckcss', () => { if (this.deck.isOpen) this.rebuild(); });   // the deck's own CSS changed: thumbnails load it afresh
         this.deck.addEventListener('slide', () => this.highlight());
         this.deck.addEventListener('mutate', (e) => this._onMutate(e.detail));
         this.addButton.addEventListener('click', () => this.showLayoutPicker());
-        new ResizeObserver(() => this._resizeThumbs()).observe(this.list);
+        new ResizeObserver(() => { this._resizeThumbs(); this._fillSoon(); }).observe(this.list);
+        this.list.addEventListener('scroll', () => this._fillSoon(), { passive: true });
 
         // Navigation happens on pointerup in _bindDrag(): the drag code takes pointer
         // capture on the list, which makes click events land on the list, not the item.
         this.list.addEventListener('contextmenu', (e) => {
             const it = e.target.closest('.strip-item'); if (!it) return;
             e.preventDefault();
-            this.deck.goTo(this.indexOf(it));
+            this.ctx = true;
+            if (!this.sel.has(it._slide)) { this.sel.clear(); this.deck.goTo(this.indexOf(it)); }   // a right-click inside the picked slides keeps them
             this._menu(it, e.clientX, e.clientY);
         });
         this._bindDrag();
-        document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.strip-menu')) this._closeMenu(); }, true);
+        document.addEventListener('pointerdown', (e) => {
+            if (!e.target.closest('.strip-menu')) this._closeMenu();
+            this.ctx = !!(e.target.closest && e.target.closest('#stripList, .strip-menu'));
+        }, true);
+        this.deck.addEventListener('ready', () => {
+            this.sel.clear();
+            this.deck.doc.addEventListener('pointerdown', () => { this.ctx = false; }, true);
+        });
+        this.deck.addEventListener('slide', () => { if (this.sel.size && !this.sel.has(this.deck.currentSlide)) this.sel.clear(); this.highlight(); });
         document.addEventListener('pointerdown', (e) => { if (this.picker && !e.target.closest('.layout-picker') && e.target !== this.addButton) this.closeLayoutPicker(); }, true);
     }
 
     /* The deck's head, cleaned for thumbnails, computed once per open. */
     _head() {
         if (this.headHtml) return this.headHtml;
-        const src = this.deck.source || '';
+        const src = this.deck.sourceWithDeckStyles() || '';     // with the Theme > Deck CSS edits
         const m = /<head[^>]*>([\s\S]*?)<\/head>/i.exec(src);
         let head = m ? m[1] : '';
         head = head.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<title>[\s\S]*?<\/title>/gi, '')
@@ -107,6 +149,7 @@ export class SlideStrip extends EventTarget {
         this.baseHref = `${location.origin}/deck/${dir.split('/').map(encodeURIComponent).join('/')}`;
         const t = document.createElement('template'); t.innerHTML = head;
         absoluteUrls(t.content, this.baseHref);
+        this.extCss = takeExternalCss(t.content);
         head = t.innerHTML;
         this.headHtml = `<base href="${this.baseHref}">` + head + `<style>${THUMB_CSS}</style>`;
         return this.headHtml;
@@ -117,14 +160,44 @@ export class SlideStrip extends EventTarget {
         this.items = new Map();
         this.list.innerHTML = '';
         if (this.observer) this.observer.disconnect();
+        clearTimeout(this._refreshTimer); this._dirty = new Set(); this._refreshAllPending = false;
         this.observer = new IntersectionObserver((entries) => {
-            for (const en of entries) if (en.isIntersecting) this._ensureThumb(en.target);
+            // One slide that cannot be drawn must not cost the rest of the batch their thumbnails: an
+            // observer reports a change once, so an entry skipped here would stay blank for good.
+            for (const en of entries) if (en.isIntersecting) this._tryThumb(en.target);
         }, { root: this.list, rootMargin: '200px 0px' });
         if (!this.deck.isOpen) return;
         for (const slide of this.deck.slides) this.list.appendChild(this._item(slide));
         this._resizeThumbs();
         this.highlight();
         this.renumber();
+        this._fillSoon();
+    }
+
+    /* The observer is the cheap way to find the items in view, the sweep below the safety net: it
+       draws every item in or near the list's visible part that has no thumbnail yet. It runs after
+       scrolling and resizing settle, so a missed or swallowed notification (a panel that was hidden
+       or zero-sized, a thumbnail that threw, a rebuild in between) costs a moment, not a blank. */
+    _fillSoon() {
+        if (this._fillTimer) return;
+        this._fillTimer = setTimeout(() => { this._fillTimer = 0; this._fillVisible(); }, 120);
+    }
+    _fillVisible() {
+        if (!this.deck.isOpen || !this.list.clientHeight) return;
+        const r = this.list.getBoundingClientRect(), pad = 200;
+        let missing = false;
+        for (const it of this.itemList()) {
+            if (it.hidden || it.querySelector('iframe')) continue;
+            const b = it.getBoundingClientRect();
+            if (!b.height || b.bottom < r.top - pad || b.top > r.bottom + pad) continue;
+            missing = true;
+            this._tryThumb(it);
+        }
+        if (missing) this._fillSoon();          // one that failed (a deck still loading) is tried again
+    }
+    _tryThumb(it, force = false, hard = false) {
+        try { this._ensureThumb(it, force, hard); }
+        catch (err) { console.warn('thumbnail failed', err); }
     }
 
     _item(slide) {
@@ -140,16 +213,17 @@ export class SlideStrip extends EventTarget {
     }
 
     /* Create (or recreate) the thumbnail iframe of one item from the live slide. */
-    _ensureThumb(it, force = false) {
+    _ensureThumb(it, force = false, hard = false) {
         const thumb = it.querySelector('.thumb');
         let frame = thumb.querySelector('iframe');
         if (frame && !force) return;
         const slide = it._slide;
-        if (!slide || !this.deck.doc.contains(slide)) return;
+        const doc = this.deck.doc;               // null while another deck is loading
+        if (!slide || !doc || !doc.contains(slide)) return;
         const clone = slide.cloneNode(true);
         clone.classList.add('active', 'visible');
         clone.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
-        const live = ['deck-editor-fonts', 'deck-editor-overrides'].map(id => { const st = this.deck.doc.getElementById(id); return st ? st.outerHTML : ''; }).join('');
+        const live = ['deck-editor-fonts', 'deck-editor-overrides'].map(id => { const st = doc.getElementById(id); return st ? st.outerHTML : ''; }).join('');
         // The master layer (footer, page counter) goes into every thumbnail, numbered for its slide.
         const idx = this.deck.slides.indexOf(slide), total = this.deck.slides.length;
         const head = this._head();
@@ -166,8 +240,9 @@ export class SlideStrip extends EventTarget {
             frame.setAttribute('sandbox', 'allow-same-origin');
             thumb.prepend(frame);
             this._sizeFrame(frame);
+            this._watchFrame(it, frame);
             frame.srcdoc = html;
-        } else if (frame.contentDocument && frame.contentDocument.querySelector('.deck-stage')) {
+        } else if (!hard && frame.contentDocument && frame.contentDocument.querySelector('.deck-stage')) {
             // Cheap refresh: swap the slide markup (and the editor's live style blocks) without reloading the deck's CSS.
             frame.contentDocument.querySelector('.deck-stage').innerHTML = clone.outerHTML + master;
             for (const id of ['deck-editor-fonts', 'deck-editor-overrides']) {
@@ -178,8 +253,37 @@ export class SlideStrip extends EventTarget {
             }
         } else {
             frame.srcdoc = html;
+            this._watchFrame(it, frame);
         }
         it.querySelector('.thumb-label').textContent = this.deck.slideLabel(slide);
+    }
+
+    /* After its load: has the thumbnail really drawn? A stylesheet or picture the server dropped under
+       load (a burst of requests from many frames at once) leaves it unstyled or empty, and nothing
+       would ever retry. Look at the frame once it has loaded, and again after a quiet spell if it
+       never did; a damaged one is loaded afresh (a few times, with a growing pause). */
+    _watchFrame(it, frame) {
+        clearTimeout(frame._watch);
+        const check = () => {
+            clearTimeout(frame._watch);
+            if (!frame.isConnected || this.items.get(it._slide) !== it) return;
+            let bad = true;
+            try {
+                const d = frame.contentDocument;
+                if (d && d.URL === 'about:srcdoc' && d.readyState !== 'loading' && d.querySelector('.slide')) {
+                    addExternalCss(d, this.extCss || []);          // after the first paint, so a slow server cannot hold it up
+                    bad = [...d.querySelectorAll('link[rel~="stylesheet"]:not([data-ext])')].some(l => !l.sheet)
+                        || [...d.images].some(i => i.complete && !i.naturalWidth && i.getAttribute('src') && !/\.svg(\?|$)/i.test(i.src));
+                    if (!bad) frame._tries = 0;
+                } else if (d && d.URL !== 'about:srcdoc') { frame._watch = setTimeout(check, 8000); return; }     // the blank document that precedes srcdoc: the real load follows
+            } catch (e) { bad = true; }
+            if (!bad) return;
+            const n = frame._tries = (frame._tries || 0) + 1;
+            if (n > 4) return;
+            frame._watch = setTimeout(() => { if (frame.isConnected && this.items.get(it._slide) === it) this._tryThumb(it, true, true); }, 400 * n * n);
+        };
+        if (!frame._hooked) { frame._hooked = true; frame.addEventListener('load', check); }
+        frame._watch = setTimeout(check, 8000);
     }
 
     _sizeFrame(frame) {
@@ -200,38 +304,65 @@ export class SlideStrip extends EventTarget {
     /* Refresh the current slide's thumbnail shortly after the last change. */
     _onMutate(records) {
         const structural = records.some(r => r.type === 'childList' && r.target === this.deck.stage && Array.from(r.addedNodes).concat(Array.from(r.removedNodes)).some(n => n.classList && n.classList.contains('slide')));
-        if (structural) { this.syncStructure(); return; }
         // A change in the master layer (outside every slide) shows in every thumbnail.
         const inSlide = (n) => n.closest ? n.closest('.slide') : (n.parentElement && n.parentElement.closest('.slide'));
-        const t = records.some(r => r.target && r.target !== this.deck.stage && !inSlide(r.target));
-        if (t) this._refreshAllPending = true;
+        // Slides other than the current one change too (undo, redo, a paste elsewhere): remember which, so
+        // their thumbnails are redrawn rather than left showing the old picture. Navigation only toggles classes.
+        if (!this._dirty) this._dirty = new Set();
+        for (const r of records) {
+            if (!r.target) continue;
+            const sl = inSlide(r.target);
+            if (sl && !(r.type === 'attributes' && r.attributeName === 'class')) this._dirty.add(sl);
+        }
+        if (structural) this.syncStructure();
+        else if (records.some(r => r.target && r.target !== this.deck.stage && !inSlide(r.target))) this._refreshAllPending = true;
         clearTimeout(this._refreshTimer);
-        this._refreshTimer = setTimeout(() => { if (this._refreshAllPending) { this._refreshAllPending = false; this.refreshAll(); } else this.refreshCurrent(); }, 400);
+        this._refreshTimer = setTimeout(() => {
+            const dirty = this._dirty; this._dirty = new Set();
+            if (this._refreshAllPending || dirty.size > 8) { this._refreshAllPending = false; this.refreshAll(); return; }
+            this.refreshCurrent();
+            for (const sl of dirty) if (sl !== this.deck.currentSlide) { const it = this.items.get(sl); if (it && it.querySelector('iframe')) this._tryThumb(it, true); }
+        }, 400);
     }
     refreshCurrent() {
         const slide = this.deck.currentSlide;
         const it = this.items.get(slide);
-        if (it && it.querySelector('iframe')) this._ensureThumb(it, true);
+        if (it && it.querySelector('iframe')) this._tryThumb(it, true);
     }
     refreshAll() {
-        for (const it of this.itemList()) if (it.querySelector('iframe')) this._ensureThumb(it, true);
+        for (const it of this.itemList()) if (it.querySelector('iframe')) this._tryThumb(it, true);
     }
 
     /* After add/delete/reorder: make the strip match the stage's slide order, keeping existing thumbs. */
     syncStructure() {
         const slides = this.deck.slides;
         const seen = new Set();
-        let prev = null;
-        for (const slide of slides) {
-            let it = this.items.get(slide);
-            if (!it) it = this._item(slide);
-            seen.add(slide);
-            const want = prev ? prev.nextSibling : this.list.firstChild;
-            if (it !== want) this.list.insertBefore(it, want);
-            prev = it;
-        }
+        const want = slides.map(slide => { seen.add(slide); return this.items.get(slide) || this._item(slide); });
         for (const [slide, it] of this.items) if (!seen.has(slide)) { it.remove(); this.observer.unobserve(it); this.items.delete(slide); }
+        // Moving an item takes its frame out of the document and puts it back, which reloads the
+        // thumbnail. Leave in place the longest run of items that is already in order and move only the
+        // others: sending one slide to the end must not reload every thumbnail between (a burst of
+        // requests, and blanks while they load).
+        const at = new Map(this.itemList().map((it, i) => [it, i]));
+        const pos = want.map(it => at.has(it) ? at.get(it) : -1);
+        const tails = [], prevIdx = new Array(pos.length).fill(-1);       // longest increasing run of pos, patience style
+        pos.forEach((p, i) => {
+            if (p < 0) return;
+            let lo = 0, hi = tails.length;
+            while (lo < hi) { const mid = (lo + hi) >> 1; if (pos[tails[mid]] < p) lo = mid + 1; else hi = mid; }
+            if (lo) prevIdx[i] = tails[lo - 1];
+            tails[lo] = i;
+        });
+        const stay = new Set();
+        for (let i = tails.length ? tails[tails.length - 1] : -1; i >= 0; i = prevIdx[i]) stay.add(i);
+        let moved = false, next = null;
+        for (let i = want.length - 1; i >= 0; i--) {
+            if (!stay.has(i)) { this.list.insertBefore(want[i], next); moved = true; }
+            next = want[i];
+        }
+        if (moved) this._sectionsSig = null;            // the headers are laid out again around the moved items
         this.renumber();
+        this._fillSoon();
         this.highlight();
         this.dispatchEvent(new CustomEvent('structure'));
     }
@@ -274,7 +405,7 @@ export class SlideStrip extends EventTarget {
     }
     highlight() {
         const cur = this.deck.currentSlide;
-        for (const [slide, it] of this.items) it.classList.toggle('current', slide === cur);
+        for (const [slide, it] of this.items) { it.classList.toggle('current', slide === cur); it.classList.toggle('picked', this.sel.size > 0 && this.sel.has(slide)); }
         if (this.collapsed.size) this._sections();          // the current slide stays visible inside a folded section
         const c = this.items.get(cur);
         if (c) c.scrollIntoView({ block: 'nearest' });
@@ -350,31 +481,73 @@ export class SlideStrip extends EventTarget {
     duplicateSlide(index = this.deck.current) {
         const slides = this.deck.slides;
         const src = slides[index]; if (!src) return;
-        const clone = src.cloneNode(true);
-        clone.classList.remove('active', 'visible');
-        clone.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
+        const clone = cleanSlideClone(src.cloneNode(true));                       // charts belong to the deck's script
         clone.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));      // ids must stay unique
-        clone.querySelectorAll('[data-fig]').forEach(h => {                       // charts belong to the deck's script
-            h.innerHTML = '';
-            if (h.dataset.edClass != null) { h.className = h.dataset.edClass; delete h.dataset.edClass; }
-            else h.classList.remove('js-plotly-plot', 'plotly-graph-div');
-        });
         this.history.insert(clone, this.deck.stage, src.nextSibling, 'Duplicate slide');
         this._notifyDeck();
         this.deck.goTo(index + 1);
     }
 
     deleteSlide(index = this.deck.current) {
+        const s = this.deck.slides[index]; if (!s) return;
+        this.deleteSlides([s], 'Delete slide');
+    }
+
+    /* The slides picked in the strip, in deck order; the current slide when none is picked. */
+    selectedSlides() {
+        const all = this.deck.slides;
+        const picked = all.filter(s => this.sel.has(s));
+        if (picked.length) return picked;
+        const cur = this.deck.currentSlide;
+        return cur ? [cur] : [];
+    }
+    setSelection(slides) {
+        this.sel = new Set(slides.length > 1 ? slides : []);       // one slide is just the current one
+        this.highlight();
+    }
+    /* The strip, not the canvas, is what keys act on: it was the last thing clicked, and no
+       element is picked on the canvas or being typed into. */
+    isContext() {
+        return this.ctx && this.deck.isOpen && !this.app.preview && !this.app.textEdit.active && !this.app.selection.items.length;
+    }
+    deleteSelected() {
+        const slides = this.selectedSlides();
+        if (!slides.length) return false;
+        this.deleteSlides(slides, slides.length === 1 ? 'Delete slide' : 'Delete slides');
+        return true;
+    }
+
+    /* Delete slides as one undo step; a deck keeps at least one. The slide that takes the
+       current place is the one that followed the first deleted (the last, if none did). */
+    deleteSlides(list, label = 'Delete slides') {
         const slides = this.deck.slides;
-        if (slides.length <= 1) { this.app.toast('A deck needs at least one slide'); return; }
-        const s = slides[index]; if (!s) return;
-        const wasCurrent = index === this.deck.current;
-        this.history.remove(s, 'Delete slide');
+        const doomed = slides.filter(s => list.includes(s));
+        if (!doomed.length) return;
+        if (doomed.length >= slides.length) { this.app.toast('A deck needs at least one slide'); return; }
+        const first = slides.indexOf(doomed[0]);
+        const wasCurrent = doomed.includes(this.deck.currentSlide);
+        this.history.begin(label);
+        for (const s of doomed) this.history.remove(s, label);
+        this.history.end();
+        this.sel.clear();
         this._notifyDeck();
-        if (wasCurrent) {
-            const next = Math.min(index, this.deck.slides.length - 1);
-            this.deck._forceSlide(next);
+        if (wasCurrent) this.deck._forceSlide(Math.min(first, this.deck.slides.length - 1));
+        else this.highlight();
+    }
+
+    _pick(index, range) {
+        const slides = this.deck.slides, s = slides[index]; if (!s) return;
+        if (range) {
+            const a = this._anchor != null && slides[this._anchor] ? this._anchor : this.deck.current;
+            const [lo, hi] = a < index ? [a, index] : [index, a];
+            this.sel = new Set(slides.slice(lo, hi + 1));
+        } else {
+            if (!this.sel.size && this.deck.currentSlide) this.sel.add(this.deck.currentSlide);
+            if (this.sel.has(s)) this.sel.delete(s); else this.sel.add(s);
+            this._anchor = index;
+            if (this.sel.size === 1 && this.sel.has(this.deck.currentSlide)) this.sel.clear();
         }
+        this.highlight();
     }
 
     moveSlide(from, to) {
@@ -399,13 +572,18 @@ export class SlideStrip extends EventTarget {
     _menu(it, x, y) {
         this._closeMenu();
         const i = this.indexOf(it), n = this.itemList().length;
+        const picked = this.selectedSlides().length;
         const skipped = it._slide.hasAttribute('data-skip');
         const menu = document.createElement('div');
         menu.className = 'strip-menu';
         menu.innerHTML = `
             <button data-a="new">New slide after this...</button>
             <button data-a="dup">Duplicate</button>
-            <button data-a="del" ${n <= 1 ? 'disabled' : ''}>Delete</button>
+            <button data-a="del" ${n <= picked ? 'disabled' : ''}>${picked > 1 ? `Delete ${picked} slides` : 'Delete'}</button>
+            <hr>
+            <button data-a="copy">${picked > 1 ? `Copy ${picked} slides` : 'Copy slide'}</button>
+            <button data-a="cut" ${n <= picked ? 'disabled' : ''}>${picked > 1 ? `Cut ${picked} slides` : 'Cut slide'}</button>
+            <button data-a="paste">Paste slides after this</button>
             <hr>
             <button data-a="up" ${i === 0 ? 'disabled' : ''}>Move up</button>
             <button data-a="down" ${i === n - 1 ? 'disabled' : ''}>Move down</button>
@@ -417,7 +595,7 @@ export class SlideStrip extends EventTarget {
             <button data-a="section">${it._slide.hasAttribute('data-section') ? 'Rename section...' : 'Start a section here...'}</button>
             ${it._slide.hasAttribute('data-section') ? '<button data-a="unsection">Remove section</button>' : ''}`;
         menu.style.left = Math.min(x, innerWidth - 200) + 'px';
-        menu.style.top = Math.min(y, innerHeight - 260) + 'px';
+        menu.style.top = Math.min(y, innerHeight - 340) + 'px';
         document.body.appendChild(menu);
         menu.addEventListener('click', (e) => {
             const a = e.target.closest('[data-a]'); if (!a) return;
@@ -425,7 +603,10 @@ export class SlideStrip extends EventTarget {
             switch (a.dataset.a) {
                 case 'new': this.showLayoutPicker(i, it); break;
                 case 'dup': this.duplicateSlide(i); break;
-                case 'del': this.deleteSlide(i); break;
+                case 'del': this.deleteSelected(); break;
+                case 'copy': this.clip.copy(); break;
+                case 'cut': this.clip.cut(); break;
+                case 'paste': this.clip.pasteFromMenu(); break;
                 case 'up': this.moveSlide(i, i - 1); break;
                 case 'down': this.moveSlide(i, i + 1); break;
                 case 'top': this.moveSlide(i, 0); break;
@@ -469,7 +650,12 @@ export class SlideStrip extends EventTarget {
             const d = drag; drag = null;
             try { this.list.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
             this.list.querySelectorAll('.dragging, .drop-before, .drop-after').forEach(x => x.classList.remove('dragging', 'drop-before', 'drop-after'));
-            if (!d.moved) { this.deck.goTo(d.from); return; }     // a plain press: go to that slide
+            if (!d.moved) {
+                // Ctrl / Cmd toggles a slide in the picked ones, Shift picks the run from the current slide.
+                if (e.ctrlKey || e.metaKey || e.shiftKey) { this._pick(d.from, e.shiftKey); return; }
+                this.sel.clear(); this.highlight();
+                this.deck.goTo(d.from); return;                   // a plain press: go to that slide
+            }
             if (d.to === null) return;
             let to = d.to;
             if (to > d.from) to -= 1;

@@ -26,6 +26,7 @@
    ============================================================ */
 import { readChart, chartKind, seriesColour, isChart } from './chart.js';
 
+import { bleed as lineBleed } from './lines.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SKIP = 'script, style, template, noscript, aside.notes, .notes, .deck-controls, .deck-overview, .deck-laser, .deck-draw, .deck-draw-bar, [data-placeholder]';
 const INLINE = new Set(['inline', 'contents']);
@@ -701,16 +702,19 @@ export class PptxCollector {
             else this.note('a chart drawn by the deck\'s own script was left out');
             return null;
         }
-        const r = this.deck.stageRect(svg);
-        const markup = this.standaloneSvg(svg, r.w, r.h);
+        let r = this.deck.stageRect(svg);
+        // A line's stroke and heads reach outside its box: the picture gets a margin round it.
+        const bl = svg.hasAttribute('data-line') ? lineBleed(svg) : 0;
+        if (bl) r = { x: r.x - bl, y: r.y - bl, w: r.w + 2 * bl, h: r.h + 2 * bl };
+        const markup = this.standaloneSvg(svg, r.w, r.h, bl);
         const png = await this.rasterSvg(markup, r.w, r.h);
         const label = svg.getAttribute('aria-label') || el.getAttribute('data-math') || el.getAttribute('data-chem') || '';
         const item = { kind: 'svg', ...box, svg: markup, png, name: this.name(el) || (el.hasAttribute('data-math') ? 'Equation' : el.hasAttribute('data-chem') ? 'Structure' : ''), alt: label };
-        if (svg !== el) Object.assign(item, { x: r.x, y: r.y, w: r.w, h: r.h, rot: box.rot });
+        if (svg !== el || bl) Object.assign(item, { x: r.x, y: r.y, w: r.w, h: r.h, rot: box.rot });
         return item;
     }
 
-    standaloneSvg(svg, w, h) {
+    standaloneSvg(svg, w, h, bleed = 0) {
         const clone = svg.cloneNode(true);
         const live = [svg, ...svg.querySelectorAll('*')], copy = [clone, ...clone.querySelectorAll('*')];
         const props = ['fill', 'stroke', 'stroke-width', 'opacity', 'fill-opacity', 'stroke-opacity', 'stop-color', 'stop-opacity', 'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin'];
@@ -728,6 +732,11 @@ export class PptxCollector {
             if (c.getAttribute('style')) c.setAttribute('style', c.getAttribute('style').replace(/var\([^)]*\)/g, ''));
         });
         if (!clone.getAttribute('viewBox')) clone.setAttribute('viewBox', `0 0 ${svg.clientWidth || w} ${svg.clientHeight || h}`);
+        if (bleed) {
+            const vb = clone.getAttribute('viewBox').split(/s+/).map(Number);
+            clone.setAttribute('viewBox', `${vb[0] - bleed} ${vb[1] - bleed} ${vb[2] + 2 * bleed} ${vb[3] + 2 * bleed}`);
+            clone.querySelectorAll('[data-hit]').forEach(n => n.remove());
+        }
         clone.setAttribute('width', Math.round(w * 100) / 100);
         clone.setAttribute('height', Math.round(h * 100) / 100);
         clone.setAttribute('xmlns', SVG_NS);

@@ -55,6 +55,8 @@ export class EditOps {
             // A field in the editor's panels (a colour code, a size) takes the paste itself.
             const a = e.target && e.target.ownerDocument ? e.target.ownerDocument.activeElement : null;
             if (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return;
+            // Whole slides on the clipboard (or the slide strip as the context) go to the strip's paste.
+            if (this.app.strip && this.app.strip.clip.onPaste(e)) { e.preventDefault(); return; }
             if (this.paste(e.clipboardData)) e.preventDefault();
         };
         document.addEventListener('copy', onCopy);
@@ -96,6 +98,22 @@ export class EditOps {
     _markup(items) {
         const slide = this.deck.currentSlide;
         return `<div ${MARK}="1">${items.map(el => this.cloneInPlace(el, slide).outerHTML).join('')}</div>`;
+    }
+
+    /* Put markup and its text on the system clipboard (the slide strip's copy uses this too).
+       execCommand('copy') fires the copy event above in the focused document; the async API
+       is the fallback where that is refused. */
+    writeClipboard(html, text) {
+        this.pending = { html, text };
+        let ok = false;
+        try { ok = (this.deck.doc.hasFocus() ? this.deck.doc : document).execCommand('copy'); } catch (err) { ok = false; }
+        if (!ok && navigator.clipboard && navigator.clipboard.write) {
+            try {
+                navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })]).catch(() => {});
+            } catch (err) { /* ignore */ }
+        }
+        this.pending = null;
+        return ok;
     }
 
     copy(items = this.selection.items) {

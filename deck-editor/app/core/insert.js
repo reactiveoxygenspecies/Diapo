@@ -20,6 +20,7 @@ import { imagePlaceholder } from './layouts.js';
 import { sampleChart, deckPalette, writeChart } from './chart.js';
 import { texToSvg, lastMathFont } from './math.js';
 import { smilesToSvg } from './chem.js';
+import { createLine, KINDS } from './lines.js';
 
 /* A small set of icons as SVG paths on a 24x24 grid. */
 export const ICONS = {
@@ -451,24 +452,16 @@ export class Inserter {
         return this.add(svg, 'Insert ' + kind.replace('-', ' '));
     }
 
-    line(arrow = false) {
-        const d = this.defaults(), doc = this.deck.doc;
-        const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('viewBox', '0 0 480 24');
-        svg.setAttribute('fill', 'none');
-        svg.setAttribute('stroke', d.accent);
-        svg.setAttribute('stroke-width', '6');
-        svg.setAttribute('stroke-linecap', 'round');
-        svg.setAttribute('stroke-linejoin', 'round');
-        svg.innerHTML = arrow
-            ? '<path d="M6 12h460"/><path d="m448 2 20 10-20 10"/>'
-            : '<path d="M6 12h468"/>';
-        this.place(svg, 480, 24);
-        svg.style.overflow = 'visible';
-        svg.style.maxWidth = 'none';
-        svg.style.maxHeight = 'none';
-        return this.add(svg, arrow ? 'Insert arrow' : 'Insert line');
+    /* A line or arrow (see lines.js) placed in the middle of the slide, ends ready to drag.
+       kind: line, arrow, curved or double; a boolean is the older line(arrow) call. */
+    line(kind = 'arrow') {
+        if (kind === true) kind = 'arrow'; else if (kind === false) kind = 'line';
+        const n = this.count++ % 8 * 24, cx = this.deck.stageW / 2 + n, cy = this.deck.stageH / 2 + n;
+        const svg = createLine(this.app, kind, [cx - 210, cy], [cx + 210, cy]);
+        return this.add(svg, 'Insert ' + KINDS[kind].label);
     }
+    /* The same, drawn by dragging on the slide: arms the tool (a click still places a default one). */
+    drawLine(kind) { this.selection.lines.arm(kind); }
 
     icon(name) {
         const path = ICONS[name]; if (!path) return null;

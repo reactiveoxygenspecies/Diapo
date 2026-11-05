@@ -9,30 +9,42 @@
      every preset in use is written into the deck's override block
      (document.js), so the saved file animates on its own.
 
-   Preset keyframes only touch transform, opacity and filter. Moves
-   and rotation made in the editor live in the `translate` / `rotate`
-   properties (or --dx/--dy for deck reveals), so they compose with
-   the animation instead of being overwritten by it.
+   Preset keyframes touch transform, opacity, filter and, for the
+   directional presets, `translate` (added to the editor's own
+   position, see mv()), so they keep to the screen's directions
+   whatever the element's rotation. Moves and rotation made in the
+   editor live in the `translate` / `rotate` properties (or --dx/--dy
+   for deck reveals), so they compose with the animation instead of
+   being overwritten by it.
    ============================================================ */
 import { getOffset, setOffset, forgetVars } from './transform.js';
 import { ANIM_MARK_START, ANIM_MARK_END, animStateSelectors } from './document.js';
 
 const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)';
 
+/* A move along the SCREEN's axes. It animates the individual `translate` property, which CSS
+   applies before `rotate` and `scale`, so a rotated or flipped element still comes in from the
+   side the viewer calls up / down / left / right (a `transform: translateY()` would run in the
+   element's own turned frame). `animation-composition: add` puts the move on top of the position
+   the editor wrote in `translate`, instead of replacing it. It is set inside the keyframe that
+   moves, so opacity in the same animation still replaces. */
+const px = v => typeof v === 'number' ? v + 'px' : v;
+function mv(x, y) { return `translate:${px(x)} ${px(y)};animation-composition:add`; }
+
 /* name -> { label, loop, from/to or keyframes, dur } */
 export const PRESETS = {
     'fade':        { label: 'Fade',        kf: 'from{opacity:0}to{opacity:1}' },
-    'fade-up':     { label: 'Fade up',     kf: 'from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}' },
-    'fade-down':   { label: 'Fade down',   kf: 'from{opacity:0;transform:translateY(-40px)}to{opacity:1;transform:none}' },
-    'fade-left':   { label: 'Fade left',   kf: 'from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:none}' },
-    'fade-right':  { label: 'Fade right',  kf: 'from{opacity:0;transform:translateX(-60px)}to{opacity:1;transform:none}' },
+    'fade-up':     { label: 'Fade up',     kf: `from{opacity:0}from{${mv(0, 40)}}to{opacity:1}to{${mv(0, 0)}}` },
+    'fade-down':   { label: 'Fade down',   kf: `from{opacity:0}from{${mv(0, -40)}}to{opacity:1}to{${mv(0, 0)}}` },
+    'fade-left':   { label: 'Fade left',   kf: `from{opacity:0}from{${mv(60, 0)}}to{opacity:1}to{${mv(0, 0)}}` },
+    'fade-right':  { label: 'Fade right',  kf: `from{opacity:0}from{${mv(-60, 0)}}to{opacity:1}to{${mv(0, 0)}}` },
     'zoom':        { label: 'Zoom',        kf: 'from{opacity:0;transform:scale(0.6)}to{opacity:1;transform:none}' },
     'zoom-out':    { label: 'Zoom out',    kf: 'from{opacity:0;transform:scale(1.4)}to{opacity:1;transform:none}' },
     'pop':         { label: 'Pop',         kf: '0%{opacity:0;transform:scale(0.5)}70%{opacity:1;transform:scale(1.08)}100%{transform:none}', ease: 'ease-out' },
-    'bounce':      { label: 'Bounce',      kf: '0%{opacity:0;transform:translateY(-120px)}55%{opacity:1;transform:translateY(0)}72%{transform:translateY(-28px)}86%{transform:translateY(0)}94%{transform:translateY(-10px)}100%{transform:none}', ease: 'ease-out', dur: 0.9 },
-    'drop':        { label: 'Drop',        kf: 'from{opacity:0;transform:translateY(-200px) scale(1.1)}to{opacity:1;transform:none}', ease: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
-    'slide-x':     { label: 'Slide in X',  kf: 'from{transform:translateX(-100vw)}to{transform:none}' },
-    'slide-y':     { label: 'Slide in Y',  kf: 'from{transform:translateY(100vh)}to{transform:none}' },
+    'bounce':      { label: 'Bounce',      kf: `0%{opacity:0}55%{opacity:1}0%{${mv(0, -120)}}55%{${mv(0, 0)}}72%{${mv(0, -28)}}86%{${mv(0, 0)}}94%{${mv(0, -10)}}100%{${mv(0, 0)}}`, ease: 'ease-out', dur: 0.9 },
+    'drop':        { label: 'Drop',        kf: `from{opacity:0}from{${mv(0, -200)};transform:scale(1.1)}to{opacity:1}to{${mv(0, 0)};transform:none}`, ease: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
+    'slide-x':     { label: 'Slide in X',  kf: `from{${mv('-100vw', 0)}}to{${mv(0, 0)}}` },
+    'slide-y':     { label: 'Slide in Y',  kf: `from{${mv(0, '100vh')}}to{${mv(0, 0)}}` },
     'scale-x':     { label: 'Scale in X',  kf: 'from{opacity:0;transform:scaleX(0)}to{opacity:1;transform:none}' },
     'scale-y':     { label: 'Scale in Y',  kf: 'from{opacity:0;transform:scaleY(0)}to{opacity:1;transform:none}' },
     'blur':        { label: 'Blur',        kf: 'from{opacity:0;filter:blur(18px)}to{opacity:1;filter:blur(0)}' },
@@ -40,8 +52,8 @@ export const PRESETS = {
     'flip':        { label: 'Flip',        kf: 'from{opacity:0;transform:perspective(1200px) rotateX(-90deg)}to{opacity:1;transform:none}', dur: 0.7 },
     'stomp':       { label: 'Stomp',       kf: '0%{opacity:0;transform:scale(3)}60%{opacity:1;transform:scale(0.95)}100%{transform:none}', ease: 'cubic-bezier(0.7, 0, 0.3, 1)', dur: 0.5 },
     'pulse':       { label: 'Pulse',       loop: true, kf: '0%,100%{transform:none}50%{transform:scale(1.06)}', ease: 'ease-in-out', dur: 1.6 },
-    'drift-x':     { label: 'Drift X',     loop: true, kf: '0%,100%{transform:translateX(-14px)}50%{transform:translateX(14px)}', ease: 'ease-in-out', dur: 3 },
-    'drift-y':     { label: 'Drift Y',     loop: true, kf: '0%,100%{transform:translateY(-12px)}50%{transform:translateY(12px)}', ease: 'ease-in-out', dur: 3 },
+    'drift-x':     { label: 'Drift X',     loop: true, kf: `0%,100%{${mv(-14, 0)}}50%{${mv(14, 0)}}`, ease: 'ease-in-out', dur: 3 },
+    'drift-y':     { label: 'Drift Y',     loop: true, kf: `0%,100%{${mv(0, -12)}}50%{${mv(0, 12)}}`, ease: 'ease-in-out', dur: 3 },
     'spin':        { label: 'Spin',        loop: true, kf: 'from{transform:rotate(0)}to{transform:rotate(360deg)}', ease: 'linear', dur: 6 },
     'rotate':      { label: 'Rotate',      loop: true, kf: '0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}', ease: 'ease-in-out', dur: 2.4 },
 };

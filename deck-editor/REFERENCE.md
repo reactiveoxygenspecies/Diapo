@@ -285,6 +285,8 @@ the file self-contained and the DOM predictable for the round trip.
 | Ctrl+M | New slide after the current one: the layout picker (Ctrl+Shift+M: a blank slide straight away) |
 | Ctrl+D | Duplicate the selection, or the slide when nothing is selected |
 | Ctrl+Up / Ctrl+Down | Move the slide up / down |
+| Ctrl+click / Shift+click a thumbnail | Pick several slides (toggle / the run from the current slide) |
+| Delete / Backspace, Ctrl+C / X / V (slide strip last clicked, nothing picked on the canvas) | Delete, copy, cut, paste the picked slides (the current one without a pick), one undo step; a paste lands after them and works between decks (pictures are uploaded into the target deck's `assets/`) |
 | Click, Shift+click, Ctrl+click | Select, add to the selection, select the exact element under the cursor (a plain drag then moves just that element, not its group) |
 | Lock (panel, element menu) | A locked element (`data-locked`) is passed by when clicking and marquee-selecting and cannot be moved or resized: backgrounds and full-bleed pictures stay put. Ctrl+click still selects it (dotted box, no handles); Delete, the panel and Unlock work on it |
 | Picture section (panel) | Alt text for a picture or video (`alt`) and an inline SVG such as an icon (`aria-label` with `role="img"`); empty for a decorative one. For pictures and videos also: **Replace...** (another file in the same box, size and look kept), **Fit** (stretch, fill the box cropping the edges, whole picture inside: `object-fit`) with a **Focus** grid for what stays in view (`object-position`), **Flip** left-right / top-bottom (the `scale` property) and a **Grayscale** slider (`filter`). **Crop...** and **Remove crop**: see the next row |
@@ -300,6 +302,7 @@ the file self-contained and the DOM predictable for the round trip.
 | Drag on empty canvas | Marquee select |
 | Drag, handles, top handle | Move, resize (Shift on a corner keeps the aspect ratio, Alt resizes about the centre, both together both; an element in the deck's own flow keeps its footprint, so its neighbours stay put), rotate (Shift: 15 degree steps) |
 | Arrows, Shift+arrows | Nudge 1 px / 10 px |
+| Insert > Line, Arrow, Curved arrow, Double arrow | Drag on the slide to draw (Shift: 15 degree steps; a click places a default one; Esc cancels). A line is one inline `<svg data-line="x1 y1 x2 y2">` (points in the svg's own pixels; the viewBox is its box, fitted to the line and its heads) with optional `data-curve="x y"` (the point the curve passes through half way: a quadratic Bezier), `data-head-start` / `data-head-end` (`arrow`, `open`, `triangle`, `circle`, `bar`; none when absent), `data-head-size` (a multiple, 1 by default), `data-dash` (`dashed`, `dotted`), `stroke-width` (px, never scaled) and `stroke-linecap`; the colour is `color`. Heads are drawn as paths, no `<marker>`. A selected line shows a handle at each end (drag; Shift 15 degree steps; they snap to other elements, guides and the other end's level; Ctrl: no snapping) and a dot in the middle that bends it (it snaps to a symmetric arc and back to straight; double-click it to straighten), instead of the box handles. The panel has width, dashes, ends, both heads, head size, straight or curved and Flip direction. Each drag is one undo step. Older arrows (a fixed 480x24 picture) stay plain boxes; their panel offers **Make it an editable line** |
 | Tab / Shift+Tab | Next / previous sibling |
 | X, Y in the panel | The element's position on the slide in stage px (top left corner). Typing a value moves it there; the hint says how far it is from where the deck lays it out, and the x next to the field puts it back |
 | Align section in the panel | Align left / centre / right / top / middle / bottom, distribute horizontally / vertically (3+). Several elements align to their common box, or to the slide with the checkbox; one element aligns to the slide |
@@ -582,15 +585,18 @@ a deck renders with its own script (`[data-fig]`, below) stay the deck's.
 ### Equations and chemical structures
 
 Insert > Equation puts `E = mc^2` on the slide; the Equation section of the
-panel holds its LaTeX, drawn on the slide as you type (`x^2`, `rac{a}{b}`,
-`\sqrt{x}`, `lpha`, matrices, `egin{aligned}`; reactions with mhchem,
+panel holds its LaTeX, drawn on the slide as you type (`x^2`, `\frac{a}{b}`,
+`\sqrt{x}`, `\alpha`, matrices, `\begin{aligned}`; reactions with mhchem,
 `\ce{2H2 + O2 -> 2H2O}`). Ctrl+Enter or leaving the box makes it one undo step;
 a mistake shows MathJax's message and the slide keeps the last drawing that
 worked. The equation is sized by its font size (the Text size field, or a
 corner handle) and coloured by its text colour. Buttons under the box put the LaTeX in
 at the cursor (operators, fraction, powers and indices, roots, sums, integrals,
 Greek letters, reaction arrows); with words selected they wrap them, so selecting
-`a` and pressing the fraction gives `rac{a}{}` with the cursor in the second slot.
+`a` and pressing the fraction gives `\frac{a}{}` with the cursor in the second slot.
+Arrows: a typed `->`, `<-`, `<->`, `=>` or `<=>` outside `\ce{}` and `\text{}` is drawn
+as the arrow (→, ←, ↔, ⇒, ⇌); the source keeps what was typed. The arrow buttons insert
+the TeX arrow, or the mhchem one (`->`, `<=>`) when the cursor is inside `\ce{}`.
 Look switches the maths font: Classic (the LaTeX look, MathJax 3) or STIX Two (the
 look of journals, MathJax 4 with the STIX Two Math glyphs, run in a hidden frame of
 its own); new equations take the look chosen last. A maths font is needed for the
@@ -635,9 +641,12 @@ you change it:
   `--anim-delay`, `--anim-ease` inline when they differ from the preset's
   defaults), and the keyframes of every preset in use are written into the
   override block, so the saved file animates on its own when the slide becomes
-  `.visible`. Keyframes only touch transform, opacity and filter; moves and
+  `.visible`. Keyframes touch transform, opacity and filter; moves and
   rotation made in the editor use the `translate` / `rotate` properties, so they
-  compose with the animation.
+  compose with the animation. The presets that move (fade up/down/left/right,
+  bounce, drop, slide, drift) animate `translate` with
+  `animation-composition: add`, so they follow the screen's directions
+  whatever the element's rotation, and add to its position.
 - Applying a preset to a deck-reveal element hands it over: the reveal class is
   parked in `data-anim-was` and the element's `--dx/--dy` move becomes
   `translate`. **None** gives the deck reveal back.
@@ -712,6 +721,13 @@ panel sets inline still wins) and, unless **Plays while editing too** is on, to
 
 The Theme button (Ctrl+T) replaces the properties panel with the deck's base
 styling, applied live to whatever slide is shown:
+
+- **Deck CSS** (folded until opened; remembered): the deck's own `<style>`
+  blocks from the file's head, one editable box each (the editor's blocks are
+  not shown). Tab indents; applied on leaving the box, Ctrl+Enter or Apply, as
+  one undo step. On save only that block's text is replaced in the file, so no
+  block is duplicated. Bad CSS is kept as typed and flagged. Local linked
+  stylesheets are listed read-only (the editor saves the deck file only).
 
 - **Variables**: every custom property the deck defines on `:root`, grouped into
   colours, fonts, sizes and other (a `var(--x)` counts as whatever it points

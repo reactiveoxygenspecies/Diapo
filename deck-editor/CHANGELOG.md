@@ -2,6 +2,58 @@
 
 ## Unreleased
 
+- **Several decks open at once, in tabs.** Each open deck has a tab above the
+  editor (Ctrl+PageUp / PageDown to switch, middle-click to close, drag to
+  reorder). Opening a deck from the Decks list, a recent, a template or Save as
+  opens a new tab instead of replacing the deck being edited; unsaved edits stay
+  with their tab (through its draft), closing a tab with unsaved edits asks
+  first, and the tabs come back after a reload. Two decks of the same title show
+  their folder. Undo history does not follow a deck when you switch away.
+  "Keep paused" on a deck's scripts now holds for the session.
+- **Whole slides copy, cut, paste and delete.** Pick slides in the strip
+  (Ctrl+click, Shift+click) and press Delete to remove them, one undo step.
+  Ctrl+C / Ctrl+X / Ctrl+V in the strip copies, cuts and pastes whole slides,
+  also into another deck: pictures are uploaded into the target deck's
+  `assets/`, and element CSS, animations, notes and ids come along. The strip's
+  menu has Copy, Cut and Paste.
+- **Lines and arrows rebuilt.** Insert > Line, Arrow, Curved arrow and Double
+  arrow are drawn by dragging on the slide. A selected line has a handle at
+  each end (Shift snaps to 15 degrees, ends snap to other elements and guides)
+  and a dot in the middle that bends it into a curve (double-click straightens).
+  The panel sets width, dashes, ends, both heads (arrow, open, triangle, circle,
+  bar), head size and direction; the stroke keeps its width and the heads their
+  shape at any size. Older arrows keep working and can be made editable from
+  the panel.
+- **Theme > Deck CSS.** A folded section shows the deck's own style blocks and
+  lets you edit them in place, so values hard-coded in the deck's CSS can be
+  changed without leaving the editor. One undo step per change, thumbnails
+  follow, and the file is saved with each block written once.
+- **Superscript and subscript switch off again.** The same shortcut or button
+  on superscript text makes it normal, on subscript it swaps, and a caret
+  inside one steps out of it for what you type next.
+- **Pasting into text keeps its formatting.** Colour, highlight, bold, italic,
+  underline, strike, superscript, subscript, links and line breaks come along
+  from Word, web pages and other text boxes; fonts, sizes, scripts and layout
+  styles are dropped. Ctrl+Shift+V pastes plain text.
+- **Arrows in equations.** An arrow typed as `->`, `<-`, `<->`, `=>`, `<=>`
+  outside `\ce{}` is drawn as a real arrow, and the arrow buttons insert the
+  proper TeX arrow (the mhchem arrow inside `\ce{}`). Equations drawn before
+  this are redrawn when a deck opens.
+- **Directional animations follow the screen.** Fade, bounce, drop, slide and
+  drift move along the screen's directions whatever the element's rotation
+  (fade down on a turned element still comes in from above), and keep the
+  element's position instead of overriding it.
+- **Slide previews no longer stay blank.** Thumbnails in the slide strip and
+  the Decks drawer drew nothing while a web font stylesheet was slow or
+  unreachable; that stylesheet now loads after the thumbnail is drawn. A
+  thumbnail that fails is retried, thumbnails of other slides follow undo and
+  redo, and moving a slide no longer reloads every thumbnail.
+- **The problems list follows the deck.** Deleting a broken picture clears it
+  from the list and undo brings it back; Show works for pictures on any slide
+  and in the footer layer, and a missing picture has a Remove button.
+- Tests: `DIAPO_TEST_PORT` / `DIAPO_TEST_WS` run the suite on another port and
+  workspace, so two runs can work side by side.
+
 - **Charts get axes and a style of their own.** Two new sections under Chart
   in the panel, which fold like the others:
   - **Chart axes**: a line for each axis (the values, the labels), a title for

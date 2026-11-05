@@ -12,6 +12,7 @@
    ============================================================ */
 import { isElement, isMeaningful, isShape, svgHostOf, textBlocks, mediaBlocks, isLayoutUnit, slideOf, css, isMaster, ensureUniqueIds, isLocked, DRAWN } from './dom.js';
 import { getOffset, setOffset, setRotation, resizeMode, applySize, afterResize, snapLines, snapBox, usesVars } from './transform.js';
+import { LineTool, isLine } from './lines.js';
 
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 const DRAG_THRESHOLD = 3;          // screen px before a press becomes a drag
@@ -34,6 +35,7 @@ export class Selection extends EventTarget {
         this.enabled = true;
         this._raf = 0;
         this._buildOverlay();
+        this.lines = new LineTool(app, this);      // end and bend handles of a line, and drawing one (lines.js)
         this._bind();
     }
 
@@ -251,15 +253,16 @@ export class Selection extends EventTarget {
         this._raf = requestAnimationFrame(() => { this._raf = 0; this.refresh(); });
     }
     refresh() {
+        this.lines.refresh();
         if (!this.deck.isOpen) { this.el.boxes.innerHTML = ''; this.el.main.hidden = true; return; }
         const boxes = this.items.map(el => this.toOverlay(this.rectOf(el)));
-        this.el.boxes.innerHTML = boxes.map(b => `<div class="ov-box" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px"></div>`).join('');
+        this.el.boxes.innerHTML = boxes.map((b, i) => `<div class="ov-box${isLine(this.items[i]) ? ' line' : ''}" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px"></div>`).join('');
         const main = this.el.main;
         if (!this.items.length) { main.hidden = true; return; }
         const u = this.toOverlay(this.unionRect(this.items));
         Object.assign(main.style, { left: u.x + 'px', top: u.y + 'px', width: u.w + 'px', height: u.h + 'px' });
         const single = this.single;
-        const mode = this.items.every(isLocked) ? 'locked' : single ? resizeMode(single) : 'multi';
+        const mode = this.items.every(isLocked) ? 'locked' : single ? (isLine(single) ? 'line' : resizeMode(single)) : 'multi';
         main.dataset.mode = mode;
         main.hidden = false;
         this.dispatchEvent(new CustomEvent('refresh'));
@@ -291,6 +294,7 @@ export class Selection extends EventTarget {
         o.addEventListener('pointercancel', (e) => this._up(e));
         o.addEventListener('pointerleave', () => { if (!this.drag) this.showHover(null); });
         o.addEventListener('dblclick', (e) => {
+            if (this.lines.handleAt(e)) { if (this.lines.handleAt(e) === 'c') this.lines.straighten(); return; }   // (the overlay holds the pointer, so e.target is not the handle)
             const el = this.pickAt(e);
             if (el) { this.select(el); this.dispatchEvent(new CustomEvent('edit-text', { detail: { el, at: { clientX: e.clientX, clientY: e.clientY } } })); }
         });
@@ -325,6 +329,9 @@ export class Selection extends EventTarget {
             this.overlay.classList.add('panning');
             return;
         }
+        if (this.lines.armed && this.lines.startDraw(e, start)) return;
+        const lh = e.target.closest('.ov-lh');
+        if (lh && this.lines.down(e, start, lh.dataset.lh)) return;
         const handle = e.target.closest('.ov-h, .ov-rot');
         if (handle && this.items.length && !this.items.every(isLocked)) {
             if (handle.dataset.h === 'rot') return this._startRotate(e, start);
@@ -414,7 +421,7 @@ export class Selection extends EventTarget {
         const d = this.drag;
         if (!d) {
             if (!this.enabled || !this.deck.isOpen || this.space) return;
-            if (e.target.closest('.ov-h, .ov-rot')) { this.showHover(null); return; }
+            if (e.target.closest('.ov-h, .ov-rot, .ov-lh') || this.lines.armed) { this.showHover(null); return; }
             this.showHover(this.pickAt(e));
             return;
         }
@@ -429,6 +436,7 @@ export class Selection extends EventTarget {
             this.canvas.scrollTop = d.sy - sdy;
             return;
         }
+        if (d.kind === 'line') { this.lines.move(e, d); return; }
         if (d.kind === 'marquee') {
             const w = this.wrap.getBoundingClientRect();
             const x = Math.min(e.clientX, d.start.x) - w.left, y = Math.min(e.clientY, d.start.y) - w.top;
@@ -504,6 +512,7 @@ export class Selection extends EventTarget {
         try { this.overlay.releasePointerCapture(e.pointerId); } catch (err) { /* already released */ }
 
         if (d.kind === 'pan') return;
+        if (d.kind === 'line') { this.lines.finish(e, d); return; }
         if (d.kind === 'marquee') {
             this.el.marquee.hidden = true;
             if (!d.moved) return;
@@ -557,6 +566,7 @@ export class Selection extends EventTarget {
         if (!this.deck.isOpen || !this.enabled) return false;
         const k = e.key;
         if (k === ' ') { this.space = true; this.overlay.classList.add('space'); return !this.items.length; }
+        if (k === 'Escape' && this.lines.armed) { this.lines.disarm(); return true; }
         if (k === 'Escape') { if (this.items.length) { this.clear(); return true; } return false; }
         if (!this.items.length) return false;
         if (k === 'Delete' || k === 'Backspace') { this.app.editops.remove(); return true; }

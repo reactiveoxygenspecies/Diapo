@@ -69,17 +69,68 @@ function hash(s) {
     for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
     return (h >>> 0).toString(36);
 }
-export const mathKey = (tex, font = 'classic') => 'm' + hash(font === 'stix2' ? 'stix2|' + tex : tex);
+/* Arrows. In plain LaTeX, -> is a minus and a greater-than sign; only mhchem inside \ce{...}
+   reads it as a reaction arrow. So an arrow typed outside \ce{} and \text{} is drawn as the
+   real arrow. The source stays as typed: the conversion happens only when the TeX is drawn,
+   and the drawing's key is made from the converted TeX, so a deck drawn before this change
+   (with -> in a formula) is drawn again when it opens. -->, which is not an arrow in plain
+   TeX either, is left alone. */
+const ARROW_TEX = { '<->': '\\leftrightarrow', '<=>': '\\rightleftharpoons', '-->': '-->', '->': '\\to', '<-': '\\leftarrow', '=>': '\\Rightarrow' };
+const ARROW_RE = /<->|<=>|-->|->|<-|=>/y;
+const OPAQUE_RE = /\\(ce|text)\s*\{/y;
+
+/* Walks `tex` up to `end`, keeping a stack with what each open brace belongs to: 'ce' or
+   'text' for the braces of \ce{} and \text{}, '' for any other. With `arrows`, the output has
+   the plain arrows converted (none inside an open 'ce' or 'text'); without, only the stack
+   is of interest. */
+function scanTex(tex, end, arrows) {
+    let out = '';
+    const stack = [];
+    for (let i = 0; i < end;) {
+        const c = tex[i];
+        if (c === '\\') {
+            OPAQUE_RE.lastIndex = i;
+            const m = OPAQUE_RE.exec(tex);
+            if (m && i + m[0].length <= end) { stack.push(m[1]); out += m[0]; i += m[0].length; continue; }
+            out += tex.slice(i, i + 2); i += 2;          // \{ \} \\ and the other commands: copied as they are
+            continue;
+        }
+        if (c === '{') { stack.push(''); out += c; i++; continue; }
+        if (c === '}') { stack.pop(); out += c; i++; continue; }
+        if (arrows && !stack.some(Boolean)) {
+            ARROW_RE.lastIndex = i;
+            const m = ARROW_RE.exec(tex);
+            if (m && i + m[0].length <= end) {
+                // A control word needs a space after it only before a letter: a -> b and a \to b then match.
+                const after = tex[i + m[0].length] || '';
+                out += ARROW_TEX[m[0]] + (/[A-Za-z]/.test(after) ? ' ' : '');
+                i += m[0].length;
+                continue;
+            }
+        }
+        out += c; i++;
+    }
+    return { out, stack };
+}
+
+/* The TeX as it is drawn: plain arrows made into TeX arrows. Unchanged when there are none. */
+export const drawnTex = (tex) => scanTex(tex, tex.length, true).out;
+
+/* Whether a caret at the end of `text` is inside a \ce{...} (one not yet closed). */
+export const inCe = (text) => scanTex(text, text.length, false).stack.includes('ce');
+
+export const mathKey = (tex, font = 'classic') => { const t = drawnTex(tex); return 'm' + hash(font === 'stix2' ? 'stix2|' + t : t); };
 
 /* The drawing of `tex` in the given look as SVG markup, or an Error with MathJax's message
    (unknown command, missing brace). */
 export async function texToSvg(tex, font = 'classic') {
     let svg;
+    const src = drawnTex(tex);                       // the arrows as drawn (the source keeps what was typed)
     if (font === 'stix2') {
         const frame = await loadStix();
         let timer;
         const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('the STIX Two drawing did not answer')), 20000); });
-        const markup = await Promise.race([frame.renderTex(tex, { em: EM, ex: EX }), late])
+        const markup = await Promise.race([frame.renderTex(src, { em: EM, ex: EX }), late])
             .catch((err) => { throw new Error(err && err.message ? err.message : String(err)); })
             .finally(() => clearTimeout(timer));
         const t = document.createElement('template');
@@ -89,7 +140,7 @@ export async function texToSvg(tex, font = 'classic') {
     } else {
         const MJ = await loadMathJax();
         let node;
-        try { node = MJ.tex2svg(tex, { display: true, em: EM, ex: EX, containerWidth: 1920 }); }
+        try { node = MJ.tex2svg(src, { display: true, em: EM, ex: EX, containerWidth: 1920 }); }
         catch (err) { throw new Error(err && err.message ? err.message : String(err)); }
         svg = node.querySelector('svg');
         if (!svg) throw new Error('nothing to draw');
@@ -153,9 +204,9 @@ const MATH_KEYS = [
     ['Greek', [['α', '\\alpha '], ['β', '\\beta '], ['γ', '\\gamma '], ['δ', '\\delta '], ['ε', '\\varepsilon '], ['θ', '\\theta '],
         ['λ', '\\lambda '], ['μ', '\\mu '], ['ν', '\\nu '], ['π', '\\pi '], ['ρ', '\\rho '], ['σ', '\\sigma '],
         ['τ', '\\tau '], ['φ', '\\varphi '], ['ψ', '\\psi '], ['ω', '\\omega '], ['Δ', '\\Delta '], ['Ω', '\\Omega ']]],
-    ['Chemistry', [['ce', '\\ce{#}|', 'A reaction or formula: \\ce{2H2 + O2 -> 2H2O}'], ['→', ' -> ', 'Reaction arrow (inside \\ce)'],
-        ['⇌', ' <=> ', 'Equilibrium (inside \\ce)'], ['Δ', '\\Delta ', 'Heat (Delta)'], ['[ ]', '\\left[ # \\right]|', 'Concentration'],
-        ['↑', ' ^ ', 'Gas given off (inside \\ce)'], ['↓', ' v ', 'Precipitate (inside \\ce)']]],
+    ['Chemistry', [['ce', '\\ce{#}|', 'A reaction or formula: \\ce{2H2 + O2 -> 2H2O}'], ['Δ', '\\Delta ', 'Heat (Delta)'], ['[ ]', '\\left[ # \\right]|', 'Concentration']]],
+    ['Arrows', [['→', '\\to ', 'Arrow', ' -> '], ['←', '\\leftarrow ', 'Arrow left', ' <- '], ['↔', '\\leftrightarrow ', 'Arrow both ways', ' <-> '],
+        ['⇌', '\\rightleftharpoons ', 'Equilibrium', ' <=> '], ['↑', '\\uparrow ', 'Gas given off', ' ^ '], ['↓', '\\downarrow ', 'Precipitate', ' v ']]],
 ];
 
 export class MathSection {
@@ -174,14 +225,14 @@ export class MathSection {
           <textarea id="mathTex" class="insp-notes theme-css" rows="3" spellcheck="false" placeholder="E = mc^2" title="The equation in LaTeX; Ctrl+Enter or leaving the box keeps it"></textarea>
           <div class="insp-hint insp-state insp-warn" id="mathError" role="status" hidden></div>
           <div class="math-keys" id="mathKeys">${MATH_KEYS.map(([group, keys]) => `<div class="math-keys-label">${group}</div><div class="math-keys-row">`
-            + keys.map(([label, tex, name]) => `<button type="button" data-tex="${escAttr(tex)}" title="${escAttr((name ? name + ': ' : '') + tex.replace(/[#|]/g, '').trim())}">${label}</button>`).join('') + '</div>').join('')}</div>
+            + keys.map(([label, tex, name, ce]) => `<button type="button" data-tex="${escAttr(tex)}"${ce ? ` data-ce="${escAttr(ce)}"` : ''} title="${escAttr((name ? name + ': ' : '') + tex.replace(/[#|]/g, '').trim())}">${label}</button>`).join('') + '</div>').join('')}</div>
           <div class="insp-hint">LaTeX, as in a paper: <code>x^2</code>, <code>\\frac{a}{b}</code>, <code>\\sqrt{x}</code>, <code>\\alpha</code>. A reaction: <code>\\ce{2H2 + O2 -> 2H2O}</code>. The buttons put the LaTeX in at the cursor; with words selected, they wrap them. Size and colour: the Text fields below.</div>`;
         this.box = root.querySelector('#mathTex');
         this.err = root.querySelector('#mathError');
         root.querySelector('#mathFont').addEventListener('click', (e) => { const b = e.target.closest('[data-font]'); if (b) this.setFont(b.dataset.font); });
         const keys = root.querySelector('#mathKeys');
         keys.addEventListener('pointerdown', (e) => { if (e.target.closest('button')) e.preventDefault(); });   // the box keeps its focus and selection
-        keys.addEventListener('click', (e) => { const b = e.target.closest('button[data-tex]'); if (b) this.insert(b.dataset.tex); });
+        keys.addEventListener('click', (e) => { const b = e.target.closest('button[data-tex]'); if (b) this.insert(b.dataset.tex, b.dataset.ce); });
         this.box.addEventListener('input', () => this._typed());
         this.box.addEventListener('change', () => this.commit());
         this.box.addEventListener('keydown', (e) => {
@@ -192,8 +243,11 @@ export class MathSection {
 
     /* A button's LaTeX into the box at the cursor: a selection goes where # is, the cursor where
        | is (or, with nothing selected, where # is, so the next keys fill the first slot). */
-    insert(tex) {
+    /* `ce` is the arrow's mhchem form, used when the caret is inside \ce{...}: there -> is the
+       reaction arrow, and \to would not be. */
+    insert(tex, ce) {
         const box = this.box, s = box.selectionStart ?? box.value.length, e = box.selectionEnd ?? s;
+        if (ce && inCe(box.value.slice(0, s))) tex = ce;
         const sel = box.value.slice(s, e);
         const hash = tex.indexOf('#');
         let text = tex.replace('#', sel);

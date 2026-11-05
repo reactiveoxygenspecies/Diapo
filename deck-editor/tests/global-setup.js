@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'sample-deck');
-const WORKSPACE = path.join(__dirname, '.tmp-workspace');
+const WORKSPACE = process.env.DIAPO_TEST_WS || path.join(__dirname, '.tmp-workspace');
 const DECK_DIR = path.join(WORKSPACE, 'sample');
 
 function prepare() {
