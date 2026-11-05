@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.1 - 2026-11-05
 
 - **The presenter window opened from a saved deck (P) shows the next slide
   again.** Its "End of the deck" cover sat over the next-slide preview on every
