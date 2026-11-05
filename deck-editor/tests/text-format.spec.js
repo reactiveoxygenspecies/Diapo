@@ -26,6 +26,10 @@ const find = (page, str) => page.evaluate((str) => {
         const s = d.win.getSelection(); s.removeAllRanges(); s.addRange(r); return true; } }
     return false;
 }, str);
+/* Firefox gives a paste event made by a script an empty clipboard (getData answers ''), so the
+   pasted data cannot be simulated there; a real paste in Firefox carries it. */
+const noSyntheticPaste = () => test.skip(test.info().project.name === 'firefox', 'Firefox empties the clipboard of a synthetic paste event');
+
 /* Dispatch a paste carrying `data` (type -> string) into the edited text. */
 const paste = (page, data) => page.evaluate((data) => {
     const d = window.deckEditor.deck;
@@ -104,6 +108,7 @@ test('superscript: undo and redo take the whole edit back and forward', async ({
 });
 
 test('paste: rich text keeps colour, bold, links and breaks; scripts, handlers and layout are dropped', async ({ page }) => {
+    noSyntheticPaste();
     await editWith(page, 'start:');
     await caretEnd(page);
     await paste(page, {
@@ -123,6 +128,7 @@ test('paste: rich text keeps colour, bold, links and breaks; scripts, handlers a
 });
 
 test('paste: Ctrl+Shift+V pastes the plain text only', async ({ page }) => {
+    noSyntheticPaste();
     await editWith(page, 'start:');
     await caretEnd(page);
     // The keystroke arms a plain paste (a real one needs the system clipboard, so its paste event is sent by hand).
@@ -134,6 +140,7 @@ test('paste: Ctrl+Shift+V pastes the plain text only', async ({ page }) => {
 });
 
 test('paste: text copied from an element on the canvas keeps the colour set in the editor', async ({ page }) => {
+    noSyntheticPaste();
     await openDeck(page);
     const clip = await page.evaluate(() => {
         const a = window.deckEditor, el = a.deck.currentSlide.querySelector('p');

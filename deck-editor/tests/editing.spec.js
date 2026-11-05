@@ -1453,11 +1453,20 @@ test('74 chart axes crossing: the value axis through a label\'s point (0 of a gr
     await page.click('#btnInsert');
     await page.click('[data-insert="chart"]');
     const table = 'x\ty\n-2\t0.1\n-1\t0.3\n0\t1\n1\t3\n2\t9\n';
-    await page.focus('#chartGrid input[data-r="0"][data-c="0"]');
-    await page.evaluate((t) => {
-        const dt = new DataTransfer(); dt.setData('text/plain', t);
-        document.activeElement.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-    }, table);
+    if (test.info().project.name === 'firefox') {
+        // Firefox empties the clipboardData of a made-up paste event: copy and paste for real.
+        await page.evaluate((t) => { const a = document.createElement('textarea'); a.id = 'pasteSrc'; a.value = t; document.body.appendChild(a); a.select(); }, table);
+        await page.keyboard.press('Control+c');
+        await page.evaluate(() => document.getElementById('pasteSrc').remove());
+        await page.focus('#chartGrid input[data-r="0"][data-c="0"]');
+        await page.keyboard.press('Control+v');
+    } else {
+        await page.focus('#chartGrid input[data-r="0"][data-c="0"]');
+        await page.evaluate((t) => {
+            const dt = new DataTransfer(); dt.setData('text/plain', t);
+            document.activeElement.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+        }, table);
+    }
     await page.click('#chartKind [data-kind="line"]');
     await page.uncheck('#inspChart [data-opt="legend"]');               // its key has a point too
     await page.check('#inspChartAxes [data-set="valueAxis.line"]');
