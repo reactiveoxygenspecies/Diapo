@@ -2145,7 +2145,7 @@ new SlidePresentation();
         '.count{font-size:18px;color:var(--ink-2)}.count b{color:var(--ink);font-size:24px}.grow{flex:1}.hint{font-size:12px;color:var(--ink-3)}',
         '.slidetime{font-variant-numeric:tabular-nums;font-size:18px;color:var(--ink-2);min-width:64px}.slidetime.over{color:#ff8b6a}',
         'button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}button:hover{border-color:var(--ink-3)}button.big{font-size:20px;padding:6px 18px}',
-        '.end{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);background:var(--bg)}'
+        '.end{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);background:var(--bg)}.end[hidden]{display:none}'
     ].join('');
     var HTML = '<div id="app">'
         + '<div class="stage"><span class="tag">Current</span><iframe id="cur"></iframe></div>'
@@ -2447,7 +2447,7 @@ new SlidePresentation();
         if (e.deltaY > 0 ? nextFragment() : prevFragment()) e.stopImmediatePropagation();
     }, { capture: true, passive: true });
 
-    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, version: 10 };
+    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, version: 11 };
 })();
 </script>
 </body>

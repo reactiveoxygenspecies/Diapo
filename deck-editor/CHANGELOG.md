@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **The presenter window opened from a saved deck (P) shows the next slide
+  again.** Its "End of the deck" cover sat over the next-slide preview on every
+  slide. Decks get the fixed presentation features script (version 11) the
+  next time they are saved in Diapo, or from the update button it offers.
+
 ## 1.1.0 - 2026-11-05
 
 - **Several decks open at once, in tabs.** Each open deck has a tab above the

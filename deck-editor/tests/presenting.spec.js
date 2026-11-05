@@ -42,6 +42,9 @@ test('12 standalone presenter (P): added through the editor, works from the save
         await expect(pop.locator('#notes')).toHaveText('Standalone notes.');
         await expect.poll(() => pop.evaluate(() => document.getElementById('cur').src)).toMatch(/#1$/);
         await expect.poll(() => pop.evaluate(() => document.getElementById('next').src)).toMatch(/#2$/);
+        // The end-of-deck cover stays off the next slide until the last one.
+        await expect(pop.locator('#end')).toBeHidden();
+        await expect(pop.locator('#next')).toBeVisible();
         // Arrow in the presenter moves the deck; arrow in the deck moves the presenter.
         await pop.bringToFront();
         await pop.keyboard.press('ArrowRight');
