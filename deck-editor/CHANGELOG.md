@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 - 2026-11-05
 
 - **Several decks open at once, in tabs.** Each open deck has a tab above the
   editor (Ctrl+PageUp / PageDown to switch, middle-click to close, drag to
