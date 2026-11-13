@@ -29,7 +29,8 @@ const BAR_ITEMS = [
 
 /* Parts of the editor that work on the selected part of the text (the panel's Colour and Text
    sections, the font picker they open): a press there does not end the edit, and the press on
-   anything but a field is swallowed so the text keeps its selection. */
+   anything but a field is swallowed so the text keeps its selection (a select is a field: swallowing
+   its press keeps the browser from opening it, the Weight list was dead on part of the text). */
 const KEEPS_SELECTION = '#inspColour, #inspType, .fontpick';
 
 export class TextEditor extends EventTarget {
@@ -651,7 +652,7 @@ export class TextEditor extends EventTarget {
         document.addEventListener('pointerdown', (e) => {
             if (!this.active) return;
             if (e.target.closest('.textbar, .svgtext-edit')) return;
-            if (this.el && e.target.closest(KEEPS_SELECTION) && this.hasStyleRange()) { if (!e.target.closest('input')) e.preventDefault(); return; }
+            if (this.el && e.target.closest(KEEPS_SELECTION) && this.hasStyleRange()) { if (!e.target.closest('input, select, textarea')) e.preventDefault(); return; }
             this.commit();
         }, true);
         window.addEventListener('editor:zoom', () => this._placeSvgBox());

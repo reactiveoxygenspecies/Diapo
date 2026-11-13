@@ -1168,7 +1168,7 @@ function runtimeState() {
     if (!app.deck.isOpen) return 'none';
     const el = app.deck.doc.getElementById('deck-runtime') || app.deck.doc.getElementById('deck-presenter');
     if (!el) return 'none';
-    return el.id === 'deck-runtime' && /version: (1[0-9]|[2-9]\d)\b/.test(el.textContent) ? 'current' : 'old';
+    return el.id === 'deck-runtime' && /version: (1[2-9]|[2-9]\d)\b/.test(el.textContent) ? 'current' : 'old';
 }
 function showPresenterMenu(on) {
     const dd = $('presenterMenu').querySelector('.tb-dropdown');

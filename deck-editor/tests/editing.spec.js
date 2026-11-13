@@ -1149,6 +1149,9 @@ test('58 type on a selection: font, size, weight and italic change the selected 
     // the remembered range keeps the size on the same word.
     await page.click('#inspSize');
     await page.fill('#inspSize', '120');
+    // A real press on the Weight list reaches it (its pointerdown is not swallowed), so the list opens.
+    await page.click('#inspWeight');
+    expect(await page.evaluate(() => document.activeElement.id)).toBe('inspWeight');
     await page.locator('#inspWeight').selectOption('900');
     await page.click('#inspStyle button[data-v="italic"]');
     const span = () => page.evaluate(() => window.deckEditor.deck.doc.querySelector('.slide.active h1 span').getAttribute('style'));

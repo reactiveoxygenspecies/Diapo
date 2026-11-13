@@ -1044,9 +1044,12 @@ new SlidePresentation();
         to.classList.add('visible');
         void to.offsetWidth;
         var matched = [];
+        // What waits for a click (a fragment not yet shown) stays out of the morph and the fade: an
+        // animation on it would show it for the length of the morph and then hide it again.
+        var hiddenFragment = function (el) { var f = el.closest('[data-fragment]'); return !!f && to.contains(f) && !f.classList.contains('visible'); };
         morphCandidates(to).forEach(function (el) {
             var k = matchKey(el);
-            if (!k || !old[k] || matched.some(function (m) { return m.contains(el) || el.contains(m); })) return;
+            if (!k || !old[k] || hiddenFragment(el) || matched.some(function (m) { return m.contains(el) || el.contains(m); })) return;
             var was = old[k], a = was.r, b = rectOf(el);
             if (!b.w || !b.h) return;
             delete old[k];
@@ -1086,6 +1089,7 @@ new SlidePresentation();
         // Everything else on the new slide fades in a little later.
         Array.prototype.forEach.call(to.querySelectorAll('*'), function (el) {
             if (el.classList.contains('deck-morph-ghost') || el.closest('.deck-morph-ghost')) return;
+            if (hiddenFragment(el)) return;
             if (matched.some(function (m) { return m === el || m.contains(el) || el.contains(m); })) return;
             if (el.children.length && !el.matches('img, svg')) return;      // leaves only, so containers do not double-fade
             if (el.closest('[data-fig]') && el.closest('[data-fig]') !== el) return;
@@ -1501,7 +1505,7 @@ new SlidePresentation();
         if (e.deltaY > 0 ? nextFragment() : prevFragment()) e.stopImmediatePropagation();
     }, { capture: true, passive: true });
 
-    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, version: 11 };
+    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, version: 12 };
 })();
 </script>
 </body>

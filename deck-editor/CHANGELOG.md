@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- **Click-reveal elements stay hidden through an auto-animate morph.** Going into
+  a slide from one with "Auto-animate to the next slide" on, anything set to
+  reveal on click faded in for the length of the morph and then vanished until
+  the click. The morph and its fade now leave those elements alone. Decks get
+  the fixed presentation features script (version 12) the next time they are
+  saved in Diapo, or from the update button it offers.
+- **The Weight list works on part of the text.** With some words selected in a
+  text being edited, pressing the Weight field did nothing (the press was
+  swallowed to keep the selection, which also kept the list from opening), so
+  only the whole box could be given a weight. It opens now and sets the weight
+  of the selected words.
+
 ## 1.1.1 - 2026-11-05
 
 - **The presenter window opened from a saved deck (P) shows the next slide

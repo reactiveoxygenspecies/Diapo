@@ -140,7 +140,16 @@ test('15 runtime: fragments step with Space, O opens the overview, auto-animate 
     await deck.waitForSelector('.slide.active.visible');
     await deck.waitForFunction(() => window.deckRuntime);
     // Fragments: Space reveals step 1, then step 2 (two items together), then the slide changes.
-    await deck.evaluate(() => window.deckRuntime.goTo(3));       // the bullets slide (after the duplicate)
+    // The slide before auto-animates into the bullets slide: its fragments stay hidden through the morph
+    // (an animation on them would show them for 0.8 s and hide them again).
+    await deck.evaluate(() => { document.querySelectorAll('.slide')[2].setAttribute('data-auto-animate', ''); window.deckRuntime.goTo(2); });
+    await deck.waitForFunction(() => document.querySelectorAll('.slide')[2].classList.contains('visible'));
+    const peak = await deck.evaluate(() => new Promise(done => {
+        const lis = Array.from(document.querySelectorAll('.slide')[3].querySelectorAll('li')); let max = 0;
+        const t0 = performance.now(); window.deckRuntime.goTo(3);
+        (function tick() { lis.forEach(li => { max = Math.max(max, +getComputedStyle(li).opacity); }); if (performance.now() - t0 < 1200) requestAnimationFrame(tick); else done(max); })();
+    }));
+    expect(peak).toBe(0);
     await deck.waitForFunction(() => document.querySelectorAll('.slide')[3].classList.contains('visible'));
     const shown = () => deck.evaluate(() => Array.from(document.querySelectorAll('.slide')[3].querySelectorAll('li')).map(li => li.classList.contains('visible')));
     expect(await shown()).toEqual([false, false, false]);
