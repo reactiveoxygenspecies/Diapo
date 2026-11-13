@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 - 2026-11-13
 
 - **Click-reveal elements stay hidden through an auto-animate morph.** Going into
   a slide from one with "Auto-animate to the next slide" on, anything set to
