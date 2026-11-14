@@ -17,6 +17,7 @@ import { setListKind, clearMarker } from './insert.js';
 import { ChartSection, chartOf } from './chart.js';
 import { MathSection, mathOf } from './math.js';
 import { ChemSection, chemOf } from './chem.js';
+import { PlotSection, plotOf } from './plot.js';
 import { LineSection, isLine } from './lines.js';
 import { canCrop, cropBoxOf, pictureOf } from './crop.js';
 
@@ -64,6 +65,7 @@ export class Inspector {
         this.chart = new ChartSection(app, this.$('inspChart'), this.$('inspChartAxes'), this.$('inspChartStyle'));
         this.math = new MathSection(app, this.$('inspMath'));
         this.chem = new ChemSection(app, this.$('inspChem'));
+        this.plot = new PlotSection(app, this.$('inspPlot'));
         this.arrow = new LineSection(app, this.$('inspArrow'));
         this._bind();
     }
@@ -162,6 +164,7 @@ export class Inspector {
           <section class="insp-section" id="inspChartStyle" data-fold="chartstyle" hidden><h4>Chart style</h4></section>
           <section class="insp-section" id="inspMath" hidden></section>
           <section class="insp-section" id="inspChem" hidden></section>
+          <section class="insp-section" id="inspPlot" hidden></section>
           <section class="insp-section" id="inspArrow" hidden></section>
 
           <section class="insp-section" id="inspColour">
@@ -336,7 +339,7 @@ export class Inspector {
         this.selection.addEventListener('change', () => this.sync());
         // A double-click on a chart goes to its table.
         this.selection.addEventListener('edit-text', (e) => { if (chartOf(e.detail.el)) { this.sync(); this.chart.focusData(); } });
-        this.selection.addEventListener('edit-text', (e) => { if (mathOf(e.detail.el)) { this.sync(); this.math.focus(); } else if (chemOf(e.detail.el)) { this.sync(); this.chem.focus(); } });
+        this.selection.addEventListener('edit-text', (e) => { if (mathOf(e.detail.el)) { this.sync(); this.math.focus(); } else if (chemOf(e.detail.el)) { this.sync(); this.chem.focus(); } else if (plotOf(e.detail.el)) { this.sync(); this.plot.focus(); } });
         this.history.addEventListener('change', () => { if (!this.pending) this.sync(); });
         this.deck.addEventListener('ready', () => { this.swatches = null; this.sync(); });
         this.deck.addEventListener('overrides', () => { this.swatches = null; this.sync(); });
@@ -1257,6 +1260,7 @@ export class Inspector {
         this.chart.sync(el);
         this.math.sync(el);
         this.chem.sync(el);
+        this.plot.sync(el);
         this.arrow.sync(el);
         // A line has no box to size, no border or shadow: its look is the Line section and the colour below.
         const isLn = isLine(el);

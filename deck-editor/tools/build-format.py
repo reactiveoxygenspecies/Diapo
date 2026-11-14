@@ -5,14 +5,15 @@ from exactly what the editor ships:
     diapo-format/deck-base.css        the base CSS block of app/templates/blank.html
     diapo-format/deck-controller.js   the controller <script> of blank.html
     diapo-format/deck-runtime.js      app/deck-runtime.js
+    diapo-format/deck-plot.js         app/deck-plot.js (draws interactive charts)
 
-It also refreshes the skill's copies of the runtime and the controller
-(skills/diapo-deck/deck-runtime.js and deck-controller.js, byte-for-byte the
-same as the published ones) and checks that the skill's deck-base.css, which
-is annotated for skill readers and so is not generated, still contains every
-rule of the base block. A missing rule exits with status 1, so the places
-never drift apart; CI runs this through build-templates.py. build-templates.py
-runs this at the end; on its own:
+It also refreshes the skill's copies of the runtime, the controller and
+deck-plot.js (skills/diapo-deck/, byte-for-byte the same as the published
+ones; deck-plot.js is copied into diapo-format too) and checks that the
+skill's deck-base.css, which is annotated for skill readers and so is not
+generated, still contains every rule of the base block. A missing rule exits
+with status 1, so the places never drift apart; CI runs this through
+build-templates.py. build-templates.py runs this at the end; on its own:
 
     py -3 tools/build-format.py
 """
@@ -86,12 +87,14 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     changed = [name for name, text in (("deck-base.css", base), ("deck-controller.js", controller), ("deck-runtime.js", runtime))
                if write(os.path.join(OUT, name), text)]
-    # The skill's runtime and controller are byte-for-byte copies of the generated ones.
-    src, dst = os.path.join(APP, "deck-runtime.js"), os.path.join(SKILL, "deck-runtime.js")
-    raw = open(src, "rb").read()
-    if not os.path.exists(dst) or open(dst, "rb").read() != raw:
-        open(dst, "wb").write(raw)
-        changed.append("skills/diapo-deck/deck-runtime.js")
+    # The skill's runtime is a byte-for-byte copy of the app's; so is deck-plot.js, there and
+    # in the format (serve.py knows that file by its bytes).
+    for name, dst in (("deck-runtime.js", os.path.join(SKILL, "deck-runtime.js")),
+                      ("deck-plot.js", os.path.join(SKILL, "deck-plot.js")), ("deck-plot.js", os.path.join(OUT, "deck-plot.js"))):
+        raw = open(os.path.join(APP, name), "rb").read()
+        if not os.path.exists(dst) or open(dst, "rb").read() != raw:
+            open(dst, "wb").write(raw)
+            changed.append(os.path.relpath(dst, ROOT).replace(os.sep, "/"))
     if write(os.path.join(SKILL, "deck-controller.js"), controller):
         changed.append("skills/diapo-deck/deck-controller.js")
     print("diapo-format: " + (", ".join(changed) + " written" if changed else "up to date"))

@@ -8,9 +8,9 @@
    ============================================================ */
 
 export const TEXT_TAGS = 'h1, h2, h3, h4, h5, h6, p, li, blockquote, pre, td, th, dt, dd, figcaption, label, [data-edit]';
-export const MEDIA_TAGS = 'img, video, canvas, iframe, svg, [data-fig], [data-chart], [data-math], [data-chem], [data-svg], picture, object';
+export const MEDIA_TAGS = 'img, video, canvas, iframe, svg, [data-fig], [data-chart], [data-math], [data-chem], [data-plot], [data-svg], picture, object';
 /* Figures the editor (or a deck's script) draws: picked, moved and sized as one, never edited inside. */
-export const DRAWN = '[data-fig], [data-chart], [data-math], [data-chem]';
+export const DRAWN = '[data-fig], [data-chart], [data-math], [data-chem], [data-plot]';
 export const SHAPE_TAGS = 'path, circle, rect, ellipse, polygon, polyline, line, text, tspan, g, use';
 
 const BLOCK_SELECTOR = TEXT_TAGS + ', ' + MEDIA_TAGS;
@@ -192,6 +192,7 @@ export function describe(el) {
         : el.hasAttribute('data-chart') ? (el.dataset.chart ? el.dataset.chart + ' chart' : 'chart')
         : el.hasAttribute('data-math') ? 'equation'
         : el.hasAttribute('data-chem') ? 'structure'
+        : el.hasAttribute('data-plot') ? 'interactive chart'
         : el.hasAttribute('data-fa') ? 'icon ' + el.getAttribute('data-fa')
         : el.hasAttribute('data-line') ? 'line'
         : el.hasAttribute('data-svg') ? 'inline SVG'
@@ -205,6 +206,7 @@ export function describe(el) {
         : isTextLike(el) || (el.hasAttribute('data-edit') && hasOwnText(el)) ? 'text' : 'box';
     const text = el.hasAttribute('data-math') ? el.getAttribute('data-math').slice(0, 70)
         : el.hasAttribute('data-chem') ? el.getAttribute('data-chem').slice(0, 70)
+        : el.hasAttribute('data-plot') ? ((el.querySelector('[data-plot-snapshot]') || el).getAttribute('alt') || '').slice(0, 70)
         : el.dataset.fig || el.hasAttribute('data-chart') ? '' : readableText(el).slice(0, 70);
     const name = (el.getAttribute('data-name') || '').trim();
     return { tag, classes: cls, role, text, name, id: el.getAttribute('data-id') || '', label: tag + (cls.length ? '.' + cls.join('.') : '') };

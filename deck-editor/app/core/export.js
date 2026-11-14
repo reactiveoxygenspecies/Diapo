@@ -118,6 +118,8 @@ ${revealSel} { opacity: 1 !important; visibility: visible !important; filter: no
         const doc = new DOMParser().parseFromString(html, 'text/html');
         doc.querySelectorAll('.deck-stage > .slide[data-skip]').forEach(s => s.remove());
         doc.querySelectorAll('#deck-runtime, #deck-presenter').forEach(s => s.remove());
+        // Interactive charts print as their picture: the library stays out of the printable copy.
+        doc.querySelectorAll('script[data-deck-plot]').forEach(s => s.remove());
         const slides = doc.querySelectorAll('.deck-stage > .slide');
         slides.forEach(s => s.classList.add('active', 'visible'));
         if (handout) {

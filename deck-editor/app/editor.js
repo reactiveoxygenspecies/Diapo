@@ -9,6 +9,7 @@ import { fitText } from './core/transform.js';
 import { refreshCharts } from './core/chart.js';
 import { refreshMath } from './core/math.js';
 import { refreshChem, uprightLabels } from './core/chem.js';
+import { PLOT, refreshPlots, openPlotDialog, ensureDeckPlots } from './core/plot.js';
 import { LAYOUTS } from './core/layouts.js';
 import { Cropper, canCrop, cropBoxOf } from './core/crop.js';
 import { Palette, iconEntries } from './core/palette.js';
@@ -155,6 +156,29 @@ window.addEventListener('editor:open', async () => {
     }
     uprightLabels(app.deck.currentSlide);
     app.selection.refresh();
+});
+/* Interactive charts (core/plot.js). While editing, a chart is its picture, made by the editor:
+   it is drawn again when the figure, the box or the look it takes from the deck changes
+   (a resize, a theme change, an undo), a moment after the change, and when a deck opens with
+   a chart written as its figure alone. Preview shows the charts live, as the saved deck does. */
+let plotTimer = 0;
+function plotsStale() {
+    clearTimeout(plotTimer);
+    plotTimer = setTimeout(async () => {
+        const doc = app.deck.doc;
+        if (!app.deck.isOpen || !doc.querySelector(PLOT)) return;
+        const bad = await refreshPlots(app.deck.stage).catch(() => []);
+        if (app.deck.doc !== doc) return;
+        for (const b of bad) if (!app.problems.items.some(p => p.kind === 'drawn' && p.el === b.el)) app.problems.add({ kind: 'drawn', what: 'interactive chart', message: b.message, url: '', el: b.el });
+        if (app.selection.single && app.selection.single.matches(PLOT)) app.selection.refresh();
+    }, 300);
+}
+window.addEventListener('editor:plot-stale', plotsStale);
+window.addEventListener('editor:open', plotsStale);
+app.history.addEventListener('change', plotsStale);
+app.deck.addEventListener('overrides', plotsStale);
+window.addEventListener('editor:preview', (e) => {
+    if (e.detail && app.deck.isOpen) ensureDeckPlots(app.deck).catch((err) => toast('The charts stay pictures in this preview: ' + err.message, { error: true, ms: 5000 }));
 });
 // A structure rotated outside the editor (by hand, by the skill) gets its labels upright when its slide shows.
 app.deck.addEventListener('slide', () => setTimeout(() => uprightLabels(app.deck.currentSlide), 50));
@@ -1077,7 +1101,7 @@ function onKey(e) {
         if (app.strip.closeMenu()) return stop(e);                     // a thumbnail's menu, or Move to...
         if (app.themeMode) { if (typing && t.closest('#themeBody')) t.blur(); else setThemeMode(false); return stop(e); }
         if (document.querySelector('.el-menu')) { closeElementMenu(); return stop(e); }
-        if (typing && t.closest('#inspMath, #inspChem')) { t.blur(); return stop(e); }   // out of the LaTeX / SMILES, the figure still selected
+        if (typing && t.closest('#inspMath, #inspChem, #inspPlot')) { t.blur(); return stop(e); }   // out of the LaTeX / SMILES, the figure still selected
         if (app.selection.handleKey(e)) return stop(e);
         if (!typing && app.strip.isContext() && app.strip.clearPick()) return stop(e);   // the strip: back to the current slide alone
         return;
@@ -1475,6 +1499,7 @@ function paletteEntries() {
         out.push({ group: 'Slide', label: 'Auto-animate to the next slide (on / off)', run: () => { const s = app.deck.currentSlide; if (s) { sel.clear(); $('inspAutoAnimate').checked = !s.hasAttribute('data-auto-animate'); $('inspAutoAnimate').dispatchEvent(new Event('change')); } } });
         for (const [kind, label] of [['text', 'Text box'], ['list', 'Bullet list'], ['olist', 'Numbered list'], ['table', 'Table'], ['chart', 'Chart'], ['code', 'Code block'], ['image', 'Image from file...'], ['image-url', 'Image from URL...'], ['placeholder', 'Image placeholder'], ['video', 'Video from file...'], ['embed', 'Embed web page or video...'], ['rect', 'Rectangle'], ['rounded', 'Rounded rectangle'], ['ellipse', 'Ellipse'], ['shape:triangle', 'Triangle'], ['shape:diamond', 'Diamond'], ['shape:hexagon', 'Hexagon'], ['shape:star', 'Star'], ['shape:block-arrow', 'Block arrow'], ['shape:chevron', 'Chevron'], ['shape:bubble', 'Speech bubble'], ['line', 'Line'], ['arrow', 'Arrow'], ['curved', 'Curved arrow'], ['double', 'Double arrow'], ['master-footer', 'Footer on every slide']]) out.push(insert(kind, label));
         out.push({ group: 'Insert', label: 'Equation', keywords: 'math maths latex formula tex', run: click('[data-insert="equation"]') });
+        out.push({ group: 'Insert', label: 'Interactive chart (Plotly)...', keywords: 'plot plotly json figure graph live hover zoom', run: click('[data-insert="plot"]') });
         out.push({ group: 'Insert', label: 'Chemical structure', keywords: 'chemistry molecule smiles compound', run: click('[data-insert="structure"]') });
         out.push({ group: 'Insert', label: 'Font Awesome icon...', keywords: 'icons fa', run: (q) => { app.iconPicker.open($('btnInsert')); const words = q.replace(/\b(font awesome|icon|icons|fa)\b/gi, '').trim(); if (words && app.iconPicker.search) { app.iconPicker.search.value = words; app.iconPicker.search.dispatchEvent(new Event('input')); } } });
         out.push(...iconEntries(app));
@@ -1587,6 +1612,7 @@ $('insertMenu').addEventListener('click', async (e) => {
         case 'code': app.insert.code(); break;
         case 'equation': drawnInsert(() => app.insert.equation(), 'equation'); break;
         case 'structure': drawnInsert(() => app.insert.structure(), 'structure'); break;
+        case 'plot': openPlotDialog(app); break;
         case 'master-footer': app.insert.masterFooter(); break;
         case 'image': chooseImage(null); break;
         case 'image-url': { const url = prompt('Image address (URL):', 'https://'); if (url && url !== 'https://') app.insert.image(url.trim()); break; }

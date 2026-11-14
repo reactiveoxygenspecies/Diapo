@@ -8,8 +8,15 @@
      smiles-drawer.min.js  SmilesDrawer 2 (MIT, with chroma-js inside,
                            BSD-3-Clause and Apache-2.0): SMILES to 2D SVG
 
-   They run in the editor only (math.js, chem.js): a deck keeps the
-   source and the drawing, never the library. The editor's
+     plotly.min.js         plotly.js (MIT), the full bundle: interactive
+                           charts from a figure's JSON (core/plot.js)
+
+   MathJax and SmilesDrawer run in the editor only (math.js, chem.js): a
+   deck keeps the source and the drawing, never the library. plotly.js is
+   the one library a deck does carry: serve.py copies it beside a deck that
+   has an interactive chart (as deck-plotly.min.js) and counts it as one of
+   Diapo's own scripts by its SHA-256, so the file is written byte for byte
+   as npm ships it, with no banner added. The editor's
    Content-Security-Policy allows scripts from vendor/ (serve.py).
    ============================================================ */
 const fs = require('fs');
@@ -23,10 +30,15 @@ const FILES = [
     [path.join('mathjax', 'es5', 'tex-svg-full.js'), 'mathjax-tex-svg.js', `MathJax ${version('mathjax')} (tex-svg-full), Apache-2.0, https://www.mathjax.org - licence: LICENSE-mathjax.txt`],
     [path.join('smiles-drawer', 'dist', 'smiles-drawer.min.js'), 'smiles-drawer.min.js', `SmilesDrawer ${version('smiles-drawer')}, MIT, https://github.com/reymond-group/smilesDrawer - licences: LICENSE-smiles-drawer.txt, LICENSE-chroma-js.txt (chroma-js ${version('chroma-js')} is bundled in)`],
 ];
+// Copied as they are: the bytes are what serve.py recognises.
+const VERBATIM = [
+    [path.join('plotly.js-dist-min', 'plotly.min.js'), 'plotly.min.js'],
+];
 const LICENCES = [
     [path.join('mathjax', 'LICENSE'), 'LICENSE-mathjax.txt'],
     [path.join('smiles-drawer', 'LICENSE.md'), 'LICENSE-smiles-drawer.txt'],
     [path.join('chroma-js', 'LICENSE'), 'LICENSE-chroma-js.txt'],
+    [path.join('plotly.js-dist-min', 'LICENSE'), 'LICENSE-plotly.txt'],
 ];
 
 fs.mkdirSync(OUT, { recursive: true });
@@ -34,6 +46,10 @@ for (const [src, dst, note] of FILES) {
     const body = fs.readFileSync(path.join(NM, src), 'utf8').replace(/\n?\/\/# sourceMappingURL=\S+\s*$/, '\n');
     fs.writeFileSync(path.join(OUT, dst), `/* ${note} */\n` + body);
     console.log(dst, Math.round(fs.statSync(path.join(OUT, dst)).size / 1024) + ' KB');
+}
+for (const [src, dst] of VERBATIM) {
+    fs.copyFileSync(path.join(NM, src), path.join(OUT, dst));
+    console.log(dst, Math.round(fs.statSync(path.join(OUT, dst)).size / 1024) + ' KB', '(plotly.js ' + version('plotly.js-dist-min') + ')');
 }
 for (const [src, dst] of LICENCES) fs.copyFileSync(path.join(NM, src), path.join(OUT, dst));
 console.log('licences:', LICENCES.map(l => l[1]).join(', '));

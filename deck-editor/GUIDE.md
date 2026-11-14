@@ -31,7 +31,11 @@ any browser, without Diapo, and presents on its own.
   move, the handles to resize, the round handle on top to rotate. Hold **Shift**
   to keep proportions, **Ctrl** to stop snapping.
 - **Insert** (top bar) adds text, lists, tables, charts, pictures, video,
-  shapes and icons to the current slide.
+  shapes and icons to the current slide. **Interactive chart (Plotly)...**
+  takes a Plotly figure (paste what `fig.to_json()` gives, or choose the file
+  `fig.write_html()` saved): on the slide it is a picture you move and size
+  like any other, and when you present (F5, or the saved deck) it is live:
+  hover, zoom, click the legend.
 - The **panel on the right** changes what is selected: colour, text, and below,
   folded until you open them, Box, Animation, Align, Position and Link. With
   nothing selected it shows the slide: its name, transition, background and

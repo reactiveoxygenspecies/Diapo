@@ -60,6 +60,7 @@ export class Problems extends EventTarget {
             if (!['img', 'script', 'link', 'video', 'audio', 'source', 'iframe'].includes(tag)) return;
             const url = t.getAttribute('src') || t.getAttribute('href') || '';
             if (url.startsWith('data:')) return;
+            if (tag === 'script' && t.hasAttribute('data-deck-plot')) return;   // a chart's library not beside the deck yet (a draft): the editor brings its own
             this.add({ kind: 'missing', what: tag === 'img' ? 'picture' : tag === 'link' ? 'stylesheet' : tag, url, el: tag === 'img' || tag === 'video' ? t : null });
         }, true);
         win.addEventListener('error', (e) => {
@@ -154,7 +155,7 @@ export class Problems extends EventTarget {
                 return `<div class="problem"><b>Missing ${esc(it.what)}</b>${this._whereText(it.el)}: <code>${esc(it.url)}</code>${show}${remove}</div>`;
             }
             if (it.kind === 'drawn') {
-                return `<div class="problem"><b>${it.what === 'equation' ? 'Equation' : 'Structure'} not drawn</b>${this._whereText(it.el)}: ${esc(it.message)} <code>${esc(it.url)}</code>${show}</div>`;
+                return `<div class="problem"><b>${it.what === 'equation' ? 'Equation' : it.what === 'interactive chart' ? 'Interactive chart' : 'Structure'} not drawn</b>${this._whereText(it.el)}: ${esc(it.message)} <code>${esc(it.url)}</code>${show}</div>`;
             }
             return `<div class="problem"><b>Deck script error</b>${it.where ? ` (${esc(it.where)})` : ''}: ${esc(it.message)}</div>`;
         });

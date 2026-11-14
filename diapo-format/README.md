@@ -16,8 +16,9 @@ server, with no build step and no network access except the fonts it links.
 | `deck-base.css` | The fixed 1920x1080 stage, slide visibility, print layout, reduced motion and the `.reveal` entrance family | Inside the `<style>` block, after the deck's `:root` variables and reset |
 | `deck-controller.js` | Scales the stage into the window; keyboard, touch and wheel navigation; `#n` in the URL; the `deck:slide` / `deck:rescale` events | A `<script>` at the end of `<body>` |
 | `deck-runtime.js` | Presentation features: presenter window, overview, laser, drawing, fragments, auto-animate, transitions, text effects, links, speaker notes | `<script id="deck-runtime">` right after the controller |
+| `deck-plot.js` | Draws interactive charts (`figure[data-plot]`, below) when the deck is presented. Only a deck with such a chart needs it | `<script src="deck-plot.js" data-deck-plot="renderer">` at the very end of `<body>`, after the charting library |
 
-The three files are generated from the editor's own template and runtime by
+The files are generated from the editor's own template and runtime by
 `deck-editor/tools/build-format.py`, so they are always exactly what the
 editor writes into a new deck. `deck-runtime.js` reports its version as
 `window.deckRuntime.version` (currently 13); the editor offers to update older
@@ -108,9 +109,52 @@ Conventions the runtime and the editor understand, all optional:
 | `figure[data-chart="column\|bar\|line\|area\|pie\|doughnut"]` | a chart drawn by an editor: a plain inline `<svg>` and the table it was drawn from in `<script type="application/json" data-chart-data>`; tools keep both. A generator may write the table alone; Diapo draws it on open |
 | `figure[data-math="LaTeX"]` | an equation drawn by an editor: one plain inline `<svg>` (glyphs as paths, sized in `em`, `currentColor`); tools keep both. A generator may write the figure with the LaTeX alone; Diapo draws it on open |
 | `figure[data-chem="SMILES"]` | a chemical structure drawn by an editor: one plain inline `<svg>` scaled into the figure's box; optional `data-chem-colours="off"` (one colour) and `data-chem-aromatic="circles"`. A generator may write the SMILES alone; Diapo draws it on open |
+| `figure[data-plot="plotly"]` | an interactive chart: the figure as data and a picture of it (see "Interactive charts") |
 | `div[data-crop]` | a cropped picture: a box with `overflow: hidden` holding the `<img>`, placed in percentages of the box |
 | `code[data-code]` | a code block |
 | `[data-placeholder="image"]` | an unfilled image box |
+
+### Interactive charts
+
+A chart that answers the mouse when the deck is presented (hover, zoom, legend)
+is a figure that names its library and holds two children:
+
+```html
+<figure data-plot="plotly" data-plot-theme="deck" style="position:absolute; left:410px; top:230px; width:1100px; height:619px; margin:0;">
+  <img data-plot-snapshot src="data:image/svg+xml,..." alt="Growth over time" style="display:block;width:100%;height:100%;">
+  <script type="application/json" data-plot-figure>{"data":[{"type":"scatter","x":[0,10,20],"y":[0.02,0.11,0.41]}],"layout":{"title":{"text":"Growth over time"}}}</script>
+</figure>
+...
+<script src="deck-plotly.min.js" data-deck-plot="library"></script>
+<script src="deck-plot.js" data-deck-plot="renderer"></script>
+</body>
+```
+
+- `script[data-plot-figure]` is the figure, as JSON: `{"data": [...], "layout":
+  {...}, "config": {...}, "frames": [...]}`, what Plotly's `fig.to_json()`
+  writes (only `data` is required). It is a data block: it never runs. Write
+  `<` inside it as `\u003c`, so nothing in a label can end the block.
+- `img[data-plot-snapshot]` is a picture of the chart at the figure's size (an
+  SVG data URI; PNG for a very large one), with `data-key`, a mark of what it
+  was drawn from. It shows until the live chart is drawn and wherever scripts
+  do not run: thumbnails, print and PDF, a viewer that blocks scripts. An
+  editor draws it and draws it again when the figure, the box or the look
+  changes; a generator may leave it out (Diapo draws it when the deck opens).
+- Options on the figure: `data-plot-live="off"` keeps the picture and never
+  draws the live chart; `data-plot-theme="deck"` gives the chart the figure
+  element's text colour, font family and font size, a clear ground and the
+  deck's accent colours (the `:root` variables named accent, primary,
+  secondary, brand, series or highlight) for its series; `data-plot-toolbar="off"`
+  hides the library's toolbar.
+- The two scripts are the last things in `<body>`: the library (plotly.js, the
+  full minified bundle, unchanged, saved beside the deck as
+  `deck-plotly.min.js`) and `deck-plot.js`. The renderer draws each chart
+  into a `<div class="deck-plot-live">` inside its figure, for the slide on
+  show, never while `html` has the class `deck-editing`, and leaves the
+  picture when anything fails. A tool that saves the deck writes neither that
+  `div` nor the renderer's `<style id="deck-plot-style">`.
+- `data-plot` names the library so that others can follow with the same two
+  children; `plotly` is the only value defined today.
 
 Events: the deck dispatches `deck:slide` when it navigates and listens for
 `deck:rescale` (re-measure and re-scale). An editing tool dispatches

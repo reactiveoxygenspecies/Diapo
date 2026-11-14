@@ -673,6 +673,14 @@ def origin_ok(origin, fetch_site, port):
 # The editor's own pages get a policy too (their script files and Diapo's
 # known scripts only), so deck text that reaches the editor as HTML can
 # never run there either.
+#
+# One kind of Diapo script is a file beside the deck, not text in it: the
+# charting library of an interactive chart is 5 MB, too much to write into
+# every save. DECK_FILES are copied into a deck's folder when the deck is
+# saved with such a chart, and a deck page may load a file of theirs for as
+# long as its bytes are an edition of Diapo's (the SHA-256 again): the
+# policy then names that one address. A file of the same name with anything
+# else in it is the deck's own script, paused like any other.
 # ------------------------------------------------------------------
 SCRIPT_RE = re.compile(r"<script\b([^>]*)>(.*?)</script(?=[\s/>])[^>]*>", re.I | re.S)
 SRC_RE = re.compile(r"""(?:^|\s)src\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", re.I)
@@ -681,7 +689,11 @@ DECK_DOC_EXT = (".html", ".htm", ".~draft")
 # Text the editor writes into decks as inline scripts (the presentation features, the
 # print helpers): hashed as written ("\n" + text + "\n"), with its own line ends and with LF.
 EDITOR_SCRIPTS = ("deck-runtime.js", "print/prep.js", "print/keeper.js")
+# Script files Diapo puts beside a deck: {name in the deck's folder: the file in app/}. An
+# interactive chart's library (plotly.js, exactly as npm ships it) and the script that draws it.
+DECK_FILES = {"deck-plotly.min.js": "vendor/plotly.min.js", "deck-plot.js": "deck-plot.js"}
 _known = None
+_known_files = None
 _scan_cache = {}
 
 
@@ -729,6 +741,15 @@ def _known_sets():
             for text in (raw, raw.replace("\r\n", "\n")):
                 exact.add(script_hash("\n" + text.strip() + "\n"))
             trimmed.add(script_hash(raw.replace("\r\n", "\n").strip()))
+        # The files beside a deck, as text in a page: the single-file export writes them in
+        # whole (Inliner), and the editor puts them into the deck it shows before the first save.
+        for rel in DECK_FILES.values():
+            try:
+                with open(os.path.join(APP_DIR, rel), encoding="utf-8", newline="") as f:
+                    raw = f.read()
+            except OSError:
+                continue
+            exact.update(inline_hashes(raw))
         try:
             with open(os.path.join(APP_DIR, "known-scripts.json"), encoding="utf-8") as f:
                 data = json.load(f)
@@ -744,20 +765,72 @@ def known_script_hashes():
     return _known_sets()[0]
 
 
-REMOTE_SRC = re.compile(r"^([a-z][a-z0-9+.-]*:|//)", re.I)
-_file_digests = {}
+def inline_hashes(raw):
+    """Hashes of a script file's text once it is an inline script: as the single-file export
+    writes it and as the editor does (trimmed), both between two line breaks."""
+    text = raw.replace("\r\n", "\n").replace("\r", "\n")
+    return {script_hash("\n" + text.replace("</script", "<\\/script") + "\n"), script_hash("\n" + text.strip() + "\n")}
 
 
-def file_digest(path):
-    """SHA-256 of a file (16 hex digits), kept while its size and time stay the same."""
+def file_sha256(path):
+    """SHA-256 of a file's bytes (hex), kept while its size and time stay the same."""
     st = os.stat(path)
     key = (path, st.st_mtime_ns, st.st_size)
     if key not in _file_digests:
         if len(_file_digests) > 256:
             _file_digests.clear()
         with open(path, "rb") as f:
-            _file_digests[key] = hashlib.sha256(f.read()).hexdigest()[:16]
+            _file_digests[key] = hashlib.sha256(f.read()).hexdigest()
     return _file_digests[key]
+
+
+def known_file_hashes():
+    """SHA-256 (hex) of every edition of the script files Diapo puts beside a deck: the
+    current ones in app/, and the earlier ones in app/known-scripts.json ("files")."""
+    global _known_files
+    if _known_files is None:
+        found = set()
+        for rel in DECK_FILES.values():
+            try:
+                found.add(file_sha256(os.path.join(APP_DIR, rel)))
+            except OSError:
+                pass
+        try:
+            with open(os.path.join(APP_DIR, "known-scripts.json"), encoding="utf-8") as f:
+                found.update(json.load(f).get("files", []))
+        except (OSError, ValueError):
+            pass
+        _known_files = found
+    return _known_files
+
+
+def ensure_deck_files(deck_full, html):
+    """Put beside a deck the script files of Diapo's that its page loads (DECK_FILES): copied
+    when missing, replaced when the one there is an earlier edition of Diapo's. A file of that
+    name with anything else in it is somebody's own and is left alone. Returns the names written."""
+    written = []
+    folder = os.path.dirname(deck_full)
+    for src, _body in page_scripts(html):
+        if src not in DECK_FILES or src in written:
+            continue
+        source, target = os.path.join(APP_DIR, DECK_FILES[src]), os.path.join(folder, src)
+        if not os.path.isfile(source):
+            continue
+        if os.path.isfile(target) and (file_sha256(target) == file_sha256(source) or file_sha256(target) not in known_file_hashes()):
+            continue
+        shutil.copyfile(source, target + ".tmp")
+        os.replace(target + ".tmp", target)
+        written.append(src)
+    return written
+
+
+REMOTE_SRC = re.compile(r"^([a-z][a-z0-9+.-]*:|//)", re.I)
+_file_digests = {}
+
+
+def file_digest(path):
+    """SHA-256 of a file (16 hex digits), kept while its size and time stay the same."""
+    return file_sha256(path)[:16]
 
 
 def local_script(full, src):
@@ -775,14 +848,16 @@ def local_script(full, src):
 
 
 def scan_deck(full, data):
-    """What a deck page runs, as {"own": [...], "allow": [...], "remote": n}.
+    """What a deck page runs, as {"own": [...], "allow": [...], "files": [...], "remote": n}.
     own: its scripts that are not Diapo's: inline ones by hash, files on this computer by
     src and the hash of their contents (so trust lapses when the file changes), files from
     the internet by src (their contents can change unseen: "remote" counts them). A local
     file that does not exist is left out: it cannot run; so is the earlier in-deck editor
     prototype, editor.js, which is served as a no-op.
     allow: exact hashes of scripts that are a Diapo edition with other whitespace round it
-    (a deck that pasted the controller in); the policy lets those run in this deck."""
+    (a deck that pasted the controller in); the policy lets those run in this deck.
+    files: the src of script files on this computer whose bytes are an edition of a file Diapo
+    puts beside decks (DECK_FILES); they are not the deck's own, and the policy names them."""
     key = (hashlib.sha256(data).digest(), os.path.dirname(full), WORKSPACE)
     if key not in _scan_cache:
         exact, trimmed = _known_sets()
@@ -810,8 +885,10 @@ def scan_deck(full, data):
     own, allow, files, remote = _scan_cache[key]
     # The files are hashed on every call (kept per file while it is unchanged), not with the
     # page: a library next to the deck can change while the deck's own text does not.
-    own = set(own) | {f"src:{src}#{file_digest(local)}" for src, local in files if os.path.isfile(local)}
-    return {"own": sorted(own), "allow": sorted(allow), "remote": remote}
+    files = [(src, local) for src, local in files if os.path.isfile(local)]
+    ours = [src for src, local in files if file_sha256(local) in known_file_hashes()]
+    own = set(own) | {f"src:{src}#{file_digest(local)}" for src, local in files if src not in ours}
+    return {"own": sorted(own), "allow": sorted(allow), "files": ours, "remote": remote}
 
 
 def scripts_fingerprint(own):
@@ -832,13 +909,26 @@ def hash_sources(hashes):
 FRAME_POLICY = "frame-ancestors 'self'"
 
 
-def deck_csp(allow=()):
-    return f"script-src {hash_sources(known_script_hashes() | set(allow))}; form-action 'none'; {FRAME_POLICY}"
+def deck_csp(allow=(), urls=()):
+    """The policy of a deck page: Diapo's scripts by hash, and by address the script files of
+    Diapo's that this deck has beside it (urls, already checked byte for byte)."""
+    sources = " ".join([*urls, hash_sources(known_script_hashes() | set(allow))])
+    return f"script-src {sources}; form-action 'none'; {FRAME_POLICY}"
+
+
+def script_urls(host, route, srcs):
+    """The full address of each script file a deck page at `route` loads, as a policy takes it:
+    one exact path, percent-encoded (a space or a semicolon would end the source)."""
+    out = []
+    for src in srcs:
+        path = urllib.parse.urlsplit(urllib.parse.urljoin("http://" + host + route, src)).path
+        out.append("http://" + host + urllib.parse.quote(urllib.parse.unquote(path), safe="/"))
+    return out
 
 
 def editor_csp(host):
     base = "http://" + host
-    files = " ".join(f"{base}/{p}" for p in ("editor.js", "look.js", "presenter.js", "core/", "vendor/"))   # vendor/: MathJax, SmilesDrawer
+    files = " ".join(f"{base}/{p}" for p in ("editor.js", "look.js", "presenter.js", "deck-plot.js", "core/", "vendor/"))   # vendor/: MathJax, SmilesDrawer, plotly.js
     return f"script-src {files} {hash_sources(known_script_hashes())}; form-action 'none'; object-src 'none'; {FRAME_POLICY}"
 
 
@@ -1313,7 +1403,10 @@ class Inliner:
         # 1. Scripts loaded from files next to the deck.
         def script(m):
             attrs, src, attrs2 = m.group(1), m.group(2), m.group(3)
-            full = self.resolve(src)
+            if src in DECK_FILES and not os.path.isfile(os.path.join(self.deck_dir, src)):
+                full = os.path.join(APP_DIR, DECK_FILES[src])      # a chart added since the last save: Diapo's own copy
+            else:
+                full = self.resolve(src)
             if not full:
                 return m.group(0)
             with open(full, "r", encoding="utf-8", errors="replace") as f:
@@ -1575,7 +1668,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _body(self):
         return self._request_body
 
-    def _deck_policy(self, full, served):
+    def _deck_policy(self, full, served, route=""):
         """The CSP header for a file under /deck/ (see "Scripts in decks"): Diapo's own
         scripts only for a page, unless the user trusts that deck; no scripts at all for
         any other file a frame might show as a document (an SVG, say)."""
@@ -1587,7 +1680,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         except OSError:
             return deck_csp()
         scan = scan_deck(full, data)
-        return FRAME_POLICY if deck_trusted(full, scan["own"]) else deck_csp(scan["allow"])
+        if deck_trusted(full, scan["own"]):
+            return FRAME_POLICY
+        return deck_csp(scan["allow"], script_urls(self.headers.get("Host").strip().lower(), route, scan["files"]))
 
     def _trust_reply(self, full, draft):
         """{trusted, scripts, remote, known} for a deck: how many scripts of its own it has (and
@@ -1692,7 +1787,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 if not os.path.isfile(served):
                     return self._fail("not found", 404)
                 extra = {"X-Diapo-Version": served_version(full, served)} if served.lower().endswith(DECK_DOC_EXT) else None
-                return self._send_file(served, csp=self._deck_policy(full, served), headers=extra)
+                return self._send_file(served, csp=self._deck_policy(full, served, route), headers=extra)
             if route == "/":
                 route = "/index.html"
             # Everything else is the editor app itself (no path escapes here either).
@@ -1904,6 +1999,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         with open(tmp, "wb") as f:
             f.write(body)
         os.replace(tmp, full)
+        ensure_deck_files(full, body.decode("utf-8", "replace"))
         print(f"saved {rel_path(full)} ({len(body)} bytes)" + (f", previous -> {backup}" if backup else ""))
         return self._json({"ok": True, "bytes": len(body), "backup": backup, "file": rel_path(full), "version": content_version(body)})
 
@@ -2001,7 +2097,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         with open(target + ".tmp", "wb") as f:
             f.write(body)
         os.replace(target + ".tmp", target)
-        notes = [f"not found next to the deck, not copied: {m}" for m in missing]
+        # A chart's script files are Diapo's to bring: the deck may never have been saved with them.
+        brought = ensure_deck_files(target, html_text)
+        notes = [f"not found next to the deck, not copied: {m}" for m in missing if m not in brought and m not in DECK_FILES]
         # A target outside the current workspace becomes the workspace, as Open deck... does.
         if not (target == WORKSPACE or target.startswith(WORKSPACE + os.sep)):
             set_workspace(tgt_dir)
