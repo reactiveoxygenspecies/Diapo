@@ -1144,6 +1144,14 @@ so checks of a dragged distance use `near()` with `slack()` from the helpers, wh
 is 0 in Chrome. Firefox also writes `style` before other attributes of a new
 element and short forms of some CSS; checks of saved markup accept both.
 
+GitHub Actions (`.github/workflows/tests.yml`, on push and pull request to `main`)
+runs the same on a Windows runner: it first rebuilds the generated copies
+(`tools/build-templates.py`, which also writes `diapo-format/` and the skill's
+runtime and controller) and fails if that changes a tracked file, then runs
+`npx playwright test --project=chrome` and `npm run test:py`. The report and
+results are uploaded when a run fails. Set `DIAPO_TEST_PORT` (the workflow uses
+8828) when running two sets of tests at once.
+
 ## Not yet
 
 Every P0, P1 and P2 item of the brief is built. Ideas beyond it live in the

@@ -1,0 +1,71 @@
+# Tests for Diapo: the browser tests (Playwright, the installed Chrome) and the
+# Python tests, on a Windows runner, which is what Diapo ships on. The generated
+# copies (diapo-format/, skills/diapo-deck/, app/templates/) are rebuilt first and
+# the job fails if that changes anything, so a copy can't drift silently.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (Windows, Chrome)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      DIAPO_TEST_PORT: '8828'   # Playwright's server port; set for every run, as in RELEASING.md
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1   # build-known-scripts.py (a release step) needs history; it is not in this check
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: deck-editor/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        working-directory: deck-editor
+        run: npm ci
+
+      - name: Check the generated copies are current
+        # Rebuilds app/templates/*.html, diapo-format/ and the skill's runtime and
+        # controller from their sources; build-templates.py also runs build-format.py,
+        # which fails when the skill's annotated base CSS lacks a rule of the base block.
+        working-directory: deck-editor
+        run: |
+          py -3 tools/build-templates.py
+          git diff --exit-code -- app/templates ../diapo-format ../skills/diapo-deck
+
+      - name: Browser tests (Playwright, installed Chrome)
+        working-directory: deck-editor
+        run: npx playwright test --project=chrome
+
+      - name: Python tests
+        working-directory: deck-editor
+        run: npm run test:py
+
+      - name: Upload Playwright report and test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            deck-editor/playwright-report/
+            deck-editor/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
