@@ -9,7 +9,7 @@
    colour, a rule colour and a panel colour.
 
    Kinds: text box, bullet list, table, chart (chart.js), code block, image (file or
-   URL), video (file or URL), embedded web page, shapes (rectangle,
+   URL), video (file or URL), audio (file), embedded web page, shapes (rectangle,
    rounded rectangle, ellipse, triangle, diamond, hexagon, star,
    block arrow, chevron, speech bubble), line, arrow, icons, and
    filling an image placeholder from a layout.
@@ -21,6 +21,7 @@ import { sampleChart, deckPalette, writeChart } from './chart.js';
 import { texToSvg, lastMathFont } from './math.js';
 import { smilesToSvg } from './chem.js';
 import { createLine, KINDS } from './lines.js';
+import { choosePlace, centreOn, obstaclesOn } from './placement.js';
 
 /* A small set of icons as SVG paths on a 24x24 grid. */
 export const ICONS = {
@@ -81,7 +82,8 @@ export class Inserter {
         this.deck = app.deck;
         this.history = app.history;
         this.selection = app.selection;
-        this.count = 0;                // cascades successive inserts so they do not stack exactly
+        this.count = 0;                // cascades successive inserts on a full slide so they do not stack exactly
+        this.fresh = new WeakMap();    // element -> { w, h, at } between place() and add(), see arrange()
     }
 
     /* ------------------------------------------------------------
@@ -123,15 +125,44 @@ export class Inserter {
         };
     }
 
-    /* Position for a new element of the given size: slide centre, nudged per insert. */
-    place(el, w, h) {
-        const n = this.count++ % 8;
-        const x = Math.round((this.deck.stageW - w) / 2 + n * 24), y = Math.round((this.deck.stageH - (h || 200)) / 2 + n * 24);
+    /* Size a new element and mark it to be placed once it is on the slide (add() does that, see
+       arrange()): a w or h of 0 leaves that side to the content. `at` (stage px) centres it on a
+       point, where a file was dropped; `hint` is the size to plan with while the content has
+       none yet (a picture still loading). */
+    place(el, w, h, { at = null, hint = null } = {}) {
         el.style.position = 'absolute';
-        el.style.left = x + 'px';
-        el.style.top = y + 'px';
+        el.style.left = Math.round((this.deck.stageW - w) / 2) + 'px';      // until arrange() runs
+        el.style.top = Math.round((this.deck.stageH - (h || 200)) / 2) + 'px';
         if (w) el.style.width = w + 'px';
         if (h) el.style.height = h + 'px';
+        this.fresh.set(el, { w: (hint && hint.w) || w, h: (hint && hint.h) || h, at });
+    }
+
+    /* Where a new element goes (see placement.js): measured on the slide, where its text, font
+       and drawing give it its real size, then put in the centre if that is free, else on the
+       freest grid spot nearest it, else (a full slide) on the cascade. Not an undo step of its
+       own: the element is new, and its insert step brings it back with the place it has. */
+    arrange(el, { w = 0, h = 0, at = null } = {}) {
+        const r = this.deck.stageRect(el);
+        const size = { w: r.w >= 4 ? r.w : (w || 200), h: r.h >= 4 ? r.h : (h || 200) };
+        const W = this.deck.stageW, H = this.deck.stageH;
+        let p;
+        if (at) p = centreOn(at, size.w, size.h, W, H);
+        else {
+            p = choosePlace({ w: size.w, h: size.h, stageW: W, stageH: H, rects: obstaclesOn(this.deck, el), cascade: this.count });
+            if (p.how === 'cascade') this.count++;
+        }
+        // left / top count from the box the element is in (the slide, normally at the stage's corner).
+        const o = this.app.editops ? this.app.editops._origin(el.parentElement) : { x: 0, y: 0 };
+        el.style.left = Math.round(p.x - o.x) + 'px';
+        el.style.top = Math.round(p.y - o.y) + 'px';
+        return p;
+    }
+    /* The centre of a free spot for something of w x h that is not an element yet (a line). */
+    spot(w, h) {
+        const p = choosePlace({ w, h, stageW: this.deck.stageW, stageH: this.deck.stageH, rects: obstaclesOn(this.deck), cascade: this.count });
+        if (p.how === 'cascade') this.count++;
+        return { x: p.x + w / 2, y: p.y + h / 2 };
     }
 
     add(el, label) {
@@ -139,6 +170,8 @@ export class Inserter {
         if (!slide) return null;
         if (!el.hasAttribute('data-id')) el.setAttribute('data-id', uniqueId(this.deck.doc));   // its identity, for auto-animate
         this.history.insert(el, slide, null, label);
+        const plan = this.fresh.get(el);
+        if (plan) { this.fresh.delete(el); this.arrange(el, plan); }
         this.selection.select(el);
         return el;
     }
@@ -276,7 +309,7 @@ export class Inserter {
     }
 
     /* An equation (see math.js): a figure with the LaTeX and its drawing, in the deck's text
-       colour, centred on the slide. MathJax loads on the first one, so this waits for it. */
+       colour, placed like everything else (arrange()). MathJax loads on the first one, so this waits for it. */
     async equation(tex = 'E = mc^2') {
         const d = this.defaults(), doc = this.deck.doc;
         const font = lastMathFont();
@@ -285,11 +318,11 @@ export class Inserter {
         const fig = doc.createElement('figure');
         fig.setAttribute('data-math', tex);
         if (font === 'stix2') fig.setAttribute('data-math-font', 'stix2');
-        fig.style.cssText = `position:absolute; left:0px; top:0px; margin:0; font-size:64px; color:${d.color};`;
+        fig.style.cssText = `margin:0; font-size:64px; color:${d.color};`;
+        this.place(fig, 0, 0, { hint: { w: 400, h: 120 } });      // its size is the drawing's, measured once it is on the slide
         fig.innerHTML = svg;
         this.history.begin('Insert equation');
         this.add(fig, 'Insert equation');
-        this._centre(fig);
         this.history.end();
         this.selection.select(fig);
         return fig;
@@ -313,13 +346,6 @@ export class Inserter {
         return fig;
     }
 
-    /* Centre an element just added (its size known only once it is on the slide), offset like place(). */
-    _centre(el) {
-        const r = this.deck.stageRect(el), n = (this.count++ % 8) * 24;
-        el.style.left = Math.round((this.deck.stageW - r.w) / 2 + n) + 'px';
-        el.style.top = Math.round((this.deck.stageH - r.h) / 2 + n) + 'px';
-    }
-
     code(sample ='def greet(name):\n    # say hello\n    return f"Hello, {name}!"\n\nprint(greet("world"))') {
         const doc = this.deck.doc;
         const pre = doc.createElement('pre');
@@ -338,24 +364,44 @@ export class Inserter {
     /* ------------------------------------------------------------
        Media
        ------------------------------------------------------------ */
-    image(src, alt = '') {
+    /* A picture 640 px wide (narrower when it is tall, so it fits the slide's height), its height
+       following. `size` is its natural size when known (a file measured before the upload);
+       without it the place is planned for a 16:9 picture. `at` centres it on a point. */
+    image(src, alt = '', { size = null, at = null } = {}) {
         const el = this.deck.doc.createElement('img');
         el.src = src;
         el.alt = alt;
-        this.place(el, 640, 0);
+        let w = 640, h = 360;
+        if (size && size.w > 0 && size.h > 0) {
+            w = Math.round(Math.min(640, this.deck.stageH * 0.9 * size.w / size.h));
+            h = Math.round(w * size.h / size.w);
+        }
+        this.place(el, w, 0, { at, hint: { w, h } });
         el.style.maxWidth = 'none';
         el.style.maxHeight = 'none';
         el.style.height = 'auto';
         return this.add(el, 'Insert image');
     }
 
-    /* Upload files into assets/ and insert each as an image or a video. */
-    async upload(files, { placeholder = null } = {}) {
+    /* Upload files into assets/ and insert each as a picture, a video or an audio player. `at`
+       (stage px) is where they were dropped: the first is centred there, the next ones step
+       down and right from it. Pictures are measured first (read in the browser: nothing leaves
+       the computer for it), so their place is planned at their real height. */
+    async upload(files, { placeholder = null, at = null } = {}) {
+        files = Array.from(files);
         const dir = this.deck.file.includes('/') ? this.deck.file.slice(0, this.deck.file.lastIndexOf('/')) : '';
+        const sizes = await Promise.all(files.map(localImageSize));
         const r = await this.app.api.upload(dir, files);
+        // The server answers with the files it kept, in order: matched to what was sent when it kept them all.
+        const sent = r.files.length === files.length;
+        // Several files at once (a drop, a pick of many) are one undo step, and stay selected together.
+        const many = !placeholder && r.files.length > 1, made = [];
+        if (many) this.history.begin(`Insert ${r.files.length} files`);
         let last = null;
-        for (const rel of r.files) {
-            const alt = files[0] ? files[0].name.replace(/\.[^.]+$/, '') : '';
+        r.files.forEach((rel, i) => {
+            const file = sent ? files[i] : files[0];
+            const alt = file ? file.name.replace(/\.[^.]+$/, '') : '';
+            const point = at ? { x: at.x + i * 24, y: at.y + i * 24 } : null;
             const target = placeholder && this.deck.doc.contains(placeholder) ? placeholder : null;
             if (target && /^(img|video)$/i.test(target.tagName)) {
                 // Another file in the same box: the picture (or video) keeps its place, size and look.
@@ -365,10 +411,13 @@ export class Inserter {
                 this.history.end();
                 this.selection.select(target); last = target; placeholder = null;
             }
-            else if (/\.(mp4|webm|mov|ogg)$/i.test(rel)) last = this.video(rel);
+            else if (/\.(mp3|m4a|wav)$/i.test(rel) || (/\.ogg$/i.test(rel) && sent && /^audio\//.test(file.type))) last = this.audio(rel, { at: point });
+            else if (/\.(mp4|webm|mov|ogg)$/i.test(rel)) last = this.video(rel, { at: point });
             else if (target) { last = this.fillPlaceholder(target, rel, alt); placeholder = null; }
-            else last = this.image(rel, alt);
-        }
+            else last = this.image(rel, alt, { size: sent ? sizes[i] : null, at: point });
+            if (last) made.push(last);
+        });
+        if (many) { this.history.end(); this.selection.set(made); }
         return { el: last, files: r.files, refused: r.refused || [] };
     }
 
@@ -394,17 +443,28 @@ export class Inserter {
         return this.add(ph, 'Insert image placeholder');
     }
 
-    video(src) {
+    video(src, { at = null } = {}) {
         const el = this.deck.doc.createElement('video');
         el.src = src;
         el.setAttribute('controls', '');
         el.setAttribute('playsinline', '');
         el.setAttribute('preload', 'metadata');
-        this.place(el, 1280, 720);
+        this.place(el, 1280, 720, { at });
         el.style.maxWidth = 'none';
         el.style.maxHeight = 'none';
         el.style.background = '#000';
         return this.add(el, 'Insert video');
+    }
+
+    /* An audio player (a sound file dropped on the slide): the browser's own controls, 640 px wide. */
+    audio(src, { at = null } = {}) {
+        const el = this.deck.doc.createElement('audio');
+        el.src = src;
+        el.setAttribute('controls', '');
+        el.setAttribute('preload', 'metadata');
+        this.place(el, 640, 0, { at, hint: { w: 640, h: 54 } });
+        el.style.maxWidth = 'none';
+        return this.add(el, 'Insert audio');
     }
 
     embed(url) {
@@ -452,11 +512,12 @@ export class Inserter {
         return this.add(svg, 'Insert ' + kind.replace('-', ' '));
     }
 
-    /* A line or arrow (see lines.js) placed in the middle of the slide, ends ready to drag.
-       kind: line, arrow, curved or double; a boolean is the older line(arrow) call. */
+    /* A line or arrow (see lines.js) placed like everything else (the middle of the slide when
+       that is free), ends ready to drag. kind: line, arrow, curved or double; a boolean is the
+       older line(arrow) call. */
     line(kind = 'arrow') {
         if (kind === true) kind = 'arrow'; else if (kind === false) kind = 'line';
-        const n = this.count++ % 8 * 24, cx = this.deck.stageW / 2 + n, cy = this.deck.stageH / 2 + n;
+        const { x: cx, y: cy } = this.spot(420, 48);
         const svg = createLine(this.app, kind, [cx - 210, cy], [cx + 210, cy]);
         return this.add(svg, 'Insert ' + KINDS[kind].label);
     }
@@ -569,6 +630,22 @@ export function highlightCode(code) {
     }
     out += esc(text.slice(last));
     code.innerHTML = out;
+}
+
+/* The natural size of a picture file, read in the browser (nothing is sent anywhere), or null
+   for anything else or a file that does not decode in time. */
+function localImageSize(file) {
+    if (!file || !(/^image\//.test(file.type) || /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i.test(file.name || ''))) return Promise.resolve(null);
+    return new Promise((resolve) => {
+        let url = null;
+        try { url = URL.createObjectURL(file); } catch (e) { resolve(null); return; }
+        const img = new Image();
+        const done = (v) => { if (url) { URL.revokeObjectURL(url); url = null; resolve(v); } };
+        img.onload = () => done(img.naturalWidth > 0 && img.naturalHeight > 0 ? { w: img.naturalWidth, h: img.naturalHeight } : null);
+        img.onerror = () => done(null);
+        setTimeout(() => done(null), 3000);
+        img.src = url;
+    });
 }
 
 /* Font stacks compare without quotes, spaces or case. */

@@ -31,6 +31,7 @@ import { readableText } from './core/dom.js';
 import { deckName, DeckPreviews } from './core/previews.js';
 import { loader } from './core/loader.js';
 import { DeckTabs } from './core/tabs.js';
+import { FileDrop } from './core/filedrop.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -411,6 +412,19 @@ export function setRulers(on) {
 }
 let savedRulers = null;
 try { savedRulers = localStorage.getItem(RULERS_KEY); } catch (e) { /* ignore */ }
+
+/* Entrances while editing: off by default, so changing slides shows the slide as it ends up at
+   once instead of blinking its content out and fading it back in (see Deck.settleSlide).
+   Preview, presenting and the Play buttons animate either way. */
+const ENTRANCES_KEY = 'deck-editor-entrances';
+export function setEntrances(on) {
+    app.deck.playEntrances = on;
+    $('btnEntrances').classList.toggle('on', on);
+    $('btnEntrancesState').textContent = on ? 'on' : 'off';
+    try { localStorage.setItem(ENTRANCES_KEY, on ? '1' : '0'); } catch (e) { /* ignore */ }
+}
+let savedEntrances = null;
+try { savedEntrances = localStorage.getItem(ENTRANCES_KEY); } catch (e) { /* ignore */ }
 let savedLook = null;
 try { savedLook = localStorage.getItem(LOOK_KEY); } catch (e) { /* ignore */ }
 applyLook(savedLook);
@@ -422,8 +436,10 @@ lookDropdown.addEventListener('click', (e) => {
     if (b) { setLook(b.dataset.look); lookDropdown.hidden = true; return; }
     if (e.target.closest('[data-opt="hints"]')) setHints(document.documentElement.dataset.hints !== 'on');
     if (e.target.closest('[data-opt="rulers"]')) setRulers(document.documentElement.dataset.rulers !== 'on');
+    if (e.target.closest('[data-opt="entrances"]')) setEntrances(!app.deck.playEntrances);
 });
 setHints(savedHints === '1');
+setEntrances(savedEntrances === '1');
 
 /* ------------------------------------------------------------
    Opening a deck
@@ -809,12 +825,32 @@ $('btnImport').addEventListener('click', async () => {
         status('Importing ' + src.split(/[\\/]/).pop() + '...', { busy: true });
         const r = await api.importPath(src);
         status('');
-        const notes = r.notes && r.notes.length ? ' | ' + r.notes.slice(0, 3).join(' | ') + (r.notes.length > 3 ? ` | +${r.notes.length - 3} more` : '') : '';
-        toast(`Imported ${r.source} as ${r.file}${notes}`, { ms: notes ? 9000 : 4000 });
-        await refreshFiles();
-        if (await openDeck(r.file)) showDrawer(false);
+        await afterImport(r);
     } catch (err) { status(''); toast('Import failed: ' + err.message, { error: true, ms: 7000 }); }
 });
+/* An imported deck: say what the import noted, list it, open it in a tab of its own. */
+async function afterImport(r) {
+    const notes = r.notes && r.notes.length ? ' | ' + r.notes.slice(0, 3).join(' | ') + (r.notes.length > 3 ? ` | +${r.notes.length - 3} more` : '') : '';
+    toast(`Imported ${r.source} as ${r.file}${notes}`, { ms: notes ? 9000 : 4000 });
+    await refreshFiles();
+    if (await openDeck(r.file)) showDrawer(false);
+}
+/* A PowerPoint or Markdown file dragged into the window (core/filedrop.js): asked first, then
+   sent to the server as the drawer's Import does (the file itself, uploaded: a dropped file has
+   no path the page may know). The deck being edited stays open in its own tab. */
+async function importDroppedDecks(files) {
+    const names = files.map(f => f.name);
+    const ask = files.length === 1 ? `Import "${names[0]}" as a new deck?` : `Import ${files.length} files as new decks?\n\n${names.join('\n')}`;
+    if (!confirm(ask)) return;
+    for (const f of files) {
+        try {
+            status('Importing ' + f.name + '...', { busy: true });
+            const r = await api.importFile(f);
+            status('');
+            await afterImport(r);
+        } catch (err) { status(''); toast(`Could not import ${f.name}: ${err.message}`, { error: true, ms: 7000 }); }
+    }
+}
 
 $('btnFiles').addEventListener('click', () => showDrawer(true));
 $('btnEmptyOpen').addEventListener('click', () => showDrawer(true));
@@ -1164,6 +1200,7 @@ app.exporter = new Exporter(app);
 app.editops = new EditOps(app);
 app.cropper = new Cropper(app);
 app.problems = new Problems(app, { badge: $('problemsBadge') });
+app.fileDrop = new FileDrop(app, { canvas: $('canvas'), importDecks: importDroppedDecks, toast: (m, o) => toast(m, o) });
 function runtimeState() {
     if (!app.deck.isOpen) return 'none';
     const el = app.deck.doc.getElementById('deck-runtime') || app.deck.doc.getElementById('deck-presenter');

@@ -31,7 +31,10 @@ any browser, without Diapo, and presents on its own.
   move, the handles to resize, the round handle on top to rotate. Hold **Shift**
   to keep proportions, **Ctrl** to stop snapping.
 - **Insert** (top bar) adds text, lists, tables, charts, pictures, video,
-  shapes and icons to the current slide.
+  shapes and icons to the current slide, in a free spot (the centre when it is
+  free). You can also **drag pictures, video or sound** from your folders onto
+  the slide; a PowerPoint or Markdown file dragged into the window becomes a
+  new deck.
 - The **panel on the right** changes what is selected: colour, text, and below,
   folded until you open them, Box, Animation, Align, Position and Link. With
   nothing selected it shows the slide: its name, transition, background and

@@ -148,6 +148,7 @@ export class Deck extends EventTarget {
         this.sourceStage = null;   // stage as parsed from the source (no scripts run), for load-time values
         this._navToken = 0;
         this._size = null;         // { w, h } of the stage, read from the live document
+        this.playEntrances = false;   // the editor's setting (Look menu), see settleSlide()
     }
 
     /* ------------------------------------------------------------
@@ -250,7 +251,7 @@ export class Deck extends EventTarget {
         this.observer = new this.win.MutationObserver((records) => {
             if (records.some(r => r.type === 'attributes' && r.target.classList && r.target.classList.contains('slide'))) {
                 const idx = this.current;
-                if (idx !== this._lastIndex) { this._lastIndex = idx; this.dispatchEvent(new CustomEvent('slide', { detail: idx })); }
+                if (idx !== this._lastIndex) { this._lastIndex = idx; this.settleSlide(); this.dispatchEvent(new CustomEvent('slide', { detail: idx })); }
             }
             this.dispatchEvent(new CustomEvent('mutate', { detail: records }));
         });
@@ -259,10 +260,12 @@ export class Deck extends EventTarget {
         // A deck whose own controller does not run (its scripts are paused until the user trusts
         // the deck, see serve.py) never marks the first slide .visible, so its reveal elements
         // would stay hidden. Do it by hand after a moment, as goTo() does for later slides.
+        // Without "Play entrances" the slide the deck opens on is shown as it ends up, now.
         const doc = this.doc;
+        this.settleSlide();
         setTimeout(() => {
             const s = this.doc === doc ? this.currentSlide : null;
-            if (s && s.classList.contains('active') && !s.classList.contains('visible')) s.classList.add('visible');
+            if (s && s.classList.contains('active') && !s.classList.contains('visible')) { s.classList.add('visible'); this.settleSlide(); }
         }, 400);
 
         this.dispatchEvent(new CustomEvent('ready'));
@@ -376,7 +379,8 @@ export class Deck extends EventTarget {
             s.classList.toggle('active', i === index);
             if (i !== index) s.classList.remove('visible');
         });
-        // .visible is added a frame later so reveal transitions still run.
+        // .visible is added a frame later so reveal transitions still run (unless the editor does
+        // not play entrances: then the observer has settled the slide already, see settleSlide).
         this.win.requestAnimationFrame(() => this.win.requestAnimationFrame(() => {
             if (slides[index] && slides[index].classList.contains('active')) slides[index].classList.add('visible');
         }));
@@ -385,6 +389,32 @@ export class Deck extends EventTarget {
 
     next() { this.goTo(this.current + 1); }
     prev() { this.goTo(this.current - 1); }
+
+    /* While editing, a slide is shown as it ends up, at once, unless the editor's "Play entrances
+       when changing slides" is on: a deck (its own controller, or _forceSlide) marks the new slide
+       .visible a frame or two after .active, so its reveal transitions and entrance animations
+       play, and the content would blink out and fade back in on every change of slide. Here the
+       slide gets .visible at once with transitions off, and every entrance still running on the
+       stage (a CSS transition, a preset's keyframes) is finished; loops keep looping. Everything
+       that reads .visible (thumbnails, the problems list, the morph, getOffset) finds it as
+       before, only sooner. Preview and presenting are not editing, so they animate as always,
+       and the Animation section's Play and the Theme panel's Replay restart animations
+       themselves, which this does not touch. Runs from the observer, before the browser paints. */
+    settleSlide() {
+        if (this.playEntrances || !this.doc || !this.stage) return;
+        const root = this.doc.documentElement;
+        if (!root.classList.contains('deck-editing')) return;
+        const slide = this.currentSlide;
+        if (!slide || !slide.classList.contains('active')) return;
+        this.withoutTransitions(() => { slide.classList.add('visible'); void root.offsetWidth; });
+        let running = [];
+        try { running = this.stage.getAnimations({ subtree: true }); } catch (e) { /* an old browser: transitions are off at least */ }
+        for (const a of running) {
+            const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
+            if (!t || t.iterations === Infinity || a.playState === 'finished') continue;
+            try { a.finish(); } catch (e) { /* an animation that cannot end (zero playback rate): leave it */ }
+        }
+    }
 
     /* ------------------------------------------------------------
        Geometry: the stage's scale as the deck applied it. Hit testing

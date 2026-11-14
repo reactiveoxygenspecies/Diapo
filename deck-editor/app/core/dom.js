@@ -8,7 +8,7 @@
    ============================================================ */
 
 export const TEXT_TAGS = 'h1, h2, h3, h4, h5, h6, p, li, blockquote, pre, td, th, dt, dd, figcaption, label, [data-edit]';
-export const MEDIA_TAGS = 'img, video, canvas, iframe, svg, [data-fig], [data-chart], [data-math], [data-chem], [data-svg], picture, object';
+export const MEDIA_TAGS = 'img, video, audio, canvas, iframe, svg, [data-fig], [data-chart], [data-math], [data-chem], [data-svg], picture, object';
 /* Figures the editor (or a deck's script) draws: picked, moved and sized as one, never edited inside. */
 export const DRAWN = '[data-fig], [data-chart], [data-math], [data-chem]';
 export const SHAPE_TAGS = 'path, circle, rect, ellipse, polygon, polyline, line, text, tspan, g, use';
