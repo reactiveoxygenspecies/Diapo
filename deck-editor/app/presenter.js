@@ -84,7 +84,41 @@ window.addEventListener('focus', () => channel.postMessage({ type: 'hello' }));
 const nav = (delta) => channel.postMessage({ type: 'nav', delta });
 $('btnPrev').addEventListener('click', () => nav(-1));
 $('btnNext').addEventListener('click', () => nav(1));
+/* "?" lists the keys, as in a presented deck (deck-runtime.js); only the ones this window has. */
+const KEYS = [['Right  Down  Space  PgDn', 'Next step, then next slide'], ['Left  Up  PgUp', 'Back one step or slide'], ['Home  End', 'First or last slide']];
+function keysList(on) {
+    let box = document.querySelector('.deck-keys');
+    if (!on) { if (box) box.remove(); return; }
+    if (box) return;
+    box = document.createElement('div');
+    box.className = 'deck-keys';
+    const panel = document.createElement('div');
+    panel.className = 'dk-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-label', 'Keys');
+    panel.tabIndex = -1;
+    const title = document.createElement('p'); title.className = 'dk-title'; title.textContent = 'Keys';
+    const h = document.createElement('h3'); h.textContent = 'Move';
+    const dl = document.createElement('dl');
+    for (const [keys, what] of KEYS) {
+        const dt = document.createElement('dt');
+        for (const k of keys.split('  ')) { const kb = document.createElement('kbd'); kb.textContent = k; dt.append(kb, ' '); }
+        const dd = document.createElement('dd'); dd.textContent = what;
+        dl.append(dt, dd);
+    }
+    const foot = document.createElement('p'); foot.className = 'dk-foot'; foot.textContent = 'Esc, ? or a click closes this list.';
+    panel.append(title, h, dl, foot);
+    panel.addEventListener('click', (e) => e.stopPropagation());
+    box.addEventListener('click', () => keysList(false));
+    box.appendChild(panel);
+    document.body.appendChild(box);
+    panel.focus();
+}
 window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === '?' || (e.key === '/' && e.shiftKey)) { e.preventDefault(); keysList(!document.querySelector('.deck-keys')); return; }
+    if (e.key === 'Escape' && document.querySelector('.deck-keys')) { e.preventDefault(); keysList(false); return; }
     switch (e.key) {
         case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': e.preventDefault(); nav(1); break;
         case 'ArrowLeft': case 'ArrowUp': case 'PageUp': e.preventDefault(); nav(-1); break;

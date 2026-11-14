@@ -49,7 +49,9 @@ any browser, without Diapo, and presents on its own.
 - **Presenter** (P) opens a second window with the next slide, your notes and
   a timer; put it on your laptop screen and the deck on the projector.
 - In the saved file, on any computer: **P** presenter view, **O** overview,
-  **L** laser pointer, **D** draw on the slide, **A** run by itself.
+  **L** laser pointer, **D** draw on the slide, **A** run by itself. Press
+  **?** to see the keys over the deck; a deck opened on its own says
+  "Press ? for keys" for a few seconds.
 
 ## Save and share
 

@@ -79,7 +79,7 @@ body { pointer-events: none; }
 .deck-controls, .notes, [data-hidden] { display: none !important; }
 [data-placeholder] { display: flex !important; }
 [data-fragment] { opacity: 1 !important; }
-.deck-overview { display: none !important; }
+.deck-overview, .deck-keys, .deck-keyhint { display: none !important; }
 `;
 
 export class SlideStrip extends EventTarget {

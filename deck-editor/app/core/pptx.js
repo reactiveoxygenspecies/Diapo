@@ -28,7 +28,7 @@ import { readChart, chartKind, seriesColour, isChart } from './chart.js';
 
 import { bleed as lineBleed } from './lines.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const SKIP = 'script, style, template, noscript, aside.notes, .notes, .deck-controls, .deck-overview, .deck-laser, .deck-draw, .deck-draw-bar, [data-placeholder]';
+const SKIP = 'script, style, template, noscript, aside.notes, .notes, .deck-controls, .deck-overview, .deck-laser, .deck-draw, .deck-draw-bar, .deck-keys, .deck-keyhint, [data-placeholder]';
 const INLINE = new Set(['inline', 'contents']);
 const LEAF_MEDIA = 'img, svg, video, canvas, iframe, object, embed, picture, table, [data-chart], [data-math], [data-chem], [data-fig]';
 const GENERIC_FONTS = { 'sans-serif': 'Arial', serif: 'Georgia', monospace: 'Consolas', 'system-ui': 'Segoe UI', cursive: 'Comic Sans MS', fantasy: 'Impact' };

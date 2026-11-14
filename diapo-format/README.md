@@ -20,7 +20,7 @@ server, with no build step and no network access except the fonts it links.
 The three files are generated from the editor's own template and runtime by
 `deck-editor/tools/build-format.py`, so they are always exactly what the
 editor writes into a new deck. `deck-runtime.js` reports its version as
-`window.deckRuntime.version` (currently 6); the editor offers to update older
+`window.deckRuntime.version` (currently 13); the editor offers to update older
 copies in a deck.
 
 ## A deck
@@ -120,7 +120,9 @@ list live, so it needs no listener).
 
 Keys the runtime adds: `P` / Shift+F5 presenter window, `O` overview, `L`
 laser, `D` draw (1-5 colours, `[` `]` width, Ctrl+Z, `C` clear), Space /
-arrows / PgUp / PgDn for fragments and slides. The runtime is safe to leave
+arrows / PgUp / PgDn for fragments and slides, `?` a list of all the keys over
+the deck (and "Press ? for keys" for 4 s when the file is opened on its own;
+neither is saved or printed). The runtime is safe to leave
 out; the deck then has the controller's navigation only.
 
 Everything an editing tool changes should be stored as inline `style`

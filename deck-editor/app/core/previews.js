@@ -40,7 +40,7 @@ async function previewHtml(path, mtime) {
     const slides = Array.from(doc.querySelectorAll('.deck-stage .slide'));
     let html = '', ext = [];
     if (slides.length) {
-        doc.querySelectorAll('script, title, aside.notes, .notes, .deck-controls').forEach(n => n.remove());
+        doc.querySelectorAll('script, title, aside.notes, .notes, .deck-controls, .deck-keys, .deck-keyhint').forEach(n => n.remove());
         slides.slice(1).forEach(s => s.remove());
         slides[0].classList.add('active', 'visible');
         const dir = url.slice(0, url.lastIndexOf('/') + 1);
