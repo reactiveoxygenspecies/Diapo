@@ -39,7 +39,9 @@ any browser, without Diapo, and presents on its own.
 - **Ctrl+Z** undoes anything, **Ctrl+Y** redoes. **Ctrl+K** finds any action,
   slide, layout, icon or font by typing its name. **Ctrl+F** finds text anywhere in the deck (Ctrl+H replaces it, all in one undo step); **Look > Check spelling while typing** marks misspelt words while you edit.
 - **Ctrl+M** adds a slide with a layout; right-click a slide in the strip for
-  more (duplicate, move, skip, start a section).
+  more (duplicate, move, skip, start a section). Ctrl+click or Shift+click
+  slides in the strip to pick several, then drag one of them (or Ctrl+Up /
+  Ctrl+Down, or Move to... on the menu) to move them all at once.
 - **Theme** (Ctrl+T) changes the whole deck at once: its colours, fonts and
   text styles, and how things move.
 

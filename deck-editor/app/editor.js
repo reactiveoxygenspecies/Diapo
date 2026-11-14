@@ -19,7 +19,7 @@ import { History } from './core/history.js';
 import { Selection } from './core/selection.js';
 import { Inspector } from './core/inspector.js';
 import { TextEditor } from './core/textedit.js';
-import { SlideStrip } from './core/slides.js';
+import { SlideStrip, slidesWord } from './core/slides.js';
 import { Inserter, ICONS } from './core/insert.js';
 import { Presenter } from './core/present.js';
 import { ThemePanel } from './core/theme.js';
@@ -894,7 +894,7 @@ $('btnPreview').addEventListener('click', () => setPreview(true));
    ------------------------------------------------------------ */
 const KEYS = [
     ['Files', [['Ctrl+O', 'Open the deck list'], ['Ctrl+S', 'Save'], ['Ctrl+Shift+S', 'Save as: a new name or folder, with the deck\'s files copied along'], ['Ctrl+P', 'Export as PDF (Export menu: single HTML file)'], ['Ctrl+T', 'Theme panel (colours, fonts, base styles)'], ['F5', 'Preview'], ['P / Shift+F5', 'Presenter view (second window)'], ['Esc', 'Leave preview, close dialogs, deselect']]],
-    ['Slides', [['PgUp / PgDn', 'Previous / next slide'], ['Home / End', 'First / last slide'], ['Ctrl+M', 'New slide (layout picker; Ctrl+Shift+M: blank)'], ['Ctrl+D', 'Duplicate (slide or selection)'], ['Ctrl+Up / Down', 'Move the slide up / down']]],
+    ['Slides', [['PgUp / PgDn', 'Previous / next slide'], ['Home / End', 'First / last slide'], ['Ctrl+M', 'New slide (layout picker; Ctrl+Shift+M: blank)'], ['Ctrl+D', 'Duplicate (slide or selection)'], ['Ctrl+Up / Down', 'Move the slide, or the picked slides, up / down'], ['Ctrl+click / Shift+click a thumbnail', 'Pick several slides; drag one of them to move them all'], ['Shift+Up / Down (strip)', 'Pick one more or one fewer slide (Esc: none)']]],
     ['Canvas', [['Click', 'Select'], ['Shift+click', 'Add to the selection'], ['Ctrl+click', 'Select the exact element under the cursor (a plain drag then moves just that)'], ['Alt+drag', 'Duplicate what you drag'], ['Ctrl while dragging', 'Disable snapping'], ['Shift / Alt while resizing', 'Keep the aspect ratio (corners) / resize about the centre; both together, both'], ['Right-click', 'Element menu'], ['Drag on empty space', 'Marquee select'], ['Double-click / Enter', 'Edit text (Esc when done; Ctrl+B / I / U, Ctrl+Shift+X strike, Ctrl+Shift+= superscript, Ctrl+= subscript while editing)'], ['Arrows', 'Nudge 1px (Shift: 10px)'], ['Delete', 'Delete the selection (Hide is in the panel and the menu)'], ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste, also across slides; images and text from elsewhere paste too'], ['Ctrl+Alt+C / Ctrl+Alt+V', 'Copy the look of an element (colours, border, type, padding) / put it on the selection'], ['Ctrl+G / Ctrl+Shift+G', 'Group / ungroup'], ['Ctrl+] / Ctrl+[', 'Bring forward / send backward (Shift: to front / to back)'], ['Tab', 'Next sibling'], ['Ctrl+F / Ctrl+H', 'Find / find and replace across the deck (Enter / Shift+Enter: next / previous match; Esc closes)'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'], ['Ctrl++ / Ctrl+- / Ctrl+0', 'Zoom in / out / fit'], ['Space+drag, middle button, wheel', 'Pan when zoomed in (the middle button grabs the view)'], ['Ctrl+\\', 'Hide / show both side panels (drag their edges to resize)']]],
 ];
 /* The "?" dialog: the keyboard map, and a tab "About Diapo" (version, checking for a new
@@ -1074,10 +1074,12 @@ function onKey(e) {
         if (document.querySelector('.help')) { document.querySelector('.help').remove(); return stop(e); }
         if (!$('drawer').hidden) { showDrawer(false); return stop(e); }
         if (app.strip.picker) { app.strip.closeLayoutPicker(); return stop(e); }
+        if (app.strip.closeMenu()) return stop(e);                     // a thumbnail's menu, or Move to...
         if (app.themeMode) { if (typing && t.closest('#themeBody')) t.blur(); else setThemeMode(false); return stop(e); }
         if (document.querySelector('.el-menu')) { closeElementMenu(); return stop(e); }
         if (typing && t.closest('#inspMath, #inspChem')) { t.blur(); return stop(e); }   // out of the LaTeX / SMILES, the figure still selected
         if (app.selection.handleKey(e)) return stop(e);
+        if (!typing && app.strip.isContext() && app.strip.clearPick()) return stop(e);   // the strip: back to the current slide alone
         return;
     }
     // A while previewing: the deck's own script does it when the deck carries a current one (its
@@ -1133,6 +1135,8 @@ function onKey(e) {
         if (ctrl && !e.altKey && kl === 'c') { stop(e); app.strip.clip.copy(); return; }
         if (ctrl && !e.altKey && kl === 'x') { stop(e); app.strip.clip.cut(); return; }
         if (!ctrl && !e.altKey && !e.shiftKey && (k === 'Delete' || k === 'Backspace')) { stop(e); app.strip.deleteSelected(); return; }
+        // Shift+Up / Down grow or shrink the pick (plain arrows change slide, Ctrl+arrows move the slides).
+        if (!ctrl && !e.altKey && e.shiftKey && (k === 'ArrowUp' || k === 'ArrowDown')) { stop(e); app.strip.extendPick(k === 'ArrowUp' ? -1 : 1); return; }
     }
     if (k === 'Enter' && app.selection.primary) { stop(e); if (canCrop(app.selection.primary)) app.cropper.start(app.selection.primary); else app.textEdit.start(app.selection.primary); return; }
     if (ctrl && k.toLowerCase() === 'm') { stop(e); if (e.shiftKey) app.strip.addSlide(); else app.strip.showLayoutPicker(); return; }
@@ -1146,8 +1150,8 @@ function onKey(e) {
     if (ctrl && k.toLowerCase() === 'g') { stop(e); if (e.shiftKey) app.editops.ungroup(); else app.editops.group(); return; }
     if (ctrl && e.code === 'BracketRight') { stop(e); app.editops.layer(e.shiftKey ? 'front' : 'forward'); return; }
     if (ctrl && e.code === 'BracketLeft') { stop(e); app.editops.layer(e.shiftKey ? 'back' : 'backward'); return; }
-    if (ctrl && k === 'ArrowUp') { stop(e); app.strip.moveSlide(app.deck.current, app.deck.current - 1); return; }
-    if (ctrl && k === 'ArrowDown') { stop(e); app.strip.moveSlide(app.deck.current, app.deck.current + 1); return; }
+    if (ctrl && k === 'ArrowUp') { stop(e); app.strip.moveSelected('up'); return; }        // the picked slides, or the current one
+    if (ctrl && k === 'ArrowDown') { stop(e); app.strip.moveSelected('down'); return; }
     if (app.selection.handleKey(e)) return stop(e);
     if (k === 'ArrowDown' || k === 'ArrowRight') { stop(e); app.deck.next(); return; }
     if (k === 'ArrowUp' || k === 'ArrowLeft') { stop(e); app.deck.prev(); return; }
@@ -1453,6 +1457,19 @@ function paletteEntries() {
         out.push({ group: 'Slide', label: 'New slide (layout picker)', hint: 'Ctrl+M', run: () => app.strip.showLayoutPicker() });
         out.push({ group: 'Slide', label: 'New blank slide', hint: 'Ctrl+Shift+M', run: () => app.strip.addSlide(app.deck.current, 'blank') });
         out.push({ group: 'Slide', label: 'Duplicate this slide', run: () => app.strip.duplicateSlide() });
+        // The moves act on the picked slides in the strip, or this slide. "move to 5" moves straight there.
+        const moving = app.strip.selectedSlides(), what = slidesWord(moving.length), total = app.deck.slides.length;
+        if (moving.length < total) {
+            const max = total - moving.length + 1;
+            // The places it can go are among its keywords, so "move to 12" keeps the entry in the list.
+            out.push({ group: 'Slide', label: `Move ${what} to...`, keywords: 'reorder position number section ' + Array.from({ length: max }, (_, i) => i + 1).join(' '), run: (q) => {
+                const m = /\b(\d+)\s*$/.exec(q);
+                if (m && +m[1] >= 1 && +m[1] <= max) app.strip.moveSelected(+m[1] - 1, moving); else app.strip.showMoveTo(moving);
+            } });
+            out.push({ group: 'Slide', label: `Move ${what} up`, hint: 'Ctrl+Up', keywords: 'reorder', run: () => app.strip.moveSelected('up', moving) });
+            out.push({ group: 'Slide', label: `Move ${what} down`, hint: 'Ctrl+Down', keywords: 'reorder', run: () => app.strip.moveSelected('down', moving) });
+            for (const sec of app.strip.sections()) if (!moving.includes(sec.start)) out.push({ group: 'Slide', label: `Move ${what} to the end of section ${sec.name}`, keywords: 'reorder', quiet: true, run: () => app.strip.moveToSection(sec.start, moving) });
+        }
         // Every layout of the picker, straight in: "new slide quote", "layout two columns".
         for (const l of LAYOUTS) out.push({ group: 'Slide', label: 'New slide: ' + l.label, keywords: 'layout add', quiet: true, run: () => app.strip.addSlide(app.deck.current, l.id) });
         out.push({ group: 'Slide', label: 'Auto-animate to the next slide (on / off)', run: () => { const s = app.deck.currentSlide; if (s) { sel.clear(); $('inspAutoAnimate').checked = !s.hasAttribute('data-auto-animate'); $('inspAutoAnimate').dispatchEvent(new Event('change')); } } });
