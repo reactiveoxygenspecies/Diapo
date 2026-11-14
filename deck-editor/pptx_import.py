@@ -28,7 +28,7 @@ import_pptx):
     the picture PowerPoint keeps of them, ink and other newer content as the
     fallback PowerPoint saves for older readers, tables (column widths, merged cells, cell fills, per-cell alignment,
     the table style's header and banding), charts (bar / column, line,
-    pie / doughnut, area drawn as inline SVG), SmartArt (from the drawing
+    pie / doughnut, area, scatter drawn as inline SVG), SmartArt (from the drawing
     PowerPoint saves beside it), speaker notes, hidden slides (data-skip);
   - hyperlinks on text.
 

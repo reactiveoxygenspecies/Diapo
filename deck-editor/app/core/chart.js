@@ -1,25 +1,34 @@
 /* ============================================================
    chart.js - charts the editor draws and edits.
 
-   A chart is a <figure data-chart="column|bar|line|area|pie|doughnut">
+   A chart is a <figure data-chart="column|bar|line|area|pie|doughnut|scatter">
    holding two things:
      - <svg data-key> the drawing, plain inline SVG sized to the box
        (viewBox = the box in stage px), so the saved deck needs no
        script or library to show it, in the PDF and the thumbnails too;
      - <script type="application/json" data-chart-data> the table it
        is drawn from: { labels, series: [{ name, values, colour?,
-       marker?, dash?, errors? }], palette, legend, values, grid, stacked, unit?,
+       marker?, dash?, errors?, trend? }], palette, legend, values, grid, stacked, unit?,
        title?, and the look, each written only when it is not the
        default: valueAxis { title, line, min, max, step, log, at },
-       labelAxis { title, line, angle, at }, ticks, axisWidth, decimals,
-       legendPos, lineWidth, pointSize, smooth, barWidth, rounded,
-       errorKind, errorDir, errorCaps }. A series' errors are the sizes
-       of its error bars, one per label, a column of the grid of their own.
+       labelAxis { title, line, angle, at, min, max, step, log }, ticks,
+       axisWidth, decimals, legendPos, lineWidth, pointSize, smooth,
+       barWidth, rounded, errorKind, errorDir, errorCaps, lines }. A
+       series' errors are the sizes of its error bars, one per label, a
+       column of the grid of their own.
        The value axis is the one with the numbers (up the side, or
        along the bottom of a bar chart), the label axis the other.
        Where each crosses the other: valueAxis.at a label (the axis
        runs through its point), labelAxis.at a value; by default the
        edge of the plot.
+   A scatter chart keeps the same table, so a chart changes kind and
+   back without losing anything: its labels are X (read as numbers;
+   labels that are not all numbers put the points at 1, 2, 3, as a
+   spreadsheet does), the label axis is the X axis with a range, a
+   step and a log scale of its own, valueAxis.at is the X the Y axis
+   crosses at (a number written as text, as a label would be), lines
+   joins the points in the table's order and a series' trend draws its
+   least-squares line.
    The editor redraws the SVG from the table whenever the box, the
    text size or the font changes (the data-key tells), and after
    every change to the table. Colours are the deck's theme variables
@@ -44,6 +53,7 @@ export const CHART_KINDS = [
     ['area', 'Area', 'M3 20v-4l5-6 4 3 8-8v15z'],
     ['pie', 'Pie', 'M12 3a9 9 0 1 0 9 9h-9z M14 1.5v8.5h8.5A8.5 8.5 0 0 0 14 1.5z'],
     ['doughnut', 'Doughnut', 'M12 3a9 9 0 1 0 9 9h-4a5 5 0 1 1-5-5z M14 1.5V7a5 5 0 0 1 3.5 3.5h5A8.5 8.5 0 0 0 14 1.5z'],
+    ['scatter', 'Scatter (XY)', 'M3.5 2v18.5H22M6 15.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0M10 10.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0M14 13.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0M17 6a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0'],
 ];
 const KIND_NAMES = Object.fromEntries(CHART_KINDS.map(([k, l]) => [k, l]));
 const FALLBACK = ['#2f6fed', '#f59e0b', '#10b981', '#e8503f', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
@@ -89,6 +99,8 @@ function normalise(raw) {
         ...(s && DASH_NAMES.includes(s.dash) && s.dash !== 'solid' ? { dash: s.dash } : {}),
         // Error bars: one size (plus or minus) per label, in a column of its own beside the values.
         ...(s && Array.isArray(s.errors) ? { errors: labels.map((_, j) => { const v = s.errors[j]; return typeof v === 'number' && isFinite(v) ? Math.abs(v) : null; }) } : {}),
+        // A scatter's straight trend line through this series (other kinds keep it, unused).
+        ...(s && s.trend === true ? { trend: true } : {}),
     }));
     const va = r.valueAxis && typeof r.valueAxis === 'object' ? r.valueAxis : {}, la = r.labelAxis && typeof r.labelAxis === 'object' ? r.labelAxis : {};
     return {
@@ -98,7 +110,10 @@ function normalise(raw) {
         unit: typeof r.unit === 'string' ? r.unit.slice(0, 12) : '',
         title: typeof r.title === 'string' ? r.title.slice(0, 200) : '',
         valueAxis: { title: str(va.title, 120), line: !!va.line, min: num(va.min, -1e15, 1e15), max: num(va.max, -1e15, 1e15), step: va.step > 0 ? num(va.step, 1e-9, 1e15) : null, log: !!va.log, at: str(va.at, 200) },
-        labelAxis: { title: str(la.title, 120), line: !!la.line, angle: [45, 90].includes(la.angle) ? la.angle : 0, at: num(la.at, -1e15, 1e15) },
+        // The label axis' range, step and log scale are a scatter's X axis; other kinds have labels there.
+        labelAxis: { title: str(la.title, 120), line: !!la.line, angle: [45, 90].includes(la.angle) ? la.angle : 0, at: num(la.at, -1e15, 1e15),
+            min: num(la.min, -1e15, 1e15), max: num(la.max, -1e15, 1e15), step: la.step > 0 ? num(la.step, 1e-9, 1e15) : null, log: !!la.log },
+        lines: !!r.lines,
         ticks: ['out', 'in'].includes(r.ticks) ? r.ticks : 'none',
         axisWidth: num(r.axisWidth, 0.5, 20),
         decimals: Number.isInteger(r.decimals) && r.decimals >= 0 && r.decimals <= 4 ? r.decimals : null,
@@ -112,7 +127,7 @@ function normalise(raw) {
 function num(v, lo, hi) { return typeof v === 'number' && isFinite(v) ? Math.min(hi, Math.max(lo, v)) : null; }
 function str(v, max) { return typeof v === 'string' ? v.slice(0, max) : ''; }
 function specJson(spec) {
-    const out = { labels: spec.labels, series: spec.series.map(s => ({ name: s.name, values: s.values, ...(s.colour ? { colour: s.colour } : {}), ...(s.marker ? { marker: s.marker } : {}), ...(s.dash ? { dash: s.dash } : {}), ...(s.errors ? { errors: s.errors } : {}) })), palette: spec.palette,
+    const out = { labels: spec.labels, series: spec.series.map(s => ({ name: s.name, values: s.values, ...(s.colour ? { colour: s.colour } : {}), ...(s.marker ? { marker: s.marker } : {}), ...(s.dash ? { dash: s.dash } : {}), ...(s.errors ? { errors: s.errors } : {}), ...(s.trend ? { trend: true } : {}) })), palette: spec.palette,
         legend: spec.legend, values: spec.values, grid: spec.grid, stacked: spec.stacked };
     if (spec.unit) out.unit = spec.unit;
     if (spec.title) out.title = spec.title;
@@ -127,12 +142,15 @@ function specJson(spec) {
     if (la.line) l.line = true;
     if (la.angle) l.angle = la.angle;
     if (la.at != null) l.at = la.at;
+    for (const key of ['min', 'max', 'step']) if (la[key] != null) l[key] = la[key];
+    if (la.log) l.log = true;
     if (Object.keys(v).length) out.valueAxis = v;
     if (Object.keys(l).length) out.labelAxis = l;
     if (spec.ticks !== 'none') out.ticks = spec.ticks;
     for (const key of ['axisWidth', 'decimals', 'lineWidth', 'pointSize', 'barWidth']) if (spec[key] != null) out[key] = spec[key];
     if (spec.legendPos) out.legendPos = spec.legendPos;
     if (spec.smooth) out.smooth = true;
+    if (spec.lines) out.lines = true;
     if (!spec.rounded) out.rounded = false;
     if (spec.errorKind) out.errorKind = spec.errorKind;
     if (spec.errorDir !== 'both') out.errorDir = spec.errorDir;
@@ -230,6 +248,7 @@ export function refreshCharts(root) {
 
 function summary(kind, spec) {
     const s = spec.series.map(x => x.name).join(', ');
+    if (kind === 'scatter') return `Scatter chart of ${spec.labels.length} point${spec.labels.length === 1 ? '' : 's'}` + (s ? ` (${s})` : '');
     return `${KIND_NAMES[kind]} chart` + (spec.labels.length ? ` of ${spec.labels.join(', ')}` : '') + (s && kind !== 'pie' && kind !== 'doughnut' ? ` (${s})` : '');
 }
 
@@ -241,7 +260,7 @@ export function drawChart(kind, spec, opt) {
         title = `<text x="${r1(opt.w / 2)}" y="${r1(opt.fs * 0.4 + size * 0.6)}" text-anchor="middle" dominant-baseline="central" fill="currentColor" style="font-size:${r1(size)}px; font-weight:600">${esc(ellipsis(spec.title, opt.w - opt.fs, size, opt.measure))}</text>`;
         opt = { ...opt, top: opt.fs * 0.4 + size * 1.5 };
     }
-    return title + (kind === 'pie' || kind === 'doughnut' ? drawPie(spec, opt, kind === 'doughnut') : drawAxes(kind, spec, opt));
+    return title + (kind === 'pie' || kind === 'doughnut' ? drawPie(spec, opt, kind === 'doughnut') : kind === 'scatter' ? drawScatter(spec, opt) : drawAxes(kind, spec, opt));
 }
 
 /* Column, bar, line and area: a value axis with round ticks (or the ones asked for, or powers of
@@ -313,9 +332,6 @@ function drawAxes(kind, spec, { w, h, fs, measure, onColour, lang, top: top0 = 0
     const crossJ = va.at ? spec.labels.indexOf(va.at) : -1;
     const crossV = la.at == null || (log && la.at <= 0) ? null : Math.min(scale.hi, Math.max(scale.lo, la.at));
     const follow = kind === 'line' || kind === 'area';
-    // The room at the edge for an axis' labels, given back as far as they stay inside the plot.
-    const fromStart = (base, need, end, f) => (f >= 0.999 ? base : Math.max(base, (base + need - f * end) / (1 - f)));
-    const fromEnd = (base, need, start, f) => (f <= 0.001 ? base : Math.min(base, (base - need - start * (1 - f)) / f));
 
     // Room for the labels: category names below (or at the left for bars), ticks at the left (below),
     // an axis title outside each, and the tick marks that stand out of the plot.
@@ -545,6 +561,232 @@ function drawAxes(kind, spec, { w, h, fs, measure, onColour, lang, top: top0 = 0
     return out.join('');
 }
 
+/* The room at the edge for an axis' labels when the axis runs inside the plot (at fraction f of
+   it), given back as far as the labels stay inside the plot. */
+function fromStart(base, need, end, f) { return f >= 0.999 ? base : Math.max(base, (base + need - f * end) / (1 - f)); }
+function fromEnd(base, need, start, f) { return f <= 0.001 ? base : Math.min(base, (base - need - start * (1 - f)) / f); }
+
+/* A scatter chart's X: its labels read as numbers. Labels that are not all numbers (a column
+   chart's quarters, switched to a scatter) put the points at 1, 2, 3..., as a spreadsheet does;
+   an empty label leaves its row out. */
+export function scatterX(labels) {
+    const xs = labels.map(l => parseNumber(l));
+    return labels.every((l, j) => xs[j] != null || !String(l).trim()) ? xs : labels.map((_, j) => j + 1);
+}
+/* The least-squares straight line through a series' points, where the axes draw it straight (the
+   logarithms on a log axis, so on log-log axes it is a power law): v = a + b u over the points'
+   u, and its R². Null under two points, or when every point has the same X. */
+export function fitLine(xs, ys, logX = false, logY = false) {
+    const p = [];
+    xs.forEach((x, j) => {
+        const y = ys[j];
+        if (x == null || y == null || (logX && x <= 0) || (logY && y <= 0)) return;
+        p.push([logX ? Math.log10(x) : x, logY ? Math.log10(y) : y]);
+    });
+    if (p.length < 2) return null;
+    const mu = p.reduce((s, q) => s + q[0], 0) / p.length, mv = p.reduce((s, q) => s + q[1], 0) / p.length;
+    let suu = 0, suv = 0, svv = 0;
+    for (const [u, v] of p) { suu += (u - mu) * (u - mu); suv += (u - mu) * (v - mv); svv += (v - mv) * (v - mv); }
+    if (!(suu > 1e-300)) return null;
+    const b = suv / suu;
+    return { a: mv - b * mu, b, r2: svv > 0 ? (suv * suv) / (suu * svv) : 1, u0: Math.min(...p.map(q => q[0])), u1: Math.max(...p.map(q => q[0])) };
+}
+
+/* Scatter (XY): X from the labels, a Y column per series. Both axes are numbers with round ticks
+   (or the range and step asked for, or powers of ten on a log scale), each with its title and
+   where it crosses the other; the points in the series' colours and shapes, lines between them
+   in the table's order when asked for, error bars up and down, and a dashed trend line with its
+   R² in the legend. Unlike columns the range follows the data, not zero: where zero falls inside
+   it, a faint line marks it, and the numbers stay at the edge unless an axis is asked to cross. */
+function drawScatter(spec, { w, h, fs, measure, lang, top: top0 = 0 }) {
+    const k = spec.series.length;
+    const ya = spec.valueAxis, xa = spec.labelAxis;
+    const small = fs * 0.85, ts = fs * 0.95, pad = fs * 0.4, room = ts * 1.5;
+    const out = [];
+    let top = Math.max(pad, top0), left = pad, right = w - pad, bottom = h - pad;
+    const aw = spec.axisWidth != null ? spec.axisWidth : Math.max(1.5, fs / 14);
+    const tl = spec.ticks === 'none' ? 0 : fs * 0.3, tout = spec.ticks === 'out' ? tl : 0;
+    const sw = spec.lineWidth != null ? spec.lineWidth : Math.max(3, fs / 7);
+    const pr = spec.pointSize != null ? spec.pointSize / 2 : sw * 1.5;
+    const xs = scatterX(spec.labels);
+    const okX = (x) => x != null && (!xa.log || x > 0), okY = (v) => v != null && (!ya.log || v > 0);
+    const shapeOf = (s) => s.marker || 'circle';
+    const fits = spec.series.map(s => (s.trend ? fitLine(xs, s.values, xa.log, ya.log) : null));
+
+    // Legend: each series' point, with its line when the points are joined.
+    let legendRight = null;
+    if (spec.legend && k > 0) {
+        let r2;
+        try { r2 = new Intl.NumberFormat(lang, { minimumFractionDigits: 3, maximumFractionDigits: 3 }); } catch (e) { r2 = new Intl.NumberFormat(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }); }
+        const entries = spec.series.map((s, i) => ({ name: s.name + (fits[i] ? ` (R² = ${r2.format(fits[i].r2)})` : ''), colour: seriesColour(spec, i),
+            line: { marker: shapeOf(s), dash: s.dash, sw: Math.min(sw, small * 0.3), point: !spec.lines && shapeOf(s) !== 'none' } }));
+        if (spec.legendPos === 'right') {
+            legendRight = entries.map(e => [{ ...e, w: legendKeyW(e, small) + small * 0.4 + measure(e.name, small) }]);
+            right -= Math.max(...legendRight.map(r => r[0].w)) + fs * 0.6;
+        } else {
+            const rows = legendRows(entries, right - left, small, measure), lh = rows.length * small * 1.6;
+            if (spec.legendPos === 'bottom') { out.push(drawLegendRows(rows, left, bottom - lh, small)); bottom -= lh + fs * 0.4; }
+            else { out.push(drawLegendRows(rows, left, top, small)); top += lh + fs * 0.4; }
+        }
+    }
+
+    // The ranges: every point that can be drawn, its error bar included.
+    const errOf = (s, j) => (s.errors && s.errors[j] > 0 ? s.errors[j] : 0);
+    const reach = (v, e) => [spec.errorDir === 'both' || v < 0 ? v - e : v, spec.errorDir === 'both' || v >= 0 ? v + e : v];
+    let xlo = Infinity, xhi = -Infinity, ylo = Infinity, yhi = -Infinity;
+    spec.series.forEach(s => s.values.forEach((v, j) => {
+        if (!okX(xs[j]) || !okY(v)) return;
+        xlo = Math.min(xlo, xs[j]); xhi = Math.max(xhi, xs[j]);
+        const [a, b] = reach(v, errOf(s, j));
+        ylo = Math.min(ylo, ya.log && a <= 0 ? v : a); yhi = Math.max(yhi, b);
+    }));
+    if (!isFinite(xlo)) { out.push(`<text x="${r1(w / 2)}" y="${r1((top + bottom) / 2)}" text-anchor="middle" dominant-baseline="central" fill="currentColor" style="opacity:0.5; font-size:${r1(small)}px">No data</text>`); return out.join(''); }
+    const xsc = xa.log ? logScale(xlo, xhi, xa) : valueScale(xlo, xhi, xa);
+    const ysc = ya.log ? logScale(ylo, yhi, ya) : valueScale(ylo, yhi, ya);
+    const tickFmt = (sc, unit) => (sc.log ? (t) => formatter(unit, lang, Math.pow(10, -decimalsOf(t)), spec.decimals)(t)
+        : formatter(unit, lang, Math.pow(10, -Math.max(...[sc.step, ...sc.ticks].map(decimalsOf))), spec.decimals));
+    const xFmt = tickFmt(xsc, ''), yFmt = tickFmt(ysc, spec.unit), fmt = formatter(spec.unit, lang, null, spec.decimals);
+    const fracOf = (sc) => { const a = sc.log ? Math.log10(sc.lo) : sc.lo, b = sc.log ? Math.log10(sc.hi) : sc.hi; return (v) => ((sc.log ? Math.log10(v) : v) - a) / (b - a); };
+    const fx = fracOf(xsc), fy = fracOf(ysc);
+    // Where each axis crosses the other (kept in the range): the Y axis at an X, the X axis at a Y.
+    const atX = parseNumber(ya.at);
+    const crossX = atX == null || (xa.log && atX <= 0) ? null : Math.min(xsc.hi, Math.max(xsc.lo, atX));
+    const crossY = xa.at == null || (ya.log && xa.at <= 0) ? null : Math.min(ysc.hi, Math.max(ysc.lo, xa.at));
+
+    // Room for the numbers, beside each axis (they go with an axis that crosses inside the plot) and
+    // half of the last X number past the right edge; the axis titles outside them.
+    const xw = (t) => measure(xFmt(t), small);
+    const titleAt = {};
+    right -= xw(xsc.ticks[xsc.ticks.length - 1]) / 2;
+    if (ya.title) { titleAt.y = left + ts * 0.7; left += room; }
+    const yRoom = Math.max(...ysc.ticks.map(t => measure(yFmt(t), small))) + fs * 0.6 + tout;
+    left = crossX != null ? fromStart(left, yRoom, right, fx(crossX)) : left + yRoom;
+    left = Math.max(left, pad + xw(xsc.ticks[0]) / 2);
+    top += spec.values ? small * 1.4 : small * 0.6;
+    if (xa.title) { titleAt.x = bottom - ts * 0.7; bottom -= room; }
+    const xRoom = small * 1.7 + tout;
+    bottom = crossY != null ? fromEnd(bottom, xRoom, top, 1 - fy(crossY)) : bottom - xRoom;
+    if (bottom - top < fs || right - left < fs) return out.join('');
+
+    const px = (v) => left + fx(v) * (right - left), py = (v) => bottom - fy(v) * (bottom - top);
+    const yAt = crossX != null ? px(crossX) : left, xAt = crossY != null ? py(crossY) : bottom;
+    const yInside = yAt > left + 0.5, xInside = xAt < bottom - 0.5;
+    // Numbers too close to read: every second (third...) one, or on a log scale the powers of ten.
+    const decade = (t) => Math.abs(Math.log10(t) - Math.round(Math.log10(t))) < 1e-9;
+    const thin = (ticks, log, gap, need) => {
+        const crowded = (list) => list.some((t, i) => i && gap(t, list[i - 1]) < need(t, list[i - 1]));
+        if (!crowded(ticks)) return ticks.map(() => true);
+        if (log) return ticks.map(decade);
+        let every = 2;
+        while (every < ticks.length && crowded(ticks.filter((_, i) => i % every === 0))) every++;
+        return ticks.map((_, i) => i % every === 0);
+    };
+    const xShow = thin(xsc.ticks, xsc.log, (a, b) => Math.abs(px(a) - px(b)), (a, b) => (xw(a) + xw(b)) / 2 + small * 0.5);
+    const yShow = thin(ysc.ticks, ysc.log, (a, b) => Math.abs(py(a) - py(b)), () => small * 1.15);
+
+    // Grid, ticks and their numbers. A number an axis line would strike through (where the axes
+    // cross inside the plot) is left out, as on a line chart.
+    const g = [], marksY = [], marksX = [];
+    const zeroY = !ya.log && ysc.lo < 0 && ysc.hi > 0, zeroX = !xa.log && xsc.lo < 0 && xsc.hi > 0;
+    const tickOp = (on) => (on ? 1 : 0.7);
+    ysc.ticks.forEach((t, i) => {
+        const y = py(t), onAxis = Math.abs(y - xAt) < 0.5;
+        if (spec.grid && !(zeroY && t === 0) && !(xa.line && onAxis)) g.push(`<line x1="${r1(left)}" y1="${r1(y)}" x2="${r1(right)}" y2="${r1(y)}"/>`);
+        if (tl) marksY.push(`<line x1="${r1(spec.ticks === 'out' ? yAt - tl : yAt + tl)}" y1="${r1(y)}" x2="${r1(yAt)}" y2="${r1(y)}"/>`);
+        if (yShow[i] && !(xa.line && yInside && onAxis)) out.push(`<text x="${r1(yAt - tout - fs * 0.4)}" y="${r1(y)}" text-anchor="end" dominant-baseline="central" fill="currentColor" style="opacity:${tickOp(ya.line)}; font-size:${r1(small)}px">${esc(yFmt(t))}</text>`);
+    });
+    xsc.ticks.forEach((t, i) => {
+        const x = px(t), onAxis = Math.abs(x - yAt) < 0.5;
+        if (spec.grid && !(zeroX && t === 0) && !(ya.line && onAxis)) g.push(`<line x1="${r1(x)}" y1="${r1(top)}" x2="${r1(x)}" y2="${r1(bottom)}"/>`);
+        if (tl) marksX.push(`<line x1="${r1(x)}" y1="${r1(spec.ticks === 'out' ? xAt + tl : xAt - tl)}" x2="${r1(x)}" y2="${r1(xAt)}"/>`);
+        if (xShow[i] && !(ya.line && xInside && onAxis)) out.push(`<text x="${r1(x)}" y="${r1(xAt + tout + small * 0.9)}" text-anchor="middle" dominant-baseline="central" fill="currentColor" style="opacity:${tickOp(xa.line)}; font-size:${r1(small)}px">${esc(xFmt(t))}</text>`);
+    });
+    if (g.length) out.unshift(`<g stroke="currentColor" stroke-width="1" style="opacity:0.14">${g.join('')}</g>`);
+    // Faint lines at zero inside the range, and where the X axis runs when it has no line of its own.
+    const faint = (x1, y1, x2, y2) => `<line x1="${r1(x1)}" y1="${r1(y1)}" x2="${r1(x2)}" y2="${r1(y2)}" stroke="currentColor" stroke-width="1.5" style="opacity:0.45"/>`;
+    const zeros = [];
+    if (zeroY && !(xa.line && Math.abs(py(0) - xAt) < 0.5)) zeros.push(faint(left, py(0), right, py(0)));
+    if (zeroX && !(ya.line && Math.abs(px(0) - yAt) < 0.5)) zeros.push(faint(px(0), top, px(0), bottom));
+    if (!xa.line && !(zeroY && Math.abs(py(0) - xAt) < 0.5)) zeros.push(faint(left, xAt, right, xAt));
+    const axisLine = (x1, y1, x2, y2) => `<line x1="${r1(x1)}" y1="${r1(y1)}" x2="${r1(x2)}" y2="${r1(y2)}"/>`;
+    const axes = [];
+    if (ya.line) axes.push(axisLine(yAt, top, yAt, bottom));
+    if (xa.line) axes.push(axisLine(left, xAt, right, xAt));
+    const stroke = (on) => `stroke="currentColor" stroke-width="${r1(aw)}" stroke-linecap="square" style="opacity:${on ? 1 : 0.45}"`;
+    const axisMarks = (marksY.length ? `<g ${stroke(ya.line)}>${marksY.join('')}</g>` : '') + (marksX.length ? `<g ${stroke(xa.line)}>${marksX.join('')}</g>` : '')
+        + (axes.length ? `<g stroke="currentColor" stroke-width="${r1(aw)}" stroke-linecap="square">${axes.join('')}</g>` : '');
+
+    // Axis titles: the one up the side turned to read from the bottom.
+    if (ya.title) out.push(`<text transform="translate(${r1(titleAt.y)} ${r1((top + bottom) / 2)}) rotate(-90)" text-anchor="middle" dominant-baseline="central" fill="currentColor" style="font-size:${r1(ts)}px; font-weight:600">${esc(ellipsis(ya.title, bottom - top + fs, ts, measure))}</text>`);
+    if (xa.title) out.push(`<text x="${r1((left + right) / 2)}" y="${r1(titleAt.x)}" text-anchor="middle" dominant-baseline="central" fill="currentColor" style="font-size:${r1(ts)}px; font-weight:600">${esc(ellipsis(xa.title, right - left + fs, ts, measure))}</text>`);
+    if (legendRight) out.push(drawLegendRows(legendRight, w - pad - Math.max(...legendRight.map(r => r[0].w)), (top + bottom) / 2 - legendRight.length * small * 0.8, small));
+
+    // Error bars up and down (or only away from zero), capped; on a log scale a lower end at or
+    // below zero stops at the axis, uncapped.
+    const cap = Math.max(pr, fs * 0.25);
+    const errPath = (x, v, e) => {
+        const [a0, b] = reach(v, e), a = ya.log && a0 <= 0 ? ysc.lo : a0;
+        let d = `M${pt([x, py(a)])}L${pt([x, py(b)])}`;
+        if (spec.errorCaps) {
+            if (a0 !== v && !(ya.log && a0 <= 0)) d += `M${pt([x - cap, py(a)])}L${pt([x + cap, py(a)])}`;
+            if (b !== v) d += `M${pt([x - cap, py(b)])}L${pt([x + cap, py(b)])}`;
+        }
+        return d;
+    };
+    // The trend line over the points' X, cut to the plot.
+    const U0 = xsc.log ? Math.log10(xsc.lo) : xsc.lo, U1 = xsc.log ? Math.log10(xsc.hi) : xsc.hi;
+    const V0 = ysc.log ? Math.log10(ysc.lo) : ysc.lo, V1 = ysc.log ? Math.log10(ysc.hi) : ysc.hi;
+    const trendEnds = (f) => {
+        let u0 = Math.max(f.u0, U0), u1 = Math.min(f.u1, U1);
+        if (f.b) { const ua = (V0 - f.a) / f.b, ub = (V1 - f.a) / f.b; u0 = Math.max(u0, Math.min(ua, ub)); u1 = Math.min(u1, Math.max(ua, ub)); }
+        else if (f.a < V0 || f.a > V1) return null;
+        if (!(u1 > u0)) return null;
+        const at = (u) => { const v = f.a + f.b * u; return [px(xsc.log ? Math.pow(10, u) : u), py(ysc.log ? Math.pow(10, v) : v)]; };
+        return [at(u0), at(u1)];
+    };
+    const clip = [xa.min, xa.max, ya.min, ya.max].some(v => v != null);
+    const shown = (x, v) => !clip || (x >= xsc.lo - 1e-9 && x <= xsc.hi + 1e-9 && v >= ysc.lo - 1e-9 && v <= ysc.hi + 1e-9);
+    const marks = [], labels = [];
+    spec.series.forEach((s, i) => {
+        const colour = seriesColour(spec, i), shape = shapeOf(s);
+        const p = spec.labels.map((_, j) => (okX(xs[j]) && okY(s.values[j]) ? [px(xs[j]), py(s.values[j])] : null));
+        const errs = p.map((q, j) => (q && errOf(s, j) ? errPath(q[0], s.values[j], errOf(s, j)) : '')).join('');
+        if (errs) marks.push(`<path d="${errs}" fill="none" stroke-width="${r1(aw)}" style="stroke:${colour}"/>`);
+        const dash = s.dash === 'dash' ? ` stroke-dasharray="${r1(sw * 2.5)} ${r1(sw * 1.8)}"` : s.dash === 'dot' ? ` stroke-dasharray="0 ${r1(sw * 2)}"` : '';
+        if (spec.lines) {
+            // In the table's order, with a gap where a row has no point; smooth only where X goes up.
+            const runs = [];
+            let run = [];
+            for (const q of p) { if (!q) { if (run.length) runs.push(run); run = []; } else run.push(q); }
+            if (run.length) runs.push(run);
+            for (const r of runs) {
+                if (r.length < 2) continue;
+                const rising = r.every((q, m) => !m || q[0] > r[m - 1][0]);
+                marks.push(`<path d="M${pt(r[0])}${spec.smooth && rising ? curve(r) : r.slice(1).map(q => 'L' + pt(q)).join('')}" fill="none" stroke-width="${r1(sw)}" stroke-linejoin="round" stroke-linecap="round"${dash} style="stroke:${colour}"/>`);
+            }
+        }
+        const ends = fits[i] && trendEnds(fits[i]);
+        if (ends) marks.push(`<path d="M${pt(ends[0])}L${pt(ends[1])}" fill="none" stroke-width="${r1(Math.max(1.5, sw * 0.6))}" stroke-dasharray="${r1(sw * 2)} ${r1(sw * 1.3)}" stroke-linecap="round" data-trend style="stroke:${colour}"/>`);
+        if (pr > 0 && (shape !== 'none' || !spec.lines)) for (const q of p) if (q) marks.push(markerSvg(shape === 'none' ? 'circle' : shape, q[0], q[1], pr, colour, sw));
+        if (spec.values) p.forEach((q, j) => {
+            const v = s.values[j];
+            if (!q || !shown(xs[j], v)) return;
+            const tip = errOf(s, j) ? Math.max(v, reach(v, errOf(s, j))[1]) : v;
+            labels.push(`<text x="${r1(q[0])}" y="${r1(Math.min(q[1] - Math.max(small * 0.9, pr + small * 0.6), py(tip) - small * 0.7))}" text-anchor="middle" dominant-baseline="central" fill="currentColor" style="font-size:${r1(small)}px">${esc(fmt(v))}</text>`);
+        });
+    });
+    if (clip) {
+        // A range set by hand cuts what falls outside it (with room for the points on its edge).
+        const m = pr + sw;
+        const id = 'chart-clip-' + hash([w, h, left, top, right, bottom, JSON.stringify(spec)].join('|'));
+        out.push(`<clipPath id="${id}"><rect x="${r1(left - m)}" y="${r1(top - m)}" width="${r1(right - left + 2 * m)}" height="${r1(bottom - top + 2 * m)}"/></clipPath><g clip-path="url(#${id})">${marks.join('')}</g>`);
+    } else out.push(`<g>${marks.join('')}</g>`);
+    out.push(zeros.join(''));
+    if (axisMarks) out.push(axisMarks);
+    if (labels.length) out.push(`<g>${labels.join('')}</g>`);
+    return out.join('');
+}
+
 /* A point of a line: filled, or open (filled with the slide's colour, so the line stops at it). */
 function markerSvg(shape, cx, cy, r, colour, sw) {
     const open = shape.endsWith('-open'), kind = shape.replace('-open', '');
@@ -649,8 +891,8 @@ function arc(cx, cy, r, inner, a1, a2) {
 }
 
 /* Legend entries laid out in rows that fit the width. An entry is a square of its colour, or, for
-   a line, a short stretch of it with its point. */
-function legendKeyW(e, size) { return e.line ? size * 1.8 : size * 0.8; }
+   a line, a short stretch of it with its point (for a scatter's points without a line, the point). */
+function legendKeyW(e, size) { return e.line && !e.line.point ? size * 1.8 : size * 0.8; }
 function legendRows(entries, width, size, measure) {
     const rows = [[]];
     let x = 0;
@@ -669,7 +911,8 @@ function drawLegendRows(rows, x0, y0, size) {
         const y = y0 + i * size * 1.6 + size * 0.8;
         for (const e of row) {
             const kw = legendKeyW(e, size);
-            if (e.line) {
+            if (e.line && e.line.point) out.push(markerSvg(e.line.marker, x + kw / 2, y, size * 0.32, e.colour, Math.max(1, e.line.sw)));
+            else if (e.line) {
                 const lw = Math.max(1, e.line.sw), dash = e.line.dash === 'dash' ? ` stroke-dasharray="${r1(lw * 2.5)} ${r1(lw * 1.8)}"` : e.line.dash === 'dot' ? ` stroke-dasharray="0 ${r1(lw * 2)}"` : '';
                 out.push(`<line x1="${r1(x)}" y1="${r1(y)}" x2="${r1(x + kw)}" y2="${r1(y)}" stroke-width="${r1(lw)}" stroke-linecap="round"${dash} style="stroke:${e.colour}"/>`);
                 if (e.line.marker !== 'none') out.push(markerSvg(e.line.marker, x + kw / 2, y, size * 0.3, e.colour, lw));
@@ -801,15 +1044,21 @@ function lum(c) {
 /* Cells pasted from a spreadsheet (tabs), a CSV (commas or semicolons) or typed. */
 export function parseCells(text) {
     const lines = String(text).replace(/\r\n?/g, '\n').replace(/\n+$/, '').split('\n');
-    const sep = lines.some(l => l.includes('\t')) ? '\t' : lines.some(l => l.includes(';')) ? ';' : lines.some(l => l.includes(',')) && !lines.every(l => /^[\s\d.,-]*$/.test(l)) ? ',' : '\t';
+    // Numbers alone with commas are decimal commas (1,5), unless every line has as many commas and
+    // they cannot be (decimal points as well, or two commas): a CSV of numbers, X and Y.
+    const commas = lines.map(l => (l.match(/,/g) || []).length);
+    const csvNumbers = commas[0] > 0 && commas.every(c => c === commas[0]) && (commas[0] > 1 || lines.some(l => l.includes('.')));
+    const sep = lines.some(l => l.includes('\t')) ? '\t' : lines.some(l => l.includes(';')) ? ';' : lines.some(l => l.includes(',')) && (csvNumbers || !lines.every(l => /^[\s\d.,eE+-]*$/.test(l))) ? ',' : '\t';
     return lines.map(l => l.split(sep).map(c => c.trim().replace(/^"(.*)"$/, '$1')));
 }
-/* "1,234.5", "1.234,5", "12 %", "$3", "(4)" -> numbers; empty or text -> null. */
+/* "1,234.5", "1.234,5", "12 %", "$3", "(4)", "-2", "1.5e-3" -> numbers; empty or text -> null.
+   A minus only counts at the start, so an exponent keeps its own (a scientist's 1e-3). */
 export function parseNumber(s) {
     let t = String(s == null ? '' : s).trim();
     if (!t) return null;
     const neg = /^\(.*\)$/.test(t) || /^[-−]/.test(t);
-    t = t.replace(/[()\s%$€£¥₹−-]/g, '').replace(/[a-z]+$/i, '');
+    t = t.replace(/[()\s%$€£¥₹]/g, '').replace(/^[-−+]/, '').replace(/[-−]$/, '');
+    if (!/\de[+-]?\d+$/i.test(t)) t = t.replace(/[a-z]+$/i, '');          // a unit after the number ("12 kg")
     if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) t = t.replace(/,/g, '');
     else if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(t)) t = t.replace(/\./g, '').replace(',', '.');
     else t = t.replace(',', '.');
@@ -870,10 +1119,12 @@ export class ChartSection {
               <div class="insp-field"><label>Line</label><select data-series="dash" title="The line of this series">${opts(DASHES)}</select></div>
             </div>
             <label class="align-toslide" id="chartErrRow" title="A column beside this series' values in the table: the size of each error bar (plus or minus), such as the SD or the SEM"><input type="checkbox" data-series-err> <span>Error bars (a &plusmn; column)</span></label>
+            <label class="align-toslide" id="chartTrendRow" title="The least-squares straight line through this series' points, dashed, with its R&sup2; in the legend. On log axes it is fitted to the logarithms, so it stays straight (a power law on both)"><input type="checkbox" data-series-trend> <span>Trend line (R&sup2; in the legend)</span></label>
           </div>
           <div class="insp-row" id="chartErrKindRow"><label>Error is</label><div class="insp-field" data-cfield="errorKind"><select data-set="errorKind" title="What the error bars stand for: it heads their columns (&plusmn; SD); the bars are drawn alike"><option value="">&plusmn; (not named)</option>${opts(ERROR_KINDS)}</select>${clear('errorKind', 'Not named')}</div></div>
           <div class="chart-opts">
             <label class="align-toslide" id="chartStackedRow"><input type="checkbox" data-opt="stacked"> <span>Stacked</span></label>
+            <label class="align-toslide" id="chartLinesRow" title="Join each series' points in the order of the table"><input type="checkbox" data-opt="lines"> <span>Lines between points</span></label>
             <label class="align-toslide"><input type="checkbox" data-opt="legend"> <span>Legend</span></label>
             <label class="align-toslide"><input type="checkbox" data-opt="values"> <span>Values on the chart</span></label>
             <label class="align-toslide" id="chartGridRow"><input type="checkbox" data-opt="grid"> <span>Grid lines</span></label>
@@ -897,12 +1148,23 @@ export class ChartSection {
           <div class="insp-row2" id="chartStepRow">
             <div class="insp-field" data-cfield="valueAxis.step"><label>Step</label><input type="number" step="any" min="0" data-set="valueAxis.step" placeholder="auto" title="The distance between two ticks; empty: about five round ones">${clear('valueAxis.step', 'Round ticks')}</div>
           </div>
-          <div class="insp-row"><label>Crosses at</label><div class="insp-field" data-cfield="valueAxis.at"><select data-set="valueAxis.at" id="chartValueAt" title="The label whose point the axis runs through (0, for a graph of x); its numbers go with it"></select>${clear('valueAxis.at', 'At the edge')}</div></div>
+          <div class="insp-row" id="chartValueAtRow"><label>Crosses at</label><div class="insp-field" data-cfield="valueAxis.at"><select data-set="valueAxis.at" id="chartValueAt" title="The label whose point the axis runs through (0, for a graph of x); its numbers go with it"></select>${clear('valueAxis.at', 'At the edge')}</div></div>
+          <div class="insp-row" id="chartValueAtXRow"><label>Crosses at</label><div class="insp-field" id="chartValueAtXField"><input type="text" inputmode="decimal" data-set="valueAxis.at" id="chartValueAtX" placeholder="left edge" spellcheck="false" title="The X the axis crosses the other at (0, left of which X is negative); its numbers go with it. Empty: at the left edge">${clear('valueAxis.at', 'At the edge')}</div></div>
           <div class="chart-axis-head" id="chartLabelHead">X axis: the labels</div>
           <div class="chart-opts">
             <label class="align-toslide"><input type="checkbox" data-set="labelAxis.line"> <span>Axis line</span></label>
+            <label class="align-toslide" id="chartXLogRow" title="Powers of ten an equal step apart; zero and negative X are left out"><input type="checkbox" data-set="labelAxis.log"> <span>Log scale</span></label>
           </div>
           <div class="insp-row"><label>Title</label><div class="insp-field" data-cfield="labelAxis.title"><input type="text" data-set="labelAxis.title" placeholder="(none)" spellcheck="true" title="The name of the axis">${clear('labelAxis.title', 'No title')}</div></div>
+          <div id="chartXRange">
+            <div class="insp-row2">
+              <div class="insp-field" data-cfield="labelAxis.min"><label>Min</label><input type="number" step="any" data-set="labelAxis.min" placeholder="auto" title="Where the axis starts; empty: from the data">${clear('labelAxis.min', 'From the data')}</div>
+              <div class="insp-field" data-cfield="labelAxis.max"><label>Max</label><input type="number" step="any" data-set="labelAxis.max" placeholder="auto" title="Where the axis ends; empty: from the data">${clear('labelAxis.max', 'From the data')}</div>
+            </div>
+            <div class="insp-row2">
+              <div class="insp-field" data-cfield="labelAxis.step"><label>Step</label><input type="number" step="any" min="0" data-set="labelAxis.step" placeholder="auto" title="The distance between two ticks; empty: about five round ones">${clear('labelAxis.step', 'Round ticks')}</div>
+            </div>
+          </div>
           <div class="insp-row"><label>Crosses at</label><div class="insp-field" data-cfield="labelAxis.at"><input type="number" step="any" data-set="labelAxis.at" id="chartLabelAt" placeholder="edge" title="The value the axis crosses the other at (0, below which values are negative); its names go with it. Empty: at the edge">${clear('labelAxis.at', 'At the edge')}</div></div>
           <div class="insp-row" id="chartAngleRow"><label>Labels</label><div class="insp-field insp-seg" id="chartAngle"><button data-set-btn="labelAxis.angle" data-v="0" title="Level">Level</button><button data-set-btn="labelAxis.angle" data-v="45" title="Turned 45 degrees, for long names">45&deg;</button><button data-set-btn="labelAxis.angle" data-v="90" title="Upright, reading from the bottom">90&deg;</button></div></div>
           <div class="chart-axis-head">Both axes</div>
@@ -939,7 +1201,13 @@ export class ChartSection {
             // The swatches and the x are the panel's own kinds of control: its handlers must not see these.
             if (e.target.closest('.insp-swatch, .insp-clear')) e.stopPropagation();
             const kb = e.target.closest('[data-kind]');
-            if (kb && this.el) { this.apply('Chart kind', () => {}, kb.dataset.kind); return; }
+            if (kb && this.el) {
+                // The table stays as it is (a scatter reads its labels as X); a line chart turned
+                // into a scatter keeps its line.
+                const from = chartKind(this.el), to = kb.dataset.kind;
+                this.apply('Chart kind', (s) => { if (to === 'scatter' && from === 'line') s.lines = true; }, to);
+                return;
+            }
             const act = e.target.closest('[data-chart-act]');
             if (act && this.el) { this._act(act.dataset.chartAct); return; }
             const chip = e.target.closest('.chart-chip');
@@ -970,6 +1238,8 @@ export class ChartSection {
                 if (first) { first.focus(); first.select(); }
                 return;
             }
+            const trend = e.target.closest('[data-series-trend]');
+            if (trend && this.el) { const i = this.active, on = trend.checked; this.apply(on ? 'Add trend line' : 'Remove trend line', (s) => { if (s.series[i]) { if (on) s.series[i].trend = true; else delete s.series[i].trend; } }); return; }
             const ser = e.target.closest('[data-series]');
             if (ser && this.el) { const i = this.active, k = ser.dataset.series, v = ser.value; this.apply('Series ' + (k === 'dash' ? 'line' : 'points'), (s) => { if (s.series[i]) { if (v && !(k === 'dash' && v === 'solid')) s.series[i][k] = v; else delete s.series[i][k]; } }); return; }
             if (e.target.id === 'chartUnit' && this.el) { const v = e.target.value.slice(0, 12); this.apply('Chart unit', (s) => { s.unit = v; }); return; }
@@ -997,7 +1267,7 @@ export class ChartSection {
             this.apply('Paste into chart', (s) => {
                 this._fromGrid(s);
                 // A whole table in the top-left cell replaces the chart's table, headings and all.
-                if (r0 === 0 && c0 === 0 && rows.length > 1) { tableInto(s, rows); return; }
+                if (r0 === 0 && c0 === 0 && rows.length > 1) { tableInto(s, rows, chartKind(this.el)); return; }
                 const needRows = r0 + rows.length - 1, needCols = c0 + Math.max(...rows.map(x => x.length)) - 1;
                 while (s.labels.length < needRows) s.labels.push('');
                 while (gridCols(s).length - 1 < needCols) s.series.push({ name: 'Series ' + (s.series.length + 1), values: s.labels.map(() => null) });
@@ -1071,7 +1341,7 @@ export class ChartSection {
         this.el = el && isChart(el) ? el : null;
         this.root.hidden = !this.el;
         if (!this.el) { this.pending = null; for (const r of this.roots) r.hidden = true; return; }
-        const spec = readChart(this.el), kind = chartKind(this.el), pie = kind === 'pie' || kind === 'doughnut';
+        const spec = readChart(this.el), kind = chartKind(this.el), pie = kind === 'pie' || kind === 'doughnut', scatter = kind === 'scatter';
         if (this.axesRoot) this.axesRoot.hidden = pie;
         if (this.styleRoot) this.styleRoot.hidden = pie;
         this.active = Math.min(this.active, Math.max(0, spec.series.length - 1));
@@ -1115,16 +1385,21 @@ export class ChartSection {
             const extra = spec.palette.filter(c => !seen.has(c)).map(c => [c, c, c]);
             setSwatches(this.$('chartSwatches'), `<button type="button" class="insp-swatch chart-auto${cur.colour ? '' : ' on'}" data-c="" title="Automatic: the chart's colours in turn" aria-label="Automatic: the chart's colours in turn"></button>`
                 + theme.concat(extra).map(([v, show, name]) => `<button type="button" class="insp-swatch${cur.colour === v ? ' on' : ''}" data-c="${esc(v)}" title="${esc(name === show ? show : colourName(name) + ' ' + show)}" aria-label="${esc(name === show ? show : colourName(name) + ' ' + show)}" style="background:${esc(show)}"></button>`).join(''));
-            // Points and line of the series, for lines and areas.
-            this.$('chartSeriesLook').hidden = !(kind === 'line' || kind === 'area');
+            // Points and line of the series, for lines, areas and scatters; a scatter's trend line.
+            this.$('chartSeriesLook').hidden = !(kind === 'line' || kind === 'area' || scatter);
             this.root.querySelector('[data-series="marker"]').value = cur.marker || '';
             this.root.querySelector('[data-series="dash"]').value = cur.dash || 'solid';
             this.root.querySelector('[data-series-err]').checked = !!cur.errors;
+            this.$('chartTrendRow').hidden = !scatter;
+            this.root.querySelector('[data-series-trend]').checked = !!cur.trend;
         }
         const errors = !pie && spec.series.some(x => x.errors);
         this.$('chartErrKindRow').hidden = !errors;
-        this.$('chartHint').textContent = pie ? 'A pie shows the first series: one slice per row. Paste cells from a spreadsheet into any cell.' : 'Paste cells from a spreadsheet into any cell; the top-left cell takes a whole table with its headings.';
+        this.$('chartHint').textContent = pie ? 'A pie shows the first series: one slice per row. Paste cells from a spreadsheet into any cell.'
+            : scatter ? 'The first column is X, each series a column of Y. Paste two or more columns of numbers into the top-left cell (headings optional), or cells into any cell.'
+                : 'Paste cells from a spreadsheet into any cell; the top-left cell takes a whole table with its headings.';
         this.$('chartStackedRow').hidden = !(kind === 'column' || kind === 'bar' || kind === 'area');
+        this.$('chartLinesRow').hidden = !scatter;
         this.$('chartGridRow').hidden = pie;
         this.$('chartLegendPosRow').hidden = !spec.legend;
         this.root.querySelectorAll('[data-opt]').forEach(i => { i.checked = !!spec[i.dataset.opt]; });
@@ -1133,9 +1408,14 @@ export class ChartSection {
         // Axes and style: every field shows the table's value; a field set away from the default is marked.
         const horizontal = kind === 'bar';
         if (this.axesRoot) {
-            this.$('chartValueHead').textContent = horizontal ? 'X axis: the values' : 'Y axis: the values';
-            this.$('chartLabelHead').textContent = horizontal ? 'Y axis: the labels' : 'X axis: the labels';
-            this.$('chartAngleRow').hidden = horizontal;
+            this.$('chartValueHead').textContent = scatter ? 'Y axis' : horizontal ? 'X axis: the values' : 'Y axis: the values';
+            this.$('chartLabelHead').textContent = scatter ? 'X axis: the first column' : horizontal ? 'Y axis: the labels' : 'X axis: the labels';
+            this.$('chartAngleRow').hidden = horizontal || scatter;
+            // A scatter's X axis has numbers: a range, a step, a log scale; its Y axis crosses at an X.
+            this.$('chartXRange').hidden = !scatter;
+            this.$('chartXLogRow').hidden = !scatter;
+            this.$('chartValueAtRow').hidden = scatter;
+            this.$('chartValueAtXRow').hidden = !scatter;
             // The labels the value axis can cross at (one no longer in the table says so: drawn at the edge).
             const at = this.$('chartValueAt'), names = [...new Set(spec.labels.filter(l => l !== ''))];
             const list = [['', horizontal ? 'Bottom edge' : 'Left edge'], ...names.map(l => [l, l])];
@@ -1146,7 +1426,7 @@ export class ChartSection {
         }
         if (this.styleRoot) {
             this.$('chartBarStyle').hidden = !(kind === 'column' || kind === 'bar');
-            this.$('chartLineStyle').hidden = !(kind === 'line' || kind === 'area');
+            this.$('chartLineStyle').hidden = !(kind === 'line' || kind === 'area' || scatter);
             this.$('chartErrStyle').hidden = !errors;
         }
         const auto = this._rangeText(spec);
@@ -1161,10 +1441,13 @@ export class ChartSection {
             r.querySelectorAll('[data-set-btn]').forEach(b => b.classList.toggle('on', String(getPath(spec, b.dataset.setBtn)) === b.dataset.v));
             r.querySelectorAll('.insp-field[data-cfield]').forEach(f => { const v = getPath(spec, f.dataset.cfield); f.classList.toggle('set', v != null && v !== ''); });
         }
+        // The scatter's own field for where the Y axis crosses (the same value as the label list's).
+        if (this.axesRoot) this.$('chartValueAtXField').classList.toggle('set', !!spec.valueAxis.at);
         // Folded, the two sections say in a few words what is set.
         const va = spec.valueAxis, la = spec.labelAxis;
-        this._summary(this.axesRoot, [va.line || la.line ? 'lines' : '', spec.ticks !== 'none' ? 'ticks' : '', va.log ? 'log' : '', va.min != null || va.max != null ? 'range' : '', va.at || la.at != null ? 'crossing' : '', va.title || la.title ? 'titles' : ''].filter(Boolean).join(', '));
-        this._summary(this.styleRoot, [spec.barWidth != null ? Math.round(spec.barWidth) + '% bars' : '', !spec.rounded ? 'square' : '', spec.smooth ? 'smooth' : '', spec.lineWidth != null ? spec.lineWidth + ' px lines' : '', errors && spec.errorDir === 'out' ? 'outward errors' : ''].filter(Boolean).join(', '));
+        const xLog = scatter && la.log, xRange = scatter && (la.min != null || la.max != null);
+        this._summary(this.axesRoot, [va.line || la.line ? 'lines' : '', spec.ticks !== 'none' ? 'ticks' : '', va.log && xLog ? 'log-log' : va.log || xLog ? 'log' : '', va.min != null || va.max != null || xRange ? 'range' : '', va.at || la.at != null ? 'crossing' : '', va.title || la.title ? 'titles' : ''].filter(Boolean).join(', '));
+        this._summary(this.styleRoot, [spec.barWidth != null ? Math.round(spec.barWidth) + '% bars' : '', !spec.rounded && !scatter ? 'square' : '', spec.smooth ? 'smooth' : '', spec.lineWidth != null ? spec.lineWidth + ' px lines' : '', errors && spec.errorDir === 'out' ? 'outward errors' : ''].filter(Boolean).join(', '));
     }
     _summary(sec, text) { const s = sec && sec.querySelector('.insp-sum'); if (s) s.textContent = text; }
 }
@@ -1208,8 +1491,13 @@ function setCell(spec, r, c, v, cols = gridCols(spec)) {
 }
 /* A whole table pasted: its first row the series names, its first column the labels. A column
    headed SD, SEM, CI, Error or ± after a series holds that series' error bars (Mean | SD | Mean | SD,
-   as statistics programs export it); its heading names what they stand for. */
-function tableInto(spec, rows) {
+   as statistics programs export it); its heading names what they stand for. A first row of
+   numbers alone is data, not headings (two columns of numbers pasted for a scatter: X and Y); a
+   scatter takes the heading over its X column as the X axis' title, when it has none. */
+export function tableInto(spec, rows, kind = '') {
+    const width = Math.max(...rows.map(r => r.length));
+    if (width > 1 && rows[0].length === width && rows[0].every(c => parseNumber(c) != null)) rows = [rows[0].map(() => ''), ...rows];
+    else if (kind === 'scatter' && rows[0][0] && !spec.labelAxis.title) spec.labelAxis.title = String(rows[0][0]).slice(0, 120);
     spec.labels = rows.slice(1).map(row => row[0] || '');
     spec.series = [];
     const map = [];

@@ -156,7 +156,10 @@ file named by a Markdown file from someone else) is left out and listed.
   as in the file. Tables keep column widths, merged cells, cell fills,
   per-cell alignment and the table style's header, banding and borders.
   Charts (bar and column, clustered or stacked; line; pie and doughnut;
-  area) are drawn as SVG with their title, legend, axes and data labels, and
+  area; scatter, with its points, lines, markers, trend lines, Y error bars
+  given point by point or as one size, and both axes' titles, ranges, steps
+  and log scales; a series whose X differ from the first's adds rows of its
+  own) are drawn as SVG with their title, legend, axes and data labels, and
   come over as editable charts: the Chart section of the panel shows their
   figures, series colours, title and options (a percent format's fractions
   as percentages, a currency sign as the unit). PowerPoint's drawing stays
@@ -165,7 +168,7 @@ file named by a Markdown file from someone else) is left out and listed.
   notes, hyperlinks and hidden slides (`data-skip`) are kept. Not carried
   over: effects beyond a simple shadow, 3-D, WordArt fills, animations and
   transitions, video and audio (the poster picture stays), embedded objects
-  and scatter or radar charts (a note says so).
+  and radar, bubble or surface charts (a note says so).
 - **Limits.** A PowerPoint file from someone else can declare parts of many
   gigabytes that pack into a few kilobytes, so the import stops at sizes no
   real deck reaches: 64 MB for a slide's or a chart's XML (the import stops
@@ -489,7 +492,7 @@ the editor shows it.
   rows and columns. A code block keeps its text as plain text with inline
   colours for comments, strings, numbers and common keywords, re-coloured
   after each edit.
-- Chart: column, bar, line, area, pie or doughnut, drawn by the editor from a
+- Chart: column, bar, line, area, pie, doughnut or scatter, drawn by the editor from a
   table (see Charts below).
 - Media: image from file or URL, image placeholder, video from file
   (mp4, webm, mov, uploaded to `assets/`) or URL, embedded web page
@@ -514,8 +517,28 @@ nothing from the editor to show it.
 Insert > Chart puts a column chart of sample figures on the slide; the Chart
 section of the properties panel edits it:
 
-- **Kind**: column, bar, line, area, pie, doughnut. A pie draws the first
-  series, a slice per row.
+- **Kind**: column, bar, line, area, pie, doughnut, scatter. A pie draws the
+  first series, a slice per row. Changing the kind keeps the table, so a
+  chart goes to another kind and back unchanged.
+- **Scatter (XY)**: the first column is X, each series a column of Y; both
+  axes are numbers. Labels that are numbers (`0.5`, `1,5`, `-2`, `1e-3`) are
+  X, so a column or line chart of years or doses becomes a scatter as it is;
+  labels that are not all numbers (Q1, Q2...) put the points at 1, 2, 3, as
+  a spreadsheet does, until X is typed in. Two or more columns of numbers
+  pasted into the top-left cell fill X and Y (a first row of numbers is data,
+  not headings; a CSV of numbers with decimal points or two commas or more
+  splits at the commas); with headings, the one over X becomes the X axis
+  title when it has none. The series' points (shape under **Points**, size
+  in Chart style), **Lines between points** (in the table's order, a gap
+  where a row has no value; a line chart turned into a scatter keeps its
+  line; smooth only where X goes up), Y error bars as for the other kinds,
+  and **Trend line** for the series picked by its chip: the least-squares
+  straight line over its points' X, dashed, with R² after its name in the
+  legend. On log axes it is fitted to the logarithms, so it is straight as
+  drawn (a power law on log-log, an exponential on a log Y). The range
+  follows the data rather than zero; where zero falls inside it a faint line
+  marks it on each axis, and the numbers stay at the edges unless an axis
+  is asked to cross.
 - **The table**: a grid of cells, the series names across the top and the
   labels down the side. Type in a cell (Enter goes down, past the last row a
   new one), or paste cells copied from a spreadsheet into any cell: they fill
@@ -531,7 +554,7 @@ section of the properties panel edits it:
   or right; a pie picks its side when left on Automatic), values on the
   chart, grid lines, a unit written with every number (`$` before it, `%` or
   ` kg` after it) and the decimals of every number (Automatic: as each needs).
-- **Series look** (line and area): the series picked by its chip gets its
+- **Series look** (line, area and scatter): the series picked by its chip gets its
   points (circle, square, triangle, diamond, each filled or open, or none)
   and its line (solid, dashed, dotted); the legend shows both.
 - **Error bars** (column, bar, line, area): **Error bars** under the colours
@@ -560,7 +583,10 @@ section of the properties panel edits it:
   other axis' line and the name the value axis runs through moved off it;
   on a column or bar chart they stay at the edge, where the bars leave them
   readable. A label renamed in the table keeps the value axis; the
-  PowerPoint chart crosses where the editor's does.
+  PowerPoint chart crosses where the editor's does. On a scatter the X axis
+  has a minimum, a maximum, a step and a log scale of its own, the Y axis
+  crosses at an X typed in (0 for a graph of a function), and the numbers
+  go with an axis that crosses inside the plot, as on a line chart.
 - **Chart style** (not for a pie): the bar width (the share of its slot a bar
   or a group of bars fills) and rounded corners; the line width, the point
   size and a smooth curve (monotone: it never overshoots a point). **Clean**
@@ -576,7 +602,12 @@ Every change is one undo step. The chart is saved as a
 and the table it was drawn from, as JSON in a
 `<script type="application/json" data-chart-data>` (the look only where it
 differs from the default: `valueAxis`, `labelAxis`, `ticks`, `legendPos`, a
-series' `marker` and `dash`, ...). The deck needs no library
+series' `marker`, `dash` and `trend`, a scatter's `lines`, ...). A scatter
+is `data-chart="scatter"` with the same table: its labels are X,
+`labelAxis` takes `min`, `max`, `step` and `log` as well, and
+`valueAxis.at` is the X the Y axis crosses at, written as text. Export >
+PowerPoint makes it a native scatter chart (`c:scatterChart`, X in column A
+of its workbook as numbers, trend lines with R² shown). The deck needs no library
 or script to show it (in the PDF and the single-file export too), and the
 editor draws it again from the table whenever the box, the text size or the
 font changes. A chart title is drawn across the top (the Title field). Charts

@@ -23,10 +23,11 @@ The description (all lengths in stage px):
       "svg"    svg (markup), png (data: URL, the fallback older readers show)
       "table"  cols [px], rows [{h, cells [{paras, fill, span, rowspan,
                hmerge, vmerge, inset, anchor, borders {l,r,t,b: LINE}}]}]
-      "chart"  kind column|bar|line|area|pie|doughnut, labels, series
-               [{name, values, color}], stacked, legend, values, grid,
-               title, text {font, size, color}; drawn natively, with its
-               table in an embedded workbook so Edit Data works
+      "chart"  kind column|bar|line|area|pie|doughnut|scatter, labels, series
+               [{name, values, color, trend}], stacked, legend, values, grid,
+               title, text {font, size, color}, a scatter's xValues and
+               lines; drawn natively, with its table in an embedded
+               workbook so Edit Data works
     PICTURE  {"path": workspace-relative file} or {"data": data: URL}
     FILL     {"color": "#hex", "alpha": 0..1}
     LINE     {"color", "alpha", "width" px, "dash": solid|dash|dot}

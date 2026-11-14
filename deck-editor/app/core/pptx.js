@@ -24,7 +24,7 @@
    ::before decorations, blend modes) is listed in the notes the
    export returns.
    ============================================================ */
-import { readChart, chartKind, seriesColour, isChart } from './chart.js';
+import { readChart, chartKind, seriesColour, isChart, scatterX } from './chart.js';
 
 import { bleed as lineBleed } from './lines.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -795,14 +795,16 @@ export class PptxCollector {
     chart(el, box, cs) {
         const spec = readChart(el), kind = chartKind(el);
         const colour = (c) => this.resolveColour(el, c).hex;
-        const series = spec.series.map((s, i) => ({ name: s.name, values: s.values, color: colour(seriesColour(spec, i)), marker: s.marker, dash: s.dash, errors: s.errors }));
+        const series = spec.series.map((s, i) => ({ name: s.name, values: s.values, color: colour(seriesColour(spec, i)), marker: s.marker, dash: s.dash, errors: s.errors, trend: !!s.trend }));
         const pie = kind === 'pie' || kind === 'doughnut';
         const palette = pie ? spec.labels.map((l, i) => colour(spec.palette[i % (spec.palette.length || 1)] || '#2f6fed')) : null;
         const text = { font: this.fontName(cs.fontFamily), size: parseFloat(cs.fontSize) || 24, color: this.hex(cs.color).hex };
         return { kind: 'chart', chart: kind, ...box, name: this.name(el) || (spec.title || 'Chart'), labels: spec.labels, series, palette, legend: spec.legend, values: spec.values, grid: spec.grid, stacked: spec.stacked, unit: spec.unit, title: spec.title, text,
             valueAxis: spec.valueAxis, labelAxis: spec.labelAxis, ticks: spec.ticks, axisWidth: spec.axisWidth, decimals: spec.decimals, legendPos: spec.legendPos,
             lineWidth: spec.lineWidth, pointSize: spec.pointSize, smooth: spec.smooth, barWidth: spec.barWidth,
-            errorDir: spec.errorDir, errorCaps: spec.errorCaps };
+            errorDir: spec.errorDir, errorCaps: spec.errorCaps,
+            // A scatter's X as the editor draws it (its labels as numbers, or 1, 2, 3...), and whether its points are joined.
+            ...(kind === 'scatter' ? { xValues: scatterX(spec.labels), lines: spec.lines } : {}) };
     }
 }
 

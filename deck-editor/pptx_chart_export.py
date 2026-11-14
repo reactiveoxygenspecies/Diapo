@@ -2,7 +2,7 @@
 
 chart_part(item) gives the chart part's XML (c:chartSpace) and a small
 embedded workbook holding the same table, so PowerPoint's Edit Data opens
-it in Excel. Kinds: column, bar, line, area, pie, doughnut; stacked,
+it in Excel. Kinds: column, bar, line, area, pie, doughnut, scatter; stacked,
 legend (and where), values on the chart, grid lines, a title, a unit and
 decimals carried over, and the look: axis lines, titles, range, step and
 log scale, tick marks, turned labels, line width, points, dashes,
@@ -91,9 +91,49 @@ SYMBOLS = {"circle": "circle", "square": "square", "triangle": "triangle", "diam
 DASHES = {"dash": "dash", "dot": "sysDot"}
 
 
-def err_bars(errors, values, n, outward, caps, colour, width):
+def marker_xml(s, colour, line_w, point_size):
+    """A series' points: the editor's line is stage px wide, its points three lines across unless
+    sized; a marker's size is in points."""
+    shape = s.get("marker") or "circle"
+    hollow = shape.endswith("-open")
+    symbol = SYMBOLS.get(shape.replace("-open", ""), "circle")
+    pt = point_size if point_size is not None else line_w * 3
+    msize = max(2, min(72, int(round(pt * 0.5))))
+    mfill = '<a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>' if hollow else f'<a:solidFill><a:srgbClr val="{colour}"/></a:solidFill>'
+    mline = f'<a:ln w="{emu(max(1, line_w * 0.6))}"><a:solidFill><a:srgbClr val="{colour}"/></a:solidFill></a:ln>' if hollow else "<a:ln><a:noFill/></a:ln>"
+    if symbol == "none" or not pt:
+        return '<c:marker><c:symbol val="none"/></c:marker>'
+    return f'<c:marker><c:symbol val="{symbol}"/><c:size val="{msize}"/><c:spPr>{mfill}{mline}</c:spPr></c:marker>'
+
+
+def parse_x(v):
+    """A scatter's X written as text (a label): "2", "0.5", "0,5", "1e-3"; None when it is not a number."""
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return float(v) if v == v and abs(v) != float("inf") else None
+    t = str(v if v is not None else "").strip().replace("−", "-").replace(" ", "")
+    if not t:
+        return None
+    if "," in t and "." not in t and t.count(",") == 1:
+        t = t.replace(",", ".")
+    try:
+        f = float(t.replace(",", ""))
+    except ValueError:
+        return None
+    return f if f == f and abs(f) != float("inf") else None
+
+
+def scatter_x(labels):
+    """X as the editor draws it: the labels as numbers, or 1, 2, 3... when they are not all numbers."""
+    xs = [parse_x(l) for l in labels]
+    if all(x is not None or not str(l).strip() for x, l in zip(xs, labels)):
+        return xs
+    return [float(i + 1) for i in range(len(labels))]
+
+
+def err_bars(errors, values, n, outward, caps, colour, width, direction=None):
     """A series' error bars, sizes given point by point: both ways, or only away from zero
-    (plus for a positive value, minus for a negative one), as the editor draws them."""
+    (plus for a positive value, minus for a negative one), as the editor draws them. A scatter
+    says which way they go (y: up and down)."""
     plus, minus = [], []
     for i in range(n):
         e = num(errors[i]) if i < len(errors) else None
@@ -105,20 +145,26 @@ def err_bars(errors, values, n, outward, caps, colour, width):
     def lit(vals):
         pts = "".join(f'<c:pt idx="{i}"><c:v>{v:g}</c:v></c:pt>' for i, v in enumerate(vals))
         return f'<c:numLit><c:formatCode>General</c:formatCode><c:ptCount val="{n}"/>{pts}</c:numLit>'
-    return (f'<c:errBars><c:errBarType val="both"/><c:errValType val="cust"/><c:noEndCap val="{0 if caps else 1}"/>'
+    err_dir = f'<c:errDir val="{direction}"/>' if direction else ""
+    return (f'<c:errBars>{err_dir}<c:errBarType val="both"/><c:errValType val="cust"/><c:noEndCap val="{0 if caps else 1}"/>'
             f'<c:plus>{lit(plus)}</c:plus><c:minus>{lit(minus)}</c:minus>'
             f'<c:spPr><a:ln w="{width}"><a:solidFill><a:srgbClr val="{colour}"/></a:solidFill></a:ln></c:spPr></c:errBars>')
 
 
-def workbook(labels, series):
-    """A minimal .xlsx: column A the labels, then one column per series, names in row 1."""
+def workbook(labels, series, xs=None):
+    """A minimal .xlsx: column A the labels (a scatter's X, as numbers), then one column per
+    series, names in row 1."""
     rows = []
     head = '<c r="A1" t="inlineStr"><is><t></t></is></c>' + "".join(
         f'<c r="{col_name(j + 1)}1" t="inlineStr"><is><t>{x(s.get("name") or "")}</t></is></c>' for j, s in enumerate(series))
     rows.append(f'<row r="1">{head}</row>')
     for i, label in enumerate(labels):
         r = i + 2
-        cells = f'<c r="A{r}" t="inlineStr"><is><t>{x(label)}</t></is></c>'
+        xv = xs[i] if xs is not None and i < len(xs) else None
+        if xs is not None:
+            cells = f'<c r="A{r}"><v>{xv:.15g}</v></c>' if xv is not None else ""
+        else:
+            cells = f'<c r="A{r}" t="inlineStr"><is><t>{x(label)}</t></is></c>'
         for j, s in enumerate(series):
             v = num((s.get("values") or [None] * len(labels))[i] if i < len(s.get("values") or []) else None)
             if v is not None:
@@ -143,8 +189,118 @@ def workbook(labels, series):
     return buf.getvalue()
 
 
+def scaling_xml(axis):
+    """An axis' c:scaling: log base 10, then max before min (the schema's order)."""
+    log = bool(axis.get("log"))
+    out = ('<c:logBase val="10"/>' if log else "") + '<c:orientation val="minMax"/>'
+    for key in ("max", "min"):
+        v = num(axis.get(key))
+        if v is not None and (not log or v > 0):
+            out += f'<c:{key} val="{v:g}"/>'
+    return out
+
+
+def scatter_part(it):
+    """A scatter (XY) chart: c:scatterChart with two value axes. X is the labels as numbers (or
+    1, 2, 3... as the editor draws them), each series' points joined or not, its Y error bars and
+    its trend line, of the kind that is straight on the axes the editor draws it on (a power law
+    on log-log, an exponential on a log Y, a logarithm on a log X) with R² shown, as in the legend."""
+    labels = [str(l) for l in (it.get("labels") or [])]
+    series = [s for s in (it.get("series") or []) if isinstance(s, dict)]
+    n = len(labels)
+    last = n + 1
+    xs_in = it.get("xValues")
+    xs = [num(v) for v in xs_in] if isinstance(xs_in, list) and len(xs_in) == n else scatter_x(labels)
+    text = it.get("text") or {}
+    decimals = it.get("decimals") if isinstance(it.get("decimals"), int) else None
+    fmt_y, fmt_x = number_format(it.get("unit"), decimals), number_format("", decimals)
+    va, la = it.get("valueAxis") or {}, it.get("labelAxis") or {}
+    size = float(text.get("size") or 24)
+    line_w = it.get("lineWidth") or max(3.0, size / 7)
+    ink = hexcol(text.get("color"), 0) if text.get("color") else "404040"
+    axis_w = emu(it.get("axisWidth") or max(1.5, size / 14))
+    lines = bool(it.get("lines"))
+    xlog, ylog = bool(la.get("log")), bool(va.get("log"))
+    trend_type = "power" if xlog and ylog else "exp" if ylog else "log" if xlog else "linear"
+
+    def cache(vals):
+        return "".join(f'<c:pt idx="{i}"><c:v>{v:.15g}</c:v></c:pt>' for i, v in enumerate(vals) if v is not None)
+
+    sers = ""
+    for j, s in enumerate(series):
+        colour = hexcol(s.get("color"), j)
+        col = col_name(j + 1)
+        vals = list(s.get("values") or [])
+        ys = [num(vals[i]) if i < len(vals) and xs[i] is not None else None for i in range(n)]
+        dash = f'<a:prstDash val="{DASHES[s["dash"]]}"/>' if s.get("dash") in DASHES else ""
+        ln = (f'<a:ln w="{emu(line_w)}" cap="rnd"><a:solidFill><a:srgbClr val="{colour}"/></a:solidFill>{dash}<a:round/></a:ln>' if lines
+              else '<a:ln w="19050" cap="rnd"><a:noFill/></a:ln>')
+        out = (f'<c:ser><c:idx val="{j}"/><c:order val="{j}"/>'
+               f'<c:tx><c:strRef><c:f>Sheet1!${col}$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>{x(s.get("name") or "")}</c:v></c:pt></c:strCache></c:strRef></c:tx>'
+               f'<c:spPr>{ln}</c:spPr>')
+        # Points without lines always show (the editor draws a circle for "none" then).
+        marker_s = s if lines or (s.get("marker") or "circle") != "none" else {**s, "marker": "circle"}
+        out += marker_xml(marker_s, colour, line_w, it.get("pointSize"))
+        if it.get("values"):
+            out += (f'<c:dLbls><c:numFmt formatCode="{x(fmt_y)}" sourceLinked="0"/><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>{text_props(text, size * 0.8)}<c:dLblPos val="t"/>'
+                    '<c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>')
+        if s.get("trend"):
+            out += (f'<c:trendline><c:spPr><a:ln w="{emu(max(1.5, line_w * 0.6))}" cap="rnd"><a:solidFill><a:srgbClr val="{colour}"/></a:solidFill><a:prstDash val="dash"/></a:ln></c:spPr>'
+                    f'<c:trendlineType val="{trend_type}"/><c:dispRSqr val="1"/><c:dispEq val="0"/></c:trendline>')
+        if isinstance(s.get("errors"), list):
+            out += err_bars(s["errors"], vals, n, it.get("errorDir") == "out", it.get("errorCaps") is not False, colour, axis_w, "y")
+        out += (f'<c:xVal><c:numRef><c:f>Sheet1!$A$2:$A${last}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="{n}"/>{cache(xs)}</c:numCache></c:numRef></c:xVal>'
+                f'<c:yVal><c:numRef><c:f>Sheet1!${col}$2:${col}${last}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="{n}"/>{cache(ys)}</c:numCache></c:numRef></c:yVal>'
+                f'<c:smooth val="{1 if lines and it.get("smooth") else 0}"/></c:ser>')
+        sers += out
+    plot = (f'<c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>{sers}'
+            '<c:axId val="111111111"/><c:axId val="222222222"/></c:scatterChart>')
+    grid = '<c:majorGridlines><c:spPr><a:ln w="6350"><a:solidFill><a:srgbClr val="D9D9D9"/></a:solidFill></a:ln></c:spPr></c:majorGridlines>' if it.get("grid") else ""
+    solid = f'<c:spPr><a:ln w="{axis_w}"><a:solidFill><a:srgbClr val="{ink}"/></a:solidFill></a:ln></c:spPr>'
+    ticks = {"out": "out", "in": "in"}.get(it.get("ticks"), "none")
+    # Where each axis crosses the other (a place on the other one): the X axis at a Y, the Y axis
+    # at an X; by default at the edge, the minimum, where the editor draws them.
+    cy = num(la.get("at"))
+    x_cross = f'<c:crossesAt val="{cy:g}"/>' if cy is not None and (not ylog or cy > 0) else '<c:crosses val="min"/>'
+    cx = parse_x(va.get("at")) if va.get("at") not in (None, "") else None
+    y_cross = f'<c:crossesAt val="{cx:g}"/>' if cx is not None and (not xlog or cx > 0) else '<c:crosses val="min"/>'
+
+    def axis(ax_id, cross_id, pos, a, fmt, title, cross, line_on):
+        step = num(a.get("step"))
+        major = f'<c:majorUnit val="{step:g}"/>' if step and step > 0 and not a.get("log") else ""
+        # An axis without its line has none (the grid shows the plot), so the import reads it back alike.
+        line = solid if line_on else '<c:spPr><a:ln><a:noFill/></a:ln></c:spPr>'
+        return (f'<c:valAx><c:axId val="{ax_id}"/><c:scaling>{scaling_xml(a)}</c:scaling><c:delete val="0"/><c:axPos val="{pos}"/>{grid}{title}'
+                f'<c:numFmt formatCode="{x(fmt)}" sourceLinked="0"/><c:majorTickMark val="{ticks}"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>'
+                f'{line}{text_props(text)}<c:crossAx val="{cross_id}"/>{cross}<c:crossBetween val="midCat"/>{major}</c:valAx>')
+    x_title = rich_title(la["title"], text, size * 0.95) if la.get("title") else ""
+    y_title = rich_title(va["title"], text, size * 0.95, -5400000) if va.get("title") else ""
+    axes = (axis(111111111, 222222222, "b", la, fmt_x, x_title, x_cross, la.get("line"))
+            + axis(222222222, 111111111, "l", va, fmt_y, y_title, y_cross, va.get("line")))
+    return frame(it, plot, axes, text), workbook(labels, series, xs)
+
+
+def frame(it, plot, axes, text):
+    """The chart space round a plot and its axes: the title, the legend, the text."""
+    size = float(text.get("size") or 24)
+    if it.get("title"):
+        title = rich_title(it["title"], text, size * 1.25) + '<c:autoTitleDeleted val="0"/>'
+    else:
+        title = '<c:autoTitleDeleted val="1"/>'
+    # Where the editor draws it: at the top, unless the chart says where.
+    pos = {"top": "t", "bottom": "b", "right": "r"}.get(it.get("legendPos") or "", "t")
+    legend = f'<c:legend><c:legendPos val="{pos}"/><c:overlay val="0"/>{text_props(text)}</c:legend>' if it.get("legend") else ""
+    return (HEAD + f'<c:chartSpace xmlns:c="{NS_C}" xmlns:a="{NS_A}" xmlns:r="{NS_R}"><c:date1904 val="0"/><c:lang val="en-US"/><c:roundedCorners val="0"/>'
+            f'<c:chart>{title}<c:plotArea><c:layout/>{plot}{axes}<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr></c:plotArea>{legend}'
+            '<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart>'
+            f'<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>{text_props(text)}'
+            '<c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>')
+
+
 def chart_part(it):
     kind = it.get("kind_chart") or it.get("chart") or "column"
+    if kind == "scatter":
+        return scatter_part(it)
     labels = [str(l) for l in (it.get("labels") or [])]
     series = [s for s in (it.get("series") or []) if isinstance(s, dict)]
     pie = kind in ("pie", "doughnut")
@@ -172,16 +328,8 @@ def chart_part(it):
         if kind == "line":
             # The editor's line is stage px wide, its points three lines across unless sized; a marker's size is in points.
             dash = f'<a:prstDash val="{DASHES[s["dash"]]}"/>' if s.get("dash") in DASHES else ""
-            shape = s.get("marker") or "circle"
-            hollow = shape.endswith("-open")
-            symbol = SYMBOLS.get(shape.replace("-open", ""), "circle")
-            pt = it.get("pointSize") if it.get("pointSize") is not None else line_w * 3
-            msize = max(2, min(72, int(round(pt * 0.5))))
-            mfill = '<a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>' if hollow else f'<a:solidFill><a:srgbClr val="{colour}"/></a:solidFill>'
-            mline = f'<a:ln w="{emu(max(1, line_w * 0.6))}"><a:solidFill><a:srgbClr val="{colour}"/></a:solidFill></a:ln>' if hollow else "<a:ln><a:noFill/></a:ln>"
-            marker = ('<c:marker><c:symbol val="none"/></c:marker>' if symbol == "none" or not pt
-                      else f'<c:marker><c:symbol val="{symbol}"/><c:size val="{msize}"/><c:spPr>{mfill}{mline}</c:spPr></c:marker>')
-            out += f'<c:spPr><a:ln w="{emu(line_w)}" cap="rnd"><a:solidFill><a:srgbClr val="{colour}"/></a:solidFill>{dash}<a:round/></a:ln></c:spPr>{marker}' 
+            marker = marker_xml(s, colour, line_w, it.get("pointSize"))
+            out +=f'<c:spPr><a:ln w="{emu(line_w)}" cap="rnd"><a:solidFill><a:srgbClr val="{colour}"/></a:solidFill>{dash}<a:round/></a:ln></c:spPr>{marker}' 
         elif pie:
             out += '<c:spPr><a:ln w="19050"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:ln></c:spPr>'
             palette = it.get("palette") or []
@@ -264,17 +412,4 @@ def chart_part(it):
                 f'<c:valAx><c:axId val="222222222"/><c:scaling>{scaling}</c:scaling><c:delete val="0"/><c:axPos val="{val_pos}"/>{grid}{val_title}'
                 f'<c:numFmt formatCode="{x(fmt)}" sourceLinked="0"/><c:majorTickMark val="{ticks}"/><c:minorTickMark val="none"/><c:tickLblPos val="{val_lbl}"/>'
                 f'{val_line}{text_props(text)}<c:crossAx val="111111111"/>{val_cross}<c:crossBetween val="{between}"/>{major}</c:valAx>')
-    title = ""
-    if it.get("title"):
-        title = rich_title(it["title"], text, size * 1.25) + '<c:autoTitleDeleted val="0"/>'
-    else:
-        title = '<c:autoTitleDeleted val="1"/>'
-    # Where the editor draws it: at the top, unless the chart says where.
-    pos = {"top": "t", "bottom": "b", "right": "r"}.get(it.get("legendPos") or "", "t")
-    legend = f'<c:legend><c:legendPos val="{pos}"/><c:overlay val="0"/>{text_props(text)}</c:legend>' if it.get("legend") else ""
-    xml = (HEAD + f'<c:chartSpace xmlns:c="{NS_C}" xmlns:a="{NS_A}" xmlns:r="{NS_R}"><c:date1904 val="0"/><c:lang val="en-US"/><c:roundedCorners val="0"/>'
-           f'<c:chart>{title}<c:plotArea><c:layout/>{plot}{axes}<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr></c:plotArea>{legend}'
-           '<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart>'
-           f'<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>{text_props(text)}'
-           '<c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>')
-    return xml, workbook(labels, series)
+    return frame(it, plot, axes, text), workbook(labels, series)

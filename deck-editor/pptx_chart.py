@@ -4,7 +4,8 @@ Bar and column charts (clustered and stacked), line charts (with markers),
 pie and doughnut charts (with data labels), area charts; the title, the
 legend, category and value axes with gridlines. Series colours come from the
 series' own fill when it has one, else from the theme's accent colours in
-PowerPoint's order. Anything else (scatter, radar, surface, combo charts
+PowerPoint's order. Scatter (XY) charts too, with both value axes, their
+points and lines. Anything else (radar, surface, bubble, combo charts
 beyond the first plot) returns None and the import notes it.
 """
 import math
@@ -120,6 +121,8 @@ def chart_spec(root, theme):
         return None
     plot = plots[0]
     tag = plot.tag.split("}")[-1]
+    if tag == "scatterChart":
+        return _scatter_spec(chart, plot, plot_area, theme)
     if tag in ("barChart", "bar3DChart"):
         bar_dir = plot.find("c:barDir", NS)
         kind = "bar" if bar_dir is not None and bar_dir.get("val") == "bar" else "column"
@@ -187,6 +190,199 @@ def chart_spec(root, theme):
     return kind, spec
 
 
+_SYMBOLS = {"circle": "circle", "square": "square", "triangle": "triangle", "diamond": "diamond", "none": "none"}
+
+
+def _num(v):
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if f == f and abs(f) != float("inf") else None
+
+
+def _xtext(v):
+    """A scatter's X as the editor's label: the number written short (0.5, 1e-05), or the text."""
+    f = _num(v)
+    return f"{f:.15g}" if f is not None else (v or "")
+
+
+def _scatter_points(plot):
+    """Each series of a c:scatterChart as (ser element, xs, ys): X from c:xVal (numbers, or the
+    texts of a text X, which the editor puts at 1, 2, 3...; 1, 2, 3 when there is none), Y from c:yVal."""
+    out = []
+    for ser in plot.findall("c:ser", NS):
+        ys = [_num(v) if v not in ("", None) else None for v in _texts(ser.find("c:yVal", NS), None)]
+        xnode = ser.find("c:xVal", NS)
+        xs = [_xtext(v) for v in _texts(xnode, None)] if xnode is not None else []
+        n = max(len(xs), len(ys))
+        xs = (xs + [""] * n)[:n] if xnode is not None else [str(i + 1) for i in range(n)]
+        out.append((ser, xs, (ys + [None] * n)[:n]))
+    return out
+
+
+def _axis_look(ax):
+    """An axis' title, range, step and log scale as the editor's table has them."""
+    out = {}
+    if ax is None:
+        return out
+    t = ax.find("c:title", NS)
+    if t is not None:
+        words = "".join(x.text or "" for x in t.iter(q("a:t"))).strip()
+        if words:
+            out["title"] = words[:120]
+    sc = ax.find("c:scaling", NS)
+    if sc is not None:
+        if sc.find("c:logBase", NS) is not None:
+            out["log"] = True
+        for key in ("min", "max"):
+            el = sc.find("c:" + key, NS)
+            v = _num(el.get("val")) if el is not None else None
+            if v is not None:
+                out[key] = v
+    mu = ax.find("c:majorUnit", NS)
+    if mu is not None and (_num(mu.get("val")) or 0) > 0 and "log" not in out:
+        out["step"] = _num(mu.get("val"))
+    ln = ax.find("c:spPr/a:ln", NS)
+    if ln is not None and ln.find("a:noFill", NS) is None and ln.find("a:solidFill", NS) is not None:
+        out["line"] = True
+    return out
+
+
+def _scatter_axes(plot, plot_area):
+    """The X and the Y value axes of a scatter: by the plot's axis ids (X first), else by position."""
+    ids = [a.get("val") for a in plot.findall("c:axId", NS)]
+    axes = {a.find("c:axId", NS).get("val"): a for a in plot_area.findall("c:valAx", NS) if a.find("c:axId", NS) is not None}
+    if len(ids) == 2 and ids[0] in axes and ids[1] in axes:
+        return axes[ids[0]], axes[ids[1]]
+    vals = plot_area.findall("c:valAx", NS)
+    xa = next((a for a in vals if (a.find("c:axPos", NS) is not None and a.find("c:axPos", NS).get("val") in ("b", "t"))), vals[0] if vals else None)
+    ya = next((a for a in vals if a is not xa), None)
+    return xa, ya
+
+
+def _scatter_spec(chart, plot, plot_area, theme):
+    """A scatter (XY) chart as the editor's table: X its labels (one row per point; series whose X
+    differ from the first's add rows of their own), each series a Y column with its colour, points,
+    error bars (custom or fixed, up and down) and trend line; whether the points are joined; the
+    two axes' titles, ranges, steps and log scales."""
+    pts = _scatter_points(plot)
+    if not pts:
+        return None
+    series_info = _series_colours(plot, theme)
+    labels, cols, errs = list(pts[0][1]), [], []
+    for k, (ser, xs, ys) in enumerate(pts):
+        if k and xs != pts[0][1]:
+            start = len(labels)
+            labels += xs
+            for c in cols:
+                c += [None] * len(xs)
+            for e in errs:
+                if e is not None:
+                    e += [None] * len(xs)
+            col = [None] * start + ys
+        else:
+            start = 0
+            col = ys + [None] * (len(labels) - len(ys))
+        cols.append(col)
+        errs.append(_scatter_errors(ser, len(ys), start, len(labels)))
+    n = len(labels)
+    cols = [(c + [None] * n)[:n] for c in cols]
+    style = plot.find("c:scatterStyle", NS)
+    style = style.get("val") if style is not None else "lineMarker"
+    joined, smooth, series = False, False, []
+    for k, (ser, xs, ys) in enumerate(pts):
+        name = "".join(t.text or "" for t in ser.findall("c:tx//c:v", NS)) or f"Series {k + 1}"
+        s = {"name": name, "values": cols[k]}
+        colour = _plain(series_info[k])
+        if colour:
+            s["colour"] = colour
+        ln = ser.find("c:spPr/a:ln", NS)
+        if style != "marker" and not (ln is not None and ln.find("a:noFill", NS) is not None):
+            joined = True
+        sm = ser.find("c:smooth", NS)
+        if sm is not None and sm.get("val") in ("1", "true"):
+            smooth = True
+        sym = ser.find("c:marker/c:symbol", NS)
+        if sym is not None and sym.get("val") in _SYMBOLS and sym.get("val") != "circle":
+            s["marker"] = _SYMBOLS[sym.get("val")]
+        if ser.find("c:trendline", NS) is not None:
+            s["trend"] = True
+        if errs[k] is not None:
+            s["errors"] = (errs[k] + [None] * n)[:n]
+        series.append(s)
+    xa, ya = _scatter_axes(plot, plot_area)
+    labels_on = [l for l in (plot.find("c:ser/c:dLbls", NS), plot.find("c:dLbls", NS)) if l is not None]
+    show_val = any((l.find("c:showVal", NS) is not None and l.find("c:showVal", NS).get("val") == "1") for l in labels_on)
+    spec = {
+        "labels": labels,
+        "series": series,
+        "palette": ["#" + theme.scheme(a) for a in ACCENTS],
+        "legend": chart.find("c:legend", NS) is not None,
+        "values": show_val,
+        "grid": any(a is not None and a.find("c:majorGridlines", NS) is not None for a in (xa, ya)),
+        "stacked": False,
+    }
+    if joined:
+        spec["lines"] = True
+    if smooth and joined:
+        spec["smooth"] = True
+    look_x, look_y = _axis_look(xa), _axis_look(ya)
+    if look_x:
+        spec["labelAxis"] = look_x
+    if look_y:
+        spec["valueAxis"] = look_y
+    title = _title(chart, [{"name": s["name"]} for s in series])
+    if title:
+        spec["title"] = title
+    return "scatter", spec
+
+
+def _series_colours(plot, theme):
+    """Each series' colour: its fill, its line, its marker's fill, else the theme's accents in turn."""
+    out = []
+    for i, ser in enumerate(plot.findall("c:ser", NS)):
+        col = None
+        for path in ("c:spPr", "c:marker/c:spPr"):
+            sp = ser.find(path, NS)
+            if sp is None:
+                continue
+            c, kind = fill_css(sp, theme)
+            if c and kind != "none":
+                col = c
+                break
+            ln = sp.find("a:ln", NS)
+            c = first_colour(ln.find("a:solidFill", NS), theme) if ln is not None else None
+            if c:
+                col = css_colour(c)
+                break
+        out.append(col or "#" + theme.scheme(ACCENTS[i % 6]))
+    return out
+
+
+def _scatter_errors(ser, count, start, total):
+    """A series' Y error bars as one size per row of the table (rows start..start+count), when
+    they are given point by point (custom) or as one fixed size; None otherwise."""
+    for eb in ser.findall("c:errBars", NS):
+        d = eb.find("c:errDir", NS)
+        if d is not None and d.get("val") != "y":
+            continue
+        kind = eb.find("c:errValType", NS)
+        kind = kind.get("val") if kind is not None else "fixedVal"
+        if kind == "cust":
+            plus = [_num(v) for v in _texts(eb.find("c:plus", NS), None)]
+            minus = [_num(v) for v in _texts(eb.find("c:minus", NS), None)]
+            sizes = [max(abs(plus[i] or 0) if i < len(plus) else 0, abs(minus[i] or 0) if i < len(minus) else 0) or None for i in range(count)]
+        elif kind == "fixedVal":
+            v = eb.find("c:val", NS)
+            size = abs(_num(v.get("val")) or 0) if v is not None else 0
+            sizes = [size or None] * count
+        else:
+            continue
+        return [None] * start + sizes + [None] * max(0, total - start - count)
+    return None
+
+
 def chart_svg(root, theme, rels, w, h, pt):
     """The SVG (string) of a chart part, sized w x h css px, or None when the kind is not drawn."""
     chart = root.find("c:chart", NS)
@@ -200,7 +396,7 @@ def chart_svg(root, theme, rels, w, h, pt):
         return None
     plot = plots[0]
     kind = plot.tag.split("}")[-1]
-    if kind not in ("barChart", "bar3DChart", "lineChart", "line3DChart", "pieChart", "pie3DChart", "doughnutChart", "areaChart", "area3DChart"):
+    if kind not in ("barChart", "bar3DChart", "lineChart", "line3DChart", "pieChart", "pie3DChart", "doughnutChart", "areaChart", "area3DChart", "scatterChart"):
         return None
     series = _series(plot, theme)
     if not series:
@@ -262,6 +458,8 @@ def chart_svg(root, theme, rels, w, h, pt):
                 left += col_w + pad
     if kind in ("pieChart", "pie3DChart", "doughnutChart"):
         parts.append(_pie(series[0], theme, left, top, right, bottom, fs, text_col, kind == "doughnutChart", plot))
+    elif kind == "scatterChart":
+        parts.append(_scatter_svg(plot, plot_area, theme, left, top, right, bottom, fs, text_col))
     else:
         parts.append(_axes_chart(kind, plot, series, left, top, right, bottom, fs, text_col))
     return (f'<svg viewBox="0 0 {w:.1f} {h:.1f}" width="100%" height="100%" style="{font} max-width:none; max-height:none; overflow:visible;">'
@@ -309,6 +507,75 @@ def _pie(s, theme, left, top, right, bottom, fs, text_col, doughnut, plot):
         hole = plot.find("c:holeSize", NS)
         hr = r * (fnum(hole.get("val"), 50) / 100.0 if hole is not None else 0.5)
         out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{hr:.1f}" fill="#fff"/>')
+    return "".join(out)
+
+
+def _ticks(lo, hi, log):
+    """Round ticks over lo..hi (about five), or the powers of ten of a log axis; (lo, hi, ticks)."""
+    if log:
+        a, b = math.floor(math.log10(lo)), math.ceil(math.log10(hi))
+        if b <= a:
+            b = a + 1
+        return 10.0 ** a, 10.0 ** b, [10.0 ** d for d in range(a, b + 1)]
+    if hi <= lo:
+        lo, hi = (lo - 1, hi + 1) if lo == hi else (hi, lo)
+    raw = (hi - lo) / 5
+    mag = 10 ** math.floor(math.log10(raw))
+    step = next(m for m in (1, 2, 2.5, 5, 10) if raw / mag <= m) * mag
+    a, b = math.floor(lo / step + 1e-9) * step, math.ceil(hi / step - 1e-9) * step
+    ticks, t = [], a
+    while t <= b + step / 2:
+        ticks.append(round(t, 12))
+        t += step
+    return a, b, ticks
+
+
+def _scatter_svg(plot, plot_area, theme, left, top, right, bottom, fs, text_col):
+    """A scatter chart as PowerPoint draws it, near enough: both axes numbers (log where asked),
+    the points, and lines between them unless the series has none."""
+    pts = _scatter_points(plot)
+    colours = _series_colours(plot, theme)
+    xa, ya = _scatter_axes(plot, plot_area)
+    lx, ly = bool(_axis_look(xa).get("log")), bool(_axis_look(ya).get("log"))
+    style = plot.find("c:scatterStyle", NS)
+    style = style.get("val") if style is not None else "lineMarker"
+    xs_all, data = [], []
+    for ser, xs, ys in pts:
+        nums = [_num(x) for x in xs]
+        if any(v is None and x != "" for v, x in zip(nums, xs)):
+            nums = [float(i + 1) for i in range(len(xs))]
+        p = [(x, y) for x, y in zip(nums, ys) if x is not None and y is not None and (not lx or x > 0) and (not ly or y > 0)]
+        data.append((ser, p))
+        xs_all += p
+    if not xs_all:
+        return ""
+    x0, x1, xt = _ticks(min(p[0] for p in xs_all), max(p[0] for p in xs_all), lx)
+    y0, y1, yt = _ticks(min(p[1] for p in xs_all), max(p[1] for p in xs_all), ly)
+    lab_w = max(len(_fmt(v)) for v in yt) * fs * 0.6 + fs
+    px0, px1, py0, py1 = left + lab_w, right - fs, top + fs * 0.5, bottom - fs * 1.8
+    f = (lambda v, a, b, log: (math.log10(v) - math.log10(a)) / (math.log10(b) - math.log10(a)) if log else (v - a) / (b - a))
+
+    def X(v):
+        return px0 + f(v, x0, x1, lx) * (px1 - px0)
+
+    def Y(v):
+        return py1 - f(v, y0, y1, ly) * (py1 - py0)
+    out = []
+    for t in yt:
+        out.append(f'<line x1="{px0:.1f}" y1="{Y(t):.1f}" x2="{px1:.1f}" y2="{Y(t):.1f}" stroke="#c8c8c8" stroke-width="1"/>'
+                   f'<text x="{px0 - fs * 0.4:.1f}" y="{Y(t) + fs * 0.35:.1f}" text-anchor="end" font-size="{fs:.1f}" fill="{text_col}">{esc(_fmt(t))}</text>')
+    for t in xt:
+        out.append(f'<text x="{X(t):.1f}" y="{py1 + fs * 1.2:.1f}" text-anchor="middle" font-size="{fs:.1f}" fill="{text_col}">{esc(_fmt(t))}</text>')
+    out.append(f'<line x1="{px0:.1f}" y1="{py1:.1f}" x2="{px1:.1f}" y2="{py1:.1f}" stroke="#888" stroke-width="1"/>')
+    for k, (ser, p) in enumerate(data):
+        col = colours[k] if k < len(colours) else "#888"
+        ln = ser.find("c:spPr/a:ln", NS)
+        if style != "marker" and not (ln is not None and ln.find("a:noFill", NS) is not None) and len(p) > 1:
+            out.append(f'<polyline points="{" ".join(f"{X(a):.1f},{Y(b):.1f}" for a, b in p)}" fill="none" stroke="{col}" stroke-width="{max(1.5, fs * 0.2):.1f}" stroke-linejoin="round"/>')
+        sym = ser.find("c:marker/c:symbol", NS)
+        if sym is None or sym.get("val") != "none":
+            for a, b in p:
+                out.append(f'<circle cx="{X(a):.1f}" cy="{Y(b):.1f}" r="{fs * 0.3:.1f}" fill="{col}"/>')
     return "".join(out)
 
 
