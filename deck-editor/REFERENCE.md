@@ -446,6 +446,15 @@ slate chrome with teal for anything you can act on and orange only as the
 "where you are" marker (current slide, unsaved changes, problems). The choice
 is remembered per browser, like the side panels.
 
+**Play entrances when changing slides** (Look menu, off by default) is about
+the canvas while you edit. Off, a slide you go to shows at once as it ends up:
+it is marked `.visible` straight away with transitions off, and every entrance
+still running on it (a deck reveal's transition, a preset's keyframes) is
+finished; loops keep looping. On, the deck marks it `.visible` a frame later as
+it would when presenting, so its reveals and entrances play each time. Preview,
+presenting, the Animation section's Play and the Theme panel's Replay the
+reveal animate either way. Remembered per browser.
+
 **Check spelling while typing** (Look, on by default, remembered like the other options) gives the text being edited, and the notes box, the browser's own spell checker in the browser's language. The element carries `spellcheck` only while it is edited: ending the edit removes it, and the saved file never has it (the serialiser strips it from the stage as well). Panel fields for colours, names, CSS, code, LaTeX and SMILES are never checked.
 
 ## The properties panel
@@ -492,7 +501,33 @@ image..." in the properties panel) to pick a picture, which takes the box
 the deck is presented or printed: it is written with `display:none` and only
 the editor shows it.
 
-**Insert** (top bar) adds one element to the current slide, at the centre:
+**Insert** (top bar) adds one element to the current slide. Every way in
+(Insert, the palette, the icon picker, a paste, a drop) places it the same way
+(`core/placement.js`): measured on the slide, it goes in the centre when that
+area is free; otherwise on the position of a 40 px grid, nearest the centre,
+that overlaps what the slide shows least (text, pictures, drawings, groups,
+filled boxes and the master layer's elements, 16 px of clear space wanted round
+each; an element covering most of the slide counts as ground), kept inside
+margins of 5% of the slide; on a slide too full for that (the best spot still
+covers half of the new element), the cascade from the centre, 24 px further
+per insert. A chart, an equation and a structure inserted in turn so end up
+side by side, not on top of each other.
+
+**Files dragged from the computer** onto the canvas are added where they are
+dropped: pictures, video and sound (the server's upload types: png, jpg, gif,
+webp, avif, bmp, svg, mp4, webm, mov, mp3, m4a, wav, ogg) are copied into the
+deck's `assets/` and the first is centred on the drop point (kept whole on the
+slide), the next ones 24 px further on; all of them are one undo step and stay
+selected. A picture is 640 px wide (narrower when tall, to fit the slide's
+height); a sound becomes an `<audio controls>` player. An overlay says what a
+drop will do while files are held over the window. A PowerPoint (.pptx) or
+Markdown (.md) file dropped anywhere is offered as a new deck (the drawer's
+Import, the file uploaded), which opens in a tab of its own. Other files are
+refused with a note saying what can be dropped; with no deck open, a picture
+only brings a hint. A file dropped where nothing takes it is never opened by
+the browser in place of the editor.
+
+The kinds of element:
 
 - Text: text box, bullet list, numbered list, table, code block.
   A list is edited as a whole (Enter makes a new item). A table is edited cell
@@ -1192,6 +1227,8 @@ deck-editor/
       textedit.js     in-place text editing and the formatting bar
       slides.js       slide strip, thumbnails, slide operations
       insert.js       new elements
+      placement.js    where a new element lands (centre, freest grid spot, cascade)
+      filedrop.js     files dragged in from the computer (pictures, video, sound, decks to import)
       chart.js        charts: the drawing from a table, the panel's Chart section
       plot.js         interactive charts (Plotly): reading the figure, its picture, the dialog, the panel's section
       crop.js         cropping a picture by hand (the data-crop box, crop mode)
@@ -1237,8 +1274,10 @@ npm run test:firefox   (the same specs in Firefox; once before:
 npm run test:py        (the Python tests: pptx_chart.py, pptx_import.py, emf_svg.py,
                         which files a Markdown import may copy, the
                         settings file written whole or not at all, the update check
-                        (version comparison and stubbed GitHub answers), and which
-                        script files beside a deck count as Diapo's own)
+                        (version comparison and stubbed GitHub answers), which
+                        script files beside a deck count as Diapo's own, and the
+                        file types a drop on the canvas sends matching the
+                        server's upload types)
 ```
 
 The tests start `serve.py` on a throw-away workspace made from

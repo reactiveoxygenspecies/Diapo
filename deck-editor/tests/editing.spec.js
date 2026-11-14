@@ -842,7 +842,7 @@ test('50 copy style: Ctrl+Alt+C takes the look of an element, Ctrl+Alt+V puts wh
     await page.evaluate(() => { const ed = window.deckEditor; const r = ed.deck.currentSlide.querySelectorAll('.slide.active > div[data-id]'); ed.selection.set([r[1], r[2]]); });
     await page.keyboard.press('Control+Alt+v');
     await page.waitForTimeout(100);
-    const looks = await page.evaluate(() => { const ed = window.deckEditor; return Array.from(ed.deck.currentSlide.querySelectorAll('.slide.active > div[data-id]')).map(e => { const cs = ed.deck.win.getComputedStyle(e); return [cs.backgroundColor, cs.borderTopLeftRadius, cs.borderTopColor, cs.boxShadow, e.style.left]; }); });
+    const looks = await page.evaluate(() => { const ed = window.deckEditor; return Array.from(ed.deck.currentSlide.querySelectorAll('.slide.active > div[data-id]')).map(e => { const cs = ed.deck.win.getComputedStyle(e); return [cs.backgroundColor, cs.borderTopLeftRadius, cs.borderTopColor, cs.boxShadow, e.style.left + ' ' + e.style.top]; }); });
     expect(looks[1].slice(0, 4)).toEqual(looks[0].slice(0, 4));
     expect(looks[2].slice(0, 4)).toEqual(looks[0].slice(0, 4));
     expect(looks[1][4]).not.toBe(looks[0][4]);                                  // where it is was not copied
