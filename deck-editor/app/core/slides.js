@@ -82,6 +82,25 @@ body { pointer-events: none; }
 .deck-overview { display: none !important; }
 `;
 
+/* The indexes of the longest run of `pos` that is already increasing (patience style; a negative
+   entry is never in it): what can stay where it is when a list is put in a new order. */
+function inOrderRun(pos) {
+    const tails = [], prevIdx = new Array(pos.length).fill(-1);
+    pos.forEach((p, i) => {
+        if (p < 0) return;
+        let lo = 0, hi = tails.length;
+        while (lo < hi) { const mid = (lo + hi) >> 1; if (pos[tails[mid]] < p) lo = mid + 1; else hi = mid; }
+        if (lo) prevIdx[i] = tails[lo - 1];
+        tails[lo] = i;
+    });
+    const stay = new Set();
+    for (let i = tails.length ? tails[tails.length - 1] : -1; i >= 0; i = prevIdx[i]) stay.add(i);
+    return stay;
+}
+
+/* "3 slides" or "this slide": how the Move to box and the palette name what a move moves. */
+export const slidesWord = (n) => n > 1 ? `${n} slides` : 'this slide';
+
 export class SlideStrip extends EventTarget {
     constructor(app, { list, addButton }) {
         super();
@@ -344,17 +363,7 @@ export class SlideStrip extends EventTarget {
         // others: sending one slide to the end must not reload every thumbnail between (a burst of
         // requests, and blanks while they load).
         const at = new Map(this.itemList().map((it, i) => [it, i]));
-        const pos = want.map(it => at.has(it) ? at.get(it) : -1);
-        const tails = [], prevIdx = new Array(pos.length).fill(-1);       // longest increasing run of pos, patience style
-        pos.forEach((p, i) => {
-            if (p < 0) return;
-            let lo = 0, hi = tails.length;
-            while (lo < hi) { const mid = (lo + hi) >> 1; if (pos[tails[mid]] < p) lo = mid + 1; else hi = mid; }
-            if (lo) prevIdx[i] = tails[lo - 1];
-            tails[lo] = i;
-        });
-        const stay = new Set();
-        for (let i = tails.length ? tails[tails.length - 1] : -1; i >= 0; i = prevIdx[i]) stay.add(i);
+        const stay = inOrderRun(want.map(it => at.has(it) ? at.get(it) : -1));
         let moved = false, next = null;
         for (let i = want.length - 1; i >= 0; i--) {
             if (!stay.has(i)) { this.list.insertBefore(want[i], next); moved = true; }
@@ -535,29 +544,181 @@ export class SlideStrip extends EventTarget {
         else this.highlight();
     }
 
+    /* The anchor of a Shift pick is a slide, not a number, so it holds after the slides move. */
+    _anchorIndex() {
+        const i = this._anchor ? this.deck.slides.indexOf(this._anchor) : -1;
+        return i < 0 ? this.deck.current : i;
+    }
     _pick(index, range) {
         const slides = this.deck.slides, s = slides[index]; if (!s) return;
         if (range) {
-            const a = this._anchor != null && slides[this._anchor] ? this._anchor : this.deck.current;
+            const a = this._anchorIndex();
             const [lo, hi] = a < index ? [a, index] : [index, a];
             this.sel = new Set(slides.slice(lo, hi + 1));
         } else {
             if (!this.sel.size && this.deck.currentSlide) this.sel.add(this.deck.currentSlide);
             if (this.sel.has(s)) this.sel.delete(s); else this.sel.add(s);
-            this._anchor = index;
+            this._anchor = s;
             if (this.sel.size === 1 && this.sel.has(this.deck.currentSlide)) this.sel.clear();
         }
+        this._end = s;
         this.highlight();
     }
+    /* Shift+Up / Shift+Down in the strip: the pick grows or shrinks from its anchor by one slide,
+       as Shift+click would, and the slide at the moving end becomes the current one. The moving end
+       is remembered rather than read from the current slide, which follows a moment later. */
+    extendPick(dir) {
+        const slides = this.deck.slides;
+        if (!this.sel.size) { this._anchor = this.deck.currentSlide; this._end = this.deck.currentSlide; }
+        const from = this._end && this.sel.has(this._end) ? slides.indexOf(this._end) : this.deck.current;
+        const to = from + dir;
+        if (from < 0 || !slides[to]) return;
+        const a = this._anchorIndex();
+        const [lo, hi] = a < to ? [a, to] : [to, a];
+        this.sel = new Set(hi > lo ? slides.slice(lo, hi + 1) : []);
+        this._end = slides[to];
+        this.deck.goTo(to);
+        this.highlight();
+        this._reveal([slides[to]]);
+    }
+    /* Esc in the strip: back to the current slide alone. */
+    clearPick() {
+        if (!this.sel.size) return false;
+        this.sel.clear();
+        this.highlight();
+        return true;
+    }
 
+    /* ------------------------------------------------------------
+       Moving slides. Every move goes through _reorder(): the new
+       order of the whole deck, as one undo step.
+       ------------------------------------------------------------ */
     moveSlide(from, to) {
         const slides = this.deck.slides;
         if (from === to || !slides[from] || to < 0 || to >= slides.length) return;
-        const s = slides[from];
-        const ref = to > from ? slides[to].nextSibling : slides[to];
-        this.history.move(s, this.deck.stage, ref, 'Move slide');
+        const order = slides.filter((s, i) => i !== from);
+        order.splice(to, 0, slides[from]);
+        this._reorder(order, 'Move slide', [slides[from]]);
+    }
+
+    /* Put the deck's slides in `order` (the same slides, rearranged), then run `fix` (a section
+       name handed over), all as one undo step. Only the slides out of order move, each before the one
+       that now follows it, so the deck's markup round them changes as little as it can and the strip
+       reloads no thumbnail but theirs (syncStructure). */
+    _reorder(order, label, moved, fix = null) {
+        const slides = this.deck.slides;
+        const same = order.length === slides.length && order.every((s, i) => s === slides[i]);
+        if (same && !fix) return false;
+        const at = new Map(slides.map((s, i) => [s, i]));
+        const stay = inOrderRun(order.map(s => at.has(s) ? at.get(s) : -1));
+        const end = slides[slides.length - 1].nextSibling;       // the master layer may follow the slides: it stays after them
+        this.history.begin(label);
+        if (!same) for (let i = order.length - 1; i >= 0; i--) {
+            if (!stay.has(i)) this.history.move(order[i], this.deck.stage, i + 1 < order.length ? order[i + 1] : end, label);
+        }
+        if (fix) fix();
+        this.history.end();
         this._notifyDeck();
-        this.highlight();
+        // A slide change still on its way (Shift+Down then Ctrl+Down at once) goes by number: send it
+        // to the same slide at its new place, not to whatever slide now has the old number.
+        const going = this.deck._navPending;
+        if (going && !same) this.deck.goTo(this.deck.slides.indexOf(going));
+        // A slide moved into a folded section unfolds it: what was moved stays in sight, and stays picked.
+        for (const s of moved) { const name = this.sectionOf(s); if (name) this.collapsed.delete(name); }
+        this.syncStructure();
+        this._reveal(moved);
+        return true;
+    }
+    /* Scroll the strip to show `slides` (the first of them if they do not all fit), once the strip
+       has caught up with the deck. */
+    _reveal(slides) {
+        const show = () => {
+            const its = slides.map(s => this.items.get(s)).filter(it => it && !it.hidden);
+            if (!its.length) return;
+            its[its.length - 1].scrollIntoView({ block: 'nearest' });
+            its[0].scrollIntoView({ block: 'nearest' });
+        };
+        show();
+        setTimeout(show, 0);            // after the deck's mutation records have reached syncStructure
+    }
+
+    /* The section a slide is in: the name on it or on the nearest slide before it that starts one. */
+    sectionOf(slide) {
+        const slides = this.deck.slides;
+        for (let i = slides.indexOf(slide); i >= 0; i--) { const n = slides[i].getAttribute('data-section'); if (n) return n; }
+        return null;
+    }
+    /* The deck's sections, in order: { name, start (the slide that starts it), slides }. */
+    sections() {
+        const out = [];
+        for (const s of this.deck.slides) {
+            const n = s.getAttribute('data-section');
+            if (n) out.push({ name: n, start: s, slides: [] });
+            if (out.length) out[out.length - 1].slides.push(s);
+        }
+        return out;
+    }
+
+    /* The order `group` (slides in deck order) makes when it lands as one block at `pos`, counted
+       among the slides that are not in it. */
+    _orderWith(group, pos) {
+        const rest = this.deck.slides.filter(s => !group.includes(s));
+        pos = Math.max(0, Math.min(pos, rest.length));
+        return [...rest.slice(0, pos), ...group, ...rest.slice(pos)];
+    }
+    /* The order after moving the picked slides one step up (-1) or down (1), as PowerPoint does:
+       each passes its unpicked neighbour, a run of picked slides moves as a block, and one already
+       at the end of the deck stays put (with the picked ones against it). */
+    _orderStep(group, dir) {
+        const order = this.deck.slides.slice(), g = new Set(group);
+        if (dir < 0) { for (let i = 1; i < order.length; i++) if (g.has(order[i]) && !g.has(order[i - 1])) [order[i - 1], order[i]] = [order[i], order[i - 1]]; }
+        else { for (let i = order.length - 2; i >= 0; i--) if (g.has(order[i]) && !g.has(order[i + 1])) [order[i], order[i + 1]] = [order[i + 1], order[i]]; }
+        return order;
+    }
+    /* What each move would make of the deck, or null when it would change nothing (the menu greys those out). */
+    _moveOrder(group, where) {
+        const slides = this.deck.slides;
+        if (!group.length) return null;
+        const rest = slides.length - group.length;
+        let order;
+        if (where === 'up' || where === 'down') order = this._orderStep(group, where === 'up' ? -1 : 1);
+        else if (where === 'top') order = this._orderWith(group, 0);
+        else if (where === 'bottom') order = this._orderWith(group, rest);
+        else if (typeof where === 'number') order = this._orderWith(group, where);
+        else return null;
+        return order.every((s, i) => s === slides[i]) ? null : order;
+    }
+    /* Move the picked slides (the current one without a pick): 'up', 'down', 'top', 'bottom', or
+       a number, the place (from 0) the first of them takes. Ctrl+Up / Ctrl+Down, the menu, the palette. */
+    moveSelected(where, group = this.selectedSlides()) {
+        const order = this._moveOrder(group, where);
+        if (!order) return false;
+        return this._reorder(order, group.length > 1 ? 'Move slides' : 'Move slide', group);
+    }
+    /* The picked slides to the end of a section (given by the slide that starts it), into it. */
+    moveToSection(start, group = this.selectedSlides()) {
+        const sec = this.sections().find(x => x.start === start);
+        if (!sec || group.includes(start)) return false;
+        const rest = this.deck.slides.filter(s => !group.includes(s));
+        const last = sec.slides.filter(s => !group.includes(s)).pop();
+        return this._reorder(this._orderWith(group, rest.indexOf(last) + 1), group.length > 1 ? 'Move slides' : 'Move slide', group);
+    }
+    /* Drop `group` before the slide at `to` (deck order; the end when there is none). `into`: the drop
+       was on a section's heading or just under it, so the slides go in at the start of that section:
+       the first of them takes the section's name over from the slide that had it. A group that
+       starts a section of its own keeps it. */
+    dropSlides(group, to, into = false) {
+        const slides = this.deck.slides;
+        const head = into ? slides[to] : null, name = head && head.getAttribute('data-section');
+        let i = to;
+        while (slides[i] && group.includes(slides[i])) i++;            // dropped onto itself: lands before the next slide that stays
+        const rest = slides.filter(s => !group.includes(s));
+        const order = this._orderWith(group, slides[i] ? rest.indexOf(slides[i]) : rest.length);
+        const first = group[0];
+        const fix = name && first !== head && !first.hasAttribute('data-section')
+            ? () => { this.history.attr(first, 'data-section', name, 'Move slides'); this.history.attr(head, 'data-section', null, 'Move slides'); }
+            : null;
+        return this._reorder(order, group.length > 1 ? 'Move slides' : 'Move slide', group, fix);
     }
 
     toggleSkip(index = this.deck.current) {
@@ -573,6 +734,11 @@ export class SlideStrip extends EventTarget {
         this._closeMenu();
         const i = this.indexOf(it), n = this.itemList().length;
         const picked = this.selectedSlides().length;
+        // The moves act on the picked slides when the menu is opened on one of them, else on this slide
+        // (the current one follows the right-click a moment later).
+        const group = this.sel.has(it._slide) ? this.selectedSlides() : [it._slide];
+        const what = group.length > 1 ? ` ${group.length} slides` : '';
+        const can = (where) => this._moveOrder(group, where) ? '' : 'disabled';
         const skipped = it._slide.hasAttribute('data-skip');
         const menu = document.createElement('div');
         menu.className = 'strip-menu';
@@ -585,10 +751,11 @@ export class SlideStrip extends EventTarget {
             <button data-a="cut" ${n <= picked ? 'disabled' : ''}>${picked > 1 ? `Cut ${picked} slides` : 'Cut slide'}</button>
             <button data-a="paste">Paste slides after this</button>
             <hr>
-            <button data-a="up" ${i === 0 ? 'disabled' : ''}>Move up</button>
-            <button data-a="down" ${i === n - 1 ? 'disabled' : ''}>Move down</button>
-            <button data-a="top" ${i === 0 ? 'disabled' : ''}>Move to top</button>
-            <button data-a="bottom" ${i === n - 1 ? 'disabled' : ''}>Move to bottom</button>
+            <button data-a="up" ${can('up')}>Move${what} up</button>
+            <button data-a="down" ${can('down')}>Move${what} down</button>
+            <button data-a="top" ${can('top')}>Move${what} to top</button>
+            <button data-a="bottom" ${can('bottom')}>Move${what} to bottom</button>
+            <button data-a="moveto" ${n <= group.length ? 'disabled' : ''}>Move${what} to...</button>
             <hr>
             <button data-a="skip">${skipped ? 'Include in presentation' : 'Skip in presentation'}</button>
             <hr>
@@ -607,10 +774,8 @@ export class SlideStrip extends EventTarget {
                 case 'copy': this.clip.copy(); break;
                 case 'cut': this.clip.cut(); break;
                 case 'paste': this.clip.pasteFromMenu(); break;
-                case 'up': this.moveSlide(i, i - 1); break;
-                case 'down': this.moveSlide(i, i + 1); break;
-                case 'top': this.moveSlide(i, 0); break;
-                case 'bottom': this.moveSlide(i, n - 1); break;
+                case 'up': case 'down': case 'top': case 'bottom': this.moveSelected(a.dataset.a, group); break;
+                case 'moveto': this.showMoveTo(group, x, y); break;
                 case 'skip': this.toggleSkip(i); break;
                 case 'section': { const name = prompt('Section name:', it._slide.getAttribute('data-section') || ''); if (name === null) break; this.history.attr(it._slide, 'data-section', name.trim() || null, name.trim() ? 'Start section' : 'Remove section'); this.syncStructure(); this.app.inspector.sync(); break; }
                 case 'unsection': this.history.attr(it._slide, 'data-section', null, 'Remove section'); this.syncStructure(); this.app.inspector.sync(); break;
@@ -618,48 +783,141 @@ export class SlideStrip extends EventTarget {
         });
     }
     _closeMenu() { document.querySelectorAll('.strip-menu').forEach(m => m.remove()); }
+    /* Esc: true when there was a menu to close. */
+    closeMenu() { const open = !!document.querySelector('.strip-menu'); this._closeMenu(); return open; }
+
+    /* "Move to...": a slide number (where the first of the slides lands) or the end of a section.
+       At (x, y), or beside the first slide's thumbnail. */
+    showMoveTo(group = this.selectedSlides(), x = null, y = null) {
+        this._closeMenu();
+        const slides = this.deck.slides;
+        if (!group.length || group.length >= slides.length) return;
+        const max = slides.length - group.length + 1;
+        const secs = this.sections();
+        const box = document.createElement('div');
+        box.className = 'strip-menu strip-moveto';
+        box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Move slides');
+        box.innerHTML = `
+            <div class="moveto-head">Move ${slidesWord(group.length)} to</div>
+            <form class="moveto-row"><label>Slide number <input type="number" min="1" max="${max}" step="1" required></label><button type="submit">Move</button></form>
+            <div class="moveto-hint">1 to ${max}${group.length > 1 ? ': the first of them lands there, the others follow' : ''}</div>
+            ${secs.length ? '<hr><div class="moveto-head">The end of a section</div>' : ''}`;
+        secs.forEach((sec, k) => {
+            const b = document.createElement('button');
+            b.type = 'button'; b.dataset.sec = k; b.textContent = sec.name;
+            if (group.includes(sec.start)) { b.disabled = true; b.title = 'The slides start this section'; }
+            box.appendChild(b);
+        });
+        const input = box.querySelector('input');
+        input.value = slides.indexOf(group[0]) + 1;
+        if (x == null) { const it = this.items.get(group[0]); const r = (it || this.list).getBoundingClientRect(); x = r.right + 4; y = r.top; }
+        box.style.left = Math.max(4, Math.min(x, innerWidth - 240)) + 'px';
+        box.style.top = Math.max(4, Math.min(y, innerHeight - 160 - secs.length * 30)) + 'px';
+        document.body.appendChild(box);
+        box.querySelector('form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const v = Math.round(+input.value);
+            if (!(v >= 1 && v <= max)) { this.app.toast(`A slide number from 1 to ${max}`); input.select(); return; }
+            this._closeMenu();
+            this.moveSelected(v - 1, group);
+        });
+        box.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-sec]'); if (!b || b.disabled) return;
+            this._closeMenu();
+            this.moveToSection(secs[+b.dataset.sec].start, group);
+        });
+        input.focus(); input.select();
+    }
 
     /* ------------------------------------------------------------
        Reorder by dragging a thumbnail
        ------------------------------------------------------------ */
+    /* Where a drag held at clientY would land: before the slide `to` (deck order; the end when it
+       is the count), `into` when that is the start of a section, and the strip element that shows
+       it (`mark`, with the class `cls`). Over a section heading's upper half, the slides land before
+       the heading, at the end of the section above; over its lower half or just under it, into the
+       section, first. Folded sections take part through their headings. */
+    _dropTarget(y) {
+        const items = this.itemList();
+        for (const k of this.list.children) {
+            if (k.hidden) continue;
+            const head = k.classList.contains('strip-section');
+            if (!head && !k.classList.contains('strip-item')) continue;
+            const r = k.getBoundingClientRect();
+            if (head) {
+                const first = items.indexOf(k.nextElementSibling);
+                if (y < r.top + r.height / 2) return { to: first, into: false, mark: k, cls: 'drop-before' };
+                if (y < r.bottom) return { to: first, into: true, mark: k, cls: 'drop-into' };
+                continue;
+            }
+            if (y < r.top + r.height / 2) {
+                const h = k.previousElementSibling;
+                if (h && h.classList.contains('strip-section')) return { to: items.indexOf(k), into: true, mark: h, cls: 'drop-into' };
+                return { to: items.indexOf(k), into: false, mark: k, cls: 'drop-before' };
+            }
+        }
+        const last = items.filter(it => !it.hidden).pop();
+        return { to: items.length, into: false, mark: last || null, cls: 'drop-after' };
+    }
+
     _bindDrag() {
         let drag = null;
+        const clearMarks = () => this.list.querySelectorAll('.dragging, .drop-before, .drop-after, .drop-into').forEach(x => x.classList.remove('dragging', 'drop-before', 'drop-after', 'drop-into'));
+        const aim = () => {
+            const t = this._dropTarget(drag.y);
+            drag.target = t;
+            this.list.querySelectorAll('.drop-before, .drop-after, .drop-into').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop-into'));
+            if (t.mark) t.mark.classList.add(t.cls);
+        };
+        // Held near the top or bottom edge, the strip scrolls, so a long deck can be crossed in one drag.
+        const edgeScroll = () => {
+            if (!drag || !drag.moved) return;
+            const r = this.list.getBoundingClientRect(), edge = 28;
+            const v = drag.y < r.top + edge ? -1 : drag.y > r.bottom - edge ? 1 : 0;
+            if (v) { this.list.scrollTop += v * 12; aim(); }
+            drag.raf = requestAnimationFrame(edgeScroll);
+        };
         this.list.addEventListener('pointerdown', (e) => {
             const it = e.target.closest('.strip-item');
             if (!it || e.button !== 0) return;
-            drag = { it, from: this.indexOf(it), y0: e.clientY, moved: false, to: null };
+            drag = { it, from: this.indexOf(it), y0: e.clientY, y: e.clientY, moved: false, target: null, group: null, badge: null, raf: 0 };
             this.list.setPointerCapture(e.pointerId);
         });
         this.list.addEventListener('pointermove', (e) => {
             if (!drag) return;
             if (!drag.moved && Math.abs(e.clientY - drag.y0) < 6) return;
-            drag.moved = true;
-            drag.it.classList.add('dragging');
-            // Insertion point: before the first item whose middle is below the pointer.
-            const items = this.itemList();
-            let to = items.length;
-            for (let i = 0; i < items.length; i++) {
-                const r = items[i].getBoundingClientRect();
-                if (e.clientY < r.top + r.height / 2) { to = i; break; }
+            drag.y = e.clientY;
+            if (!drag.moved) {
+                drag.moved = true;
+                // A picked slide takes all the picked ones along, in deck order; any other goes alone.
+                drag.group = this.sel.has(drag.it._slide) ? this.selectedSlides() : [drag.it._slide];
+                for (const s of drag.group) { const x = this.items.get(s); if (x) x.classList.add('dragging'); }
+                if (drag.group.length > 1) {
+                    drag.badge = document.createElement('div');
+                    drag.badge.className = 'strip-drag-badge';
+                    drag.badge.textContent = `${drag.group.length} slides`;
+                    document.body.appendChild(drag.badge);
+                }
+                drag.raf = requestAnimationFrame(edgeScroll);
             }
-            drag.to = to;
-            items.forEach((x, i) => { x.classList.toggle('drop-before', i === to); x.classList.toggle('drop-after', to === items.length && i === items.length - 1); });
+            if (drag.badge) { drag.badge.style.left = (e.clientX + 14) + 'px'; drag.badge.style.top = (e.clientY + 10) + 'px'; }
+            aim();
         });
         const end = (e) => {
             if (!drag) return;
             const d = drag; drag = null;
+            cancelAnimationFrame(d.raf);
+            if (d.badge) d.badge.remove();
             try { this.list.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-            this.list.querySelectorAll('.dragging, .drop-before, .drop-after').forEach(x => x.classList.remove('dragging', 'drop-before', 'drop-after'));
+            clearMarks();
             if (!d.moved) {
                 // Ctrl / Cmd toggles a slide in the picked ones, Shift picks the run from the current slide.
                 if (e.ctrlKey || e.metaKey || e.shiftKey) { this._pick(d.from, e.shiftKey); return; }
                 this.sel.clear(); this.highlight();
                 this.deck.goTo(d.from); return;                   // a plain press: go to that slide
             }
-            if (d.to === null) return;
-            let to = d.to;
-            if (to > d.from) to -= 1;
-            if (to !== d.from) this.moveSlide(d.from, to);
+            if (!d.target || e.type === 'pointercancel') return;
+            this.dropSlides(d.group, d.target.to, d.target.into);
         };
         this.list.addEventListener('pointerup', end);
         this.list.addEventListener('pointercancel', end);

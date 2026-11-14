@@ -358,13 +358,17 @@ export class Deck extends EventTarget {
         const slides = this.slides;
         if (!slides.length) return;
         index = Math.max(0, Math.min(index, slides.length - 1));
-        if (index === this.current) return;
+        // Back to the slide shown while a move away is still pending (two quick Shift+arrows in the
+        // strip): that move is overtaken, not left to land.
+        if (index === this.current && !this._navPending) return;
         const token = ++this._navToken;
         const before = this.current;
+        this._navPending = slides[index];        // the slide on its way in: a reorder meanwhile retargets it (slides.js)
         try { this.win.location.hash = '#' + (index + 1); } catch (e) { /* ignore */ }
         // Give the deck a moment to react to the hash; if it did not, do it by hand.
         setTimeout(() => {
             if (token !== this._navToken) return;
+            this._navPending = null;
             if (this.current === index) return;
             this._forceSlide(index, before);
         }, 30);

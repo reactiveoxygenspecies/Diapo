@@ -55,7 +55,8 @@
     --seg-on: var(--ink);          /* the chosen segment of a segmented control */
     --chrome: var(--ink);          /* toasts, the text formatting bar */
     --current: var(--accent);      --current-glow: transparent;  --current-marker: transparent;
-    --num-font: 11px var(--ui-font); --num-current-ink: var(--ink-3);
+    /* The slide numbers in the strip: small, so darker than --ink-3, for 4.5:1 on the panel in every look. */
+    --num-font: 11px var(--ui-font); --num-ink: #6b6c74; --num-current-ink: var(--num-ink);
     --notice-bg: #fff6d6;          --notice-line: #e6c65a;      --notice-btn-line: #d9d0a8;   /* the yellow notice bar */
     --thumb-label-bg: rgba(255,255,255,0.85); --edit-bg: rgba(255,255,255,0.92); --sketch-bg: #ddd;
 }
@@ -75,7 +76,7 @@ html[data-look="ink"] {
     --dirty: #ffb14d; --dirty-glow: rgba(255,177,77,0.25);
     --section-ink: #4c56d8; --seg-on: #4c56d8; --chrome: #1b1d27;
     --current: #4c56d8; --current-glow: rgba(76,86,216,0.12); --current-marker: #4c56d8;
-    --num-font: 500 11px var(--ui-mono); --num-current-ink: #4c56d8;
+    --num-font: 500 11px var(--ui-mono); --num-ink: #686c7a; --num-current-ink: #4c56d8;
     --zoom-bg: rgba(255,255,255,0.08); --zoom-ink: #e8e9f0;
     --problem-bg: rgba(255,177,77,0.16); --problem-ink: #ffb14d;
     --toast-edge: #6b74f0; --toast-err-edge: #ff7a55;
@@ -97,7 +98,7 @@ html[data-look="slate"] {
     --dirty: #ff5722; --dirty-glow: rgba(255,87,34,0.28);
     --section-ink: #3d7d80; --seg-on: #2f3a44; --chrome: #2f3a44;
     --current: #ff5722; --current-glow: transparent; --current-marker: #ff5722;
-    --num-font: 500 11px var(--ui-mono); --num-current-ink: #2f3a44;
+    --num-font: 500 11px var(--ui-mono); --num-ink: #636d77; --num-current-ink: #2f3a44;
     --zoom-bg: rgba(117,170,171,0.22); --zoom-ink: #b9dadb;
     --problem-bg: rgba(255,87,34,0.18); --problem-ink: #ffb59a;
     --toast-edge: #75aaab; --toast-err-edge: #ff5722;
@@ -121,7 +122,7 @@ html[data-look="dark"] {
     --dirty: #ffb14d; --dirty-glow: rgba(255,177,77,0.25);
     --section-ink: #8a92ff; --seg-on: #6b74f0; --chrome: #0f0f12;
     --current: #8a92ff; --current-glow: rgba(138,146,255,0.14); --current-marker: #8a92ff;
-    --num-font: 500 11px var(--ui-mono); --num-current-ink: #8a92ff;
+    --num-font: 500 11px var(--ui-mono); --num-ink: #8e8e98; --num-current-ink: #8a92ff;
     --zoom-bg: rgba(255,255,255,0.08); --zoom-ink: #e8e9f0;
     --problem-bg: rgba(255,177,77,0.16); --problem-ink: #ffb14d;
     --toast-edge: #8a92ff; --toast-err-edge: #ff7a55;
@@ -265,7 +266,7 @@ body.no-deck #strip, body.no-deck #inspector { display: none; }
     display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start;
     cursor: pointer; position: relative;
 }
-.strip-item .n { font: var(--num-font); color: var(--ink-3); text-align: right; padding-top: 2px; font-variant-numeric: tabular-nums; }
+.strip-item .n { font: var(--num-font); color: var(--num-ink); text-align: right; padding-top: 2px; font-variant-numeric: tabular-nums; }
 .strip-item.current .n { color: var(--num-current-ink); font-weight: 700; }
 .strip-item .thumb {
     aspect-ratio: var(--stage-ar, 16 / 9); width: 100%;
@@ -756,6 +757,20 @@ select option { background: var(--bg-2); color: var(--ink); }
 .strip-item.dragging { opacity: 0.4; }
 .strip-item.drop-before .thumb { box-shadow: 0 -6px 0 -2px var(--accent); }
 .strip-item.drop-after .thumb { box-shadow: 0 6px 0 -2px var(--accent); }
+/* A drop on a section heading (or just under it) goes into the section; above it, before it. */
+.strip-section.drop-into { color: var(--ink); background: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); border-radius: 3px; }
+.strip-section.drop-before { box-shadow: 0 -4px 0 -2px var(--accent); }
+.strip-drag-badge {
+    position: fixed; z-index: 80; pointer-events: none; padding: 3px 8px; border-radius: 10px;
+    background: var(--accent); color: #fff; font: 600 11px var(--ui-font); box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.strip-moveto { width: 230px; padding: 8px; }
+.strip-moveto .moveto-head { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--section-ink); padding: 2px 4px 6px; }
+.strip-moveto .moveto-row { display: flex; align-items: center; gap: 6px; padding: 0 4px; }
+.strip-moveto .moveto-row label { display: flex; align-items: center; gap: 6px; flex: 1; font-size: 12px; }
+.strip-moveto .moveto-row input { width: 56px; height: 26px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--bg-2); color: var(--ink); padding: 0 6px; font: inherit; }
+.strip-moveto .moveto-row button { width: auto; padding: 4px 10px; border: 1px solid var(--line-2); background: var(--bg); }
+.strip-moveto .moveto-hint { font-size: 11px; color: var(--ink-2); padding: 4px 4px 2px; }
 .strip-menu {
     position: fixed; z-index: 70; min-width: 180px; padding: 4px;
     background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 8px;
