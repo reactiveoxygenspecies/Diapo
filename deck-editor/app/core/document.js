@@ -131,6 +131,8 @@ html.deck-editing .deck-stage [data-ed-ground] > * { pointer-events: auto !impor
 html.deck-editing .deck-stage [data-ed-ground] { pointer-events: none !important; }
 html.deck-no-transitions .deck-stage, html.deck-no-transitions .deck-stage * { transition: none !important; }
 html.deck-editing .slide > aside.notes, html.deck-editing .slide > .notes { display: none !important; }
+::highlight(diapo-find) { background: rgba(255, 214, 0, 0.45); color: inherit; }
+::highlight(diapo-find-current) { background: rgba(255, 140, 0, 0.8); color: #000; }
 html.deck-editing .deck-stage [data-fragment] { opacity: 1 !important; pointer-events: auto !important; }
 html.deck-editing .deck-stage [data-placeholder] { display: flex !important; }
 `;

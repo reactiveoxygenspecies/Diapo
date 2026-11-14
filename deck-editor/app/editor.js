@@ -12,6 +12,7 @@ import { refreshChem, uprightLabels } from './core/chem.js';
 import { LAYOUTS } from './core/layouts.js';
 import { Cropper, canCrop, cropBoxOf } from './core/crop.js';
 import { Palette, iconEntries } from './core/palette.js';
+import { FindBar } from './core/find.js';
 import { Rulers } from './core/guides.js';
 import { Deck } from './core/document.js';
 import { History } from './core/history.js';
@@ -50,6 +51,8 @@ export const app = {
     editops: null,
     problems: null,
     theme: null,
+    find: null,
+    spellcheck: true,       // Look > Check spelling while typing: the browser's spellcheck on the text being edited
     themeMode: false,
     api,
     toast: null,            // set once toast() exists
@@ -397,6 +400,20 @@ export function setHints(on) {
     $('btnHintsState').textContent = on ? 'shown' : 'hidden';
     try { localStorage.setItem(HINTS_KEY, on ? '1' : '0'); } catch (e) { /* ignore */ }
 }
+/* Spelling: the browser's own checker on the text being edited (and the notes box), only while it
+   is edited: textedit.js sets spellcheck on the element then and takes it off again, so the file
+   never carries it. On by default, remembered here like the other Look options. */
+const SPELL_KEY = 'deck-editor-spell';
+export function setSpell(on) {
+    app.spellcheck = on;
+    $('btnSpell').classList.toggle('on', on);
+    $('btnSpellState').textContent = on ? 'on' : 'off';
+    const notes = $('inspNotes'); if (notes) notes.spellcheck = on;
+    if (app.textEdit) app.textEdit.applySpellcheck();
+    try { localStorage.setItem(SPELL_KEY, on ? '1' : '0'); } catch (e) { /* ignore */ }
+}
+let savedSpell = null;
+try { savedSpell = localStorage.getItem(SPELL_KEY); } catch (e) { /* ignore */ }
 let savedHints = null;
 try { savedHints = localStorage.getItem(HINTS_KEY); } catch (e) { /* ignore */ }
 
@@ -422,8 +439,10 @@ lookDropdown.addEventListener('click', (e) => {
     if (b) { setLook(b.dataset.look); lookDropdown.hidden = true; return; }
     if (e.target.closest('[data-opt="hints"]')) setHints(document.documentElement.dataset.hints !== 'on');
     if (e.target.closest('[data-opt="rulers"]')) setRulers(document.documentElement.dataset.rulers !== 'on');
+    if (e.target.closest('[data-opt="spell"]')) setSpell(!app.spellcheck);
 });
 setHints(savedHints === '1');
+setSpell(savedSpell !== '0');
 
 /* ------------------------------------------------------------
    Opening a deck
@@ -873,7 +892,7 @@ $('btnPreview').addEventListener('click', () => setPreview(true));
 const KEYS = [
     ['Files', [['Ctrl+O', 'Open the deck list'], ['Ctrl+S', 'Save'], ['Ctrl+Shift+S', 'Save as: a new name or folder, with the deck\'s files copied along'], ['Ctrl+P', 'Export as PDF (Export menu: single HTML file)'], ['Ctrl+T', 'Theme panel (colours, fonts, base styles)'], ['F5', 'Preview'], ['P / Shift+F5', 'Presenter view (second window)'], ['Esc', 'Leave preview, close dialogs, deselect']]],
     ['Slides', [['PgUp / PgDn', 'Previous / next slide'], ['Home / End', 'First / last slide'], ['Ctrl+M', 'New slide (layout picker; Ctrl+Shift+M: blank)'], ['Ctrl+D', 'Duplicate (slide or selection)'], ['Ctrl+Up / Down', 'Move the slide up / down']]],
-    ['Canvas', [['Click', 'Select'], ['Shift+click', 'Add to the selection'], ['Ctrl+click', 'Select the exact element under the cursor (a plain drag then moves just that)'], ['Alt+drag', 'Duplicate what you drag'], ['Ctrl while dragging', 'Disable snapping'], ['Shift / Alt while resizing', 'Keep the aspect ratio (corners) / resize about the centre; both together, both'], ['Right-click', 'Element menu'], ['Drag on empty space', 'Marquee select'], ['Double-click / Enter', 'Edit text (Esc when done; Ctrl+B / I / U, Ctrl+Shift+X strike, Ctrl+Shift+= superscript, Ctrl+= subscript while editing)'], ['Arrows', 'Nudge 1px (Shift: 10px)'], ['Delete', 'Delete the selection (Hide is in the panel and the menu)'], ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste, also across slides; images and text from elsewhere paste too'], ['Ctrl+Alt+C / Ctrl+Alt+V', 'Copy the look of an element (colours, border, type, padding) / put it on the selection'], ['Ctrl+G / Ctrl+Shift+G', 'Group / ungroup'], ['Ctrl+] / Ctrl+[', 'Bring forward / send backward (Shift: to front / to back)'], ['Tab', 'Next sibling'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'], ['Ctrl++ / Ctrl+- / Ctrl+0', 'Zoom in / out / fit'], ['Space+drag, middle button, wheel', 'Pan when zoomed in (the middle button grabs the view)'], ['Ctrl+\\', 'Hide / show both side panels (drag their edges to resize)']]],
+    ['Canvas', [['Click', 'Select'], ['Shift+click', 'Add to the selection'], ['Ctrl+click', 'Select the exact element under the cursor (a plain drag then moves just that)'], ['Alt+drag', 'Duplicate what you drag'], ['Ctrl while dragging', 'Disable snapping'], ['Shift / Alt while resizing', 'Keep the aspect ratio (corners) / resize about the centre; both together, both'], ['Right-click', 'Element menu'], ['Drag on empty space', 'Marquee select'], ['Double-click / Enter', 'Edit text (Esc when done; Ctrl+B / I / U, Ctrl+Shift+X strike, Ctrl+Shift+= superscript, Ctrl+= subscript while editing)'], ['Arrows', 'Nudge 1px (Shift: 10px)'], ['Delete', 'Delete the selection (Hide is in the panel and the menu)'], ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste, also across slides; images and text from elsewhere paste too'], ['Ctrl+Alt+C / Ctrl+Alt+V', 'Copy the look of an element (colours, border, type, padding) / put it on the selection'], ['Ctrl+G / Ctrl+Shift+G', 'Group / ungroup'], ['Ctrl+] / Ctrl+[', 'Bring forward / send backward (Shift: to front / to back)'], ['Tab', 'Next sibling'], ['Ctrl+F / Ctrl+H', 'Find / find and replace across the deck (Enter / Shift+Enter: next / previous match; Esc closes)'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'], ['Ctrl++ / Ctrl+- / Ctrl+0', 'Zoom in / out / fit'], ['Space+drag, middle button, wheel', 'Pan when zoomed in (the middle button grabs the view)'], ['Ctrl+\\', 'Hide / show both side panels (drag their edges to resize)']]],
 ];
 function showHelp(on) {
     let h = document.querySelector('.help');
@@ -950,6 +969,7 @@ function onKey(e) {
 
     if (k === 'Escape') {
         if (app.palette && app.palette.open) { app.palette.close(); return stop(e); }
+        if (app.find && app.find.open) { app.find.close(); return stop(e); }
         if (app.fontPicker && app.fontPicker.isOpen) { app.fontPicker.close(); return stop(e); }
         if (app.iconPicker && app.iconPicker.isOpen) { app.iconPicker.close(); return stop(e); }
         if (app.preview) { setPreview(false); return stop(e); }
@@ -983,6 +1003,15 @@ function onKey(e) {
     if (ctrl && k.toLowerCase() === 'p') { stop(e); if (app.deck.isOpen) app.exporter.pdf(); return; }
     if ((k === 'p' || k === 'P') && !ctrl && !typing && app.deck.isOpen) { stop(e); app.presenter.open(); return; }
     if (k === 'F5') { stop(e); setPreview(true); return; }
+    // Ctrl+F / Ctrl+H: find and replace across the deck (the browser's find does not see into it).
+    // In a panel field they stay the browser's; in the find bar itself Ctrl+Z is the field's own undo.
+    if (typing && t.closest('#findBar') && ctrl && (k.toLowerCase() === 'z' || k.toLowerCase() === 'y')) return;
+    if (ctrl && !e.altKey && (k.toLowerCase() === 'f' || k.toLowerCase() === 'h')) {
+        if (typing && !t.closest('#findBar') && !t.isContentEditable) return;
+        stop(e);
+        if (app.deck.isOpen) app.find.show({ replace: k.toLowerCase() === 'h' });
+        return;
+    }
     if (ctrl && k.toLowerCase() === 'z') { stop(e); e.shiftKey ? redo() : undo(); return; }
     if (ctrl && k.toLowerCase() === 'y') { stop(e); redo(); return; }
     if (typing) return;
@@ -1359,6 +1388,8 @@ function paletteEntries() {
             const name = s.getAttribute('data-name') || (heading ? readableText(heading) : '');
             out.push({ group: 'Slides', label: `Go to slide ${i + 1}` + (name.trim() ? ' · ' + name.trim().replace(/\s+/g, ' ').slice(0, 50) : ''), run: () => app.deck.goTo(i) });
         });
+        out.push({ group: 'Deck', label: 'Find...', hint: 'Ctrl+F', keywords: 'search', run: () => app.find.show() });
+        out.push({ group: 'Deck', label: 'Replace...', hint: 'Ctrl+H', keywords: 'find replace search', run: () => app.find.show({ replace: true }) });
         out.push({ group: 'Deck', label: 'Save', hint: 'Ctrl+S', run: () => saveDeck() });
         out.push({ group: 'Deck', label: 'Save as...', hint: 'Ctrl+Shift+S', run: () => saveDeckAs() });
         out.push({ group: 'Deck', label: 'Previous versions...', run: () => showVersions() });
@@ -1395,9 +1426,12 @@ function paletteEntries() {
     out.push({ group: 'Decks', label: 'Try the sample deck', run: () => openSampleDeck() });
     out.push({ group: 'Help', label: 'Keyboard map', hint: '?', run: () => showHelp(true) });
     out.push({ group: 'Help', label: 'Look (light / dark)', run: click('#btnLook') });
+    out.push({ group: 'View', label: (app.spellcheck ? 'Turn off' : 'Turn on') + ' spelling check while typing', keywords: 'spellcheck spell', run: () => setSpell(!app.spellcheck) });
     return out;
 }
 app.palette = new Palette(app, { entries: paletteEntries });
+app.find = new FindBar(app);
+setSpell(app.spellcheck);          // the notes box exists now
 app.theme = new ThemePanel(app, $('themeBody'));
 export function setThemeMode(on) {
     if (!app.deck.isOpen) return;

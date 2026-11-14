@@ -295,6 +295,7 @@ the file self-contained and the DOM predictable for the round trip.
 | Look > Rulers and guides | Rulers along the canvas in slide pixels, and the guides the deck keeps: drag one out of a ruler, drag it to move it, drag it off the slide (or double-click it) to remove it. Moving and resizing snap to them like to the smart guides. The guides live on the stage as `data-guides="x:960,y:540"`, so they are saved with the deck, travel with the file and are undone like any other change; the setting itself is the editor's, remembered per browser. The palette has "Guides at the selection (or the thirds)" and "Clear the guides" |
 | Look > Hints under the fields | The one-line notes under the panel's fields, off by default: what a field does is on its tooltip either way, and the notes that report state (how many fragments, how far an element was moved, what a deck is missing) are shown whatever the setting. Remembered per browser, like the editor's look and the panel widths |
 | Ctrl+K | The command palette: one search over the editor's actions (insert, arrange, save, export, present, view), the slides by name ("Go to slide 3 · bullets"), the built-in icons, every slide layout ("New slide: Quote"), every template ("New deck from the Swiss template..." opens New with it chosen), and "Font Awesome icon..." / "Change font..." which open those pickers with the words typed. Arrows choose, Enter runs, Esc closes |
+| Ctrl+F / Ctrl+H, Find... / Replace... (palette) | Find and replace across the whole deck (the browser's own find does not see into the deck); in a panel field the keys stay the browser's. The bar has the find field, **Match case**, **Whole word**, **Include speaker notes**, a count ("3 of 12"), Next / Previous (Enter / Shift+Enter, or the arrows) and, with Ctrl+H, the Replace with field and Replace / Replace all (Enter in that field replaces). Every slide is searched, skipped ones too, and the master layer (the footer); text, lists, tables, shapes with text (SVG labels) and, if asked, the notes, but not chart data, equations, structures or code blocks. A match is found across formatting ("Hello **world**"). Going to a match opens its slide, selects its element (a hidden element or a note is not selected; the bar says so) and marks the match: with the CSS Custom Highlight API where the browser has it (`::highlight` rules in the editor's host style, removed on save), else boxes drawn over the stage in the editor's own layer, so a highlight is never in the saved file. Replace and Replace all edit text nodes only, so bold, links and sub / sup survive, and go through the undo history as the text editor does (the element's innerHTML before / after); Replace all is one undo step. **A match that runs across two formatting runs ("Thi" + bold "rd") is skipped, not replaced** (joining the runs would drop one of the two formattings): Replace all counts it ("skipped 1") and it stays in the list for a hand edit. Esc closes the bar, clears the highlight and gives back the selection the user had |
 | Ctrl+Alt+C / Ctrl+Alt+V, Copy style / Paste style (element menu) | The look of an element (colours, border, corners, shadow, opacity, type, padding, not its place or size) copied, then put on the selection: only what differs is written, inline, one undo step |
 | Alt+drag | Duplicate what you drag and move the copy (one undo step); a selection when the press lands on it, else the element under the cursor. A copy of an element the deck lays out in flow is placed absolutely at the original's spot, so nothing else moves (Ctrl+D and paste do the same) |
 | Ctrl while dragging | Disable snapping |
@@ -435,6 +436,8 @@ controls and scrollbars follow); **Clean** is the light chrome; **Slate** is
 slate chrome with teal for anything you can act on and orange only as the
 "where you are" marker (current slide, unsaved changes, problems). The choice
 is remembered per browser, like the side panels.
+
+**Check spelling while typing** (Look, on by default, remembered like the other options) gives the text being edited, and the notes box, the browser's own spell checker in the browser's language. The element carries `spellcheck` only while it is edited: ending the edit removes it, and the saved file never has it (the serialiser strips it from the stage as well). Panel fields for colours, names, CSS, code, LaTeX and SMILES are never checked.
 
 ## The properties panel
 
@@ -1083,6 +1086,8 @@ deck-editor/
 ```
 
 ## Tests
+
+Find and replace and the spelling option have `tests/find-spell.spec.js`.
 
 The installed-fonts test (`tests/fonts-local.spec.js`) needs a visible Chrome and
 Windows fonts, so it only runs with `DECK_LOCAL_FONTS=1` set.

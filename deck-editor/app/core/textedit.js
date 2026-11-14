@@ -108,7 +108,7 @@ export class TextEditor extends EventTarget {
         this.before = t.innerHTML;
         this.history.remember(t);
         t.setAttribute('contenteditable', 'true');
-        t.setAttribute('spellcheck', 'false');
+        t.setAttribute('spellcheck', this.app.spellcheck === false ? 'false' : 'true');   // only while it is edited; commit() takes it off and the serialiser strips it too
         this.selection.setPassthrough(true);
         this.overlay.classList.add('editing');
         if (!this.selection.has(el)) this.selection.select(el);
@@ -117,6 +117,13 @@ export class TextEditor extends EventTarget {
         this._showBar();
         this.dispatchEvent(new CustomEvent('start', { detail: t }));
         return true;
+    }
+
+    /* The Look option changed while an element is being edited. */
+    applySpellcheck() {
+        const on = this.app.spellcheck !== false;
+        if (this.el) this.el.setAttribute('spellcheck', on ? 'true' : 'false');
+        if (this.svg && this.svg.ta) this.svg.ta.spellcheck = on;
     }
 
     commit() {
@@ -179,7 +186,7 @@ export class TextEditor extends EventTarget {
         ta.className = 'svgtext-edit';
         ta.rows = lines.length;
         ta.value = lines.map(l => l.textContent).join(String.fromCharCode(10));
-        ta.spellcheck = false;
+        ta.spellcheck = this.app.spellcheck !== false;
         const px = parseFloat(cs.fontSize) * k;
         ta.style.font = `${cs.fontStyle} ${cs.fontWeight} ${px}px/${1.2} ${cs.fontFamily}`;
         ta.style.color = cs.fill && cs.fill !== 'none' ? cs.fill : cs.color;
