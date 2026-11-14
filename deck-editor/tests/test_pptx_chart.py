@@ -72,7 +72,7 @@ class ChartSpec(unittest.TestCase):
         self.assertEqual(len(s["palette"]), 4)
 
     def test_kinds_the_editor_does_not_draw(self):
-        self.assertIsNone(chart_spec(part('<c:scatterChart>' + ser("XY", [1, 2]) + '</c:scatterChart>'), Theme()))
+        self.assertIsNone(chart_spec(part('<c:radarChart>' + ser("Web", [1, 2]) + '</c:radarChart>'), Theme()))   # scatters: test_pptx_scatter
 
 
 if __name__ == "__main__":
