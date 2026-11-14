@@ -1065,6 +1065,18 @@ body.resizing-panels #deckFrame { pointer-events: none; }
 .palette-foot { padding: 8px 16px; border-top: 1px solid var(--line); font-size: 11px; color: var(--ink-3); }
 .palette-foot kbd { font: 11px var(--ui-mono); padding: 0 4px; border: 1px solid var(--line-2); border-radius: 3px; margin-right: 2px; }
 .versions-card { width: 640px; }
+/* Insert > Interactive chart: the figure pasted, what is wrong with it, how it will look. */
+.plot-card { width: 720px; }
+.plot-card p { margin: 0 0 10px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.plot-card textarea { display: block; }
+.plot-card .plot-msg { min-height: 18px; margin: 6px 0; font-size: 12.5px; line-height: 1.4; color: var(--ink-2); }
+.plot-card .plot-msg.bad { color: var(--warn); }
+.plot-card .plot-preview { position: relative; height: 200px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); }
+.plot-card .plot-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 24px; text-align: center; font-size: 12.5px; color: var(--ink-3); }
+.plot-card .row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.plot-card .spacer { flex: 1; }
+.plot-card .tb-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.plot-card .tb-btn.primary:disabled { opacity: 0.45; cursor: default; }
 .versions-card p { margin: 0 0 10px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
 .versions-card td.acts { white-space: nowrap; text-align: right; }
 .versions-card td.acts .mini-btn { margin-left: 6px; }

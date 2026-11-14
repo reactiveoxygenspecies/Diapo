@@ -30,7 +30,7 @@ import { bleed as lineBleed } from './lines.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SKIP = 'script, style, template, noscript, aside.notes, .notes, .deck-controls, .deck-overview, .deck-laser, .deck-draw, .deck-draw-bar, [data-placeholder]';
 const INLINE = new Set(['inline', 'contents']);
-const LEAF_MEDIA = 'img, svg, video, canvas, iframe, object, embed, picture, table, [data-chart], [data-math], [data-chem], [data-fig]';
+const LEAF_MEDIA = 'img, svg, video, canvas, iframe, object, embed, picture, table, [data-chart], [data-math], [data-chem], [data-plot], [data-fig]';
 const GENERIC_FONTS = { 'sans-serif': 'Arial', serif: 'Georgia', monospace: 'Consolas', 'system-ui': 'Segoe UI', cursive: 'Comic Sans MS', fantasy: 'Impact' };
 const BULLETS = { disc: '•', circle: '◦', square: '▪', '-': '–' };
 const NUMBERING = { decimal: 'arabicPeriod', 'decimal-leading-zero': 'arabicPeriod', 'lower-alpha': 'alphaLcPeriod', 'lower-latin': 'alphaLcPeriod', 'upper-alpha': 'alphaUcPeriod', 'upper-latin': 'alphaUcPeriod', 'lower-roman': 'romanLcPeriod', 'upper-roman': 'romanUcPeriod' };
@@ -117,6 +117,7 @@ export class PptxCollector {
         const tag = el.tagName.toLowerCase();
         const box = this.box(el, cs);
         if (isChart(el)) { out.push(this.chart(el, box, cs)); return; }
+        if (el.matches('[data-plot]')) { const p = await this.plotItem(el, box); if (p) { const a = this.opacity(el); if (a < 0.999) p.alpha = a; out.push(p); } return; }
         if (el.matches('[data-math], [data-chem], [data-fig]') || tag === 'svg') { const s = await this.svgItem(el, box); if (s) { const a = this.opacity(el); if (a < 0.999) s.alpha = a; out.push(s); } return; }
         if (el.matches('[data-crop]')) { const img = el.querySelector('img'); if (img) { const p = await this.picture(img, box, el); if (p) out.push(p); } return; }
         if (tag === 'img') { const p = await this.picture(el, box); if (p) out.push(p); return; }
@@ -712,6 +713,23 @@ export class PptxCollector {
         const item = { kind: 'svg', ...box, svg: markup, png, name: this.name(el) || (el.hasAttribute('data-math') ? 'Equation' : el.hasAttribute('data-chem') ? 'Structure' : ''), alt: label };
         if (svg !== el || bl) Object.assign(item, { x: r.x, y: r.y, w: r.w, h: r.h, rot: box.rot });
         return item;
+    }
+
+    /* An interactive chart goes as its picture: the SVG Plotly made of it (with a PNG beside it,
+       for PowerPoint versions that do not read SVG), or the PNG a very large one is kept as. */
+    async plotItem(el, box) {
+        const img = el.querySelector('[data-plot-snapshot]');
+        const src = img && img.getAttribute('src') || '';
+        if (!src) { this.note('an interactive chart without its picture was left out (open it in the editor once to draw it)'); return null; }
+        const name = this.name(el) || 'Chart', alt = img.getAttribute('alt') || '';
+        const m = /^data:image\/svg\+xml(;[^,]*)?,/i.exec(src);
+        if (!m) return { kind: 'pic', ...box, name, alt, src: { data: src } };
+        let svg;
+        try { svg = /;base64/i.test(m[1] || '') ? new TextDecoder().decode(Uint8Array.from(atob(src.slice(m[0].length)), c => c.charCodeAt(0))) : decodeURIComponent(src.slice(m[0].length)); }
+        catch (e) { svg = ''; }
+        const png = await this.rasterImg(img, box.w, box.h);
+        if (!svg) return png ? { kind: 'pic', ...box, name, alt, src: { data: png } } : null;
+        return { kind: 'svg', ...box, svg, png, name, alt };
     }
 
     standaloneSvg(svg, w, h, bleed = 0) {

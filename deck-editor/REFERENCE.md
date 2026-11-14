@@ -387,6 +387,12 @@ Optional hooks, used when present and tolerated when absent:
   chemical structure the editor drew (see Equations and chemical structures): the
   source in the attribute and one drawn `<svg>` inside. Selected as a whole; a
   figure with the attribute alone is drawn when the deck opens.
+- `figure[data-plot="plotly"]` is an interactive chart (see Interactive charts): the
+  figure as JSON in `<script type="application/json" data-plot-figure>` and a picture
+  of it in `<img data-plot-snapshot>`. Selected as a whole; the editor keeps the
+  picture up to date, and a figure with the JSON alone gets its picture when the
+  deck opens. What the deck's renderer draws when presenting (`.deck-plot-live`) is
+  never saved.
 - `[data-svg]` hosts inline an SVG file at load. On save the host goes back to its
   original `<img>` unless a shape inside it was edited (then the inlined SVG is kept).
 - `svg.dots` and `[data-generated]` contents are regenerated at load; they are
@@ -491,6 +497,8 @@ the editor shows it.
   after each edit.
 - Chart: column, bar, line, area, pie or doughnut, drawn by the editor from a
   table (see Charts below).
+- Interactive chart (Plotly)...: a Plotly figure pasted as JSON or read from a
+  file, live when the deck is presented (see Interactive charts below).
 - Media: image from file or URL, image placeholder, video from file
   (mp4, webm, mov, uploaded to `assets/`) or URL, embedded web page
   (YouTube and Vimeo links become their players).
@@ -581,6 +589,95 @@ or script to show it (in the PDF and the single-file export too), and the
 editor draws it again from the table whenever the box, the text size or the
 font changes. A chart title is drawn across the top (the Title field). Charts
 a deck renders with its own script (`[data-fig]`, below) stay the deck's.
+
+### Interactive charts (Plotly)
+
+**Insert > Interactive chart (Plotly)...** (and the palette) opens a dialog that
+takes a Plotly figure in any of three forms: the JSON `fig.to_json()` gives
+(`{"data": [...], "layout": {...}, "frames": [...]}`, or the list of traces
+alone), pasted; a `.json` file; or a page saved with `fig.write_html()`, with
+plotly.js inside it or from a CDN, from which the data, layout and config of
+its `Plotly.newPlot(...)` call are read (and the frames of `Plotly.addFrames`;
+a page made by R's htmlwidgets too). The dialog draws the figure as it will
+look on the slide and says what is wrong when the text does not parse: the
+line where the JSON breaks, Python text pasted instead of JSON, a figure with
+no data, a page with no Plotly chart in it. **Try a sample** fills in a small
+figure. A figure that needs the internet to draw (a map's outlines or tiles,
+a picture given by address) is not drawn until **Draw it** or Insert is
+pressed, and the panel says that the chart fetches them whenever it shows.
+
+On the slide the chart is an element like any other: placed, sized, rotated,
+animated, a fragment, copied between slides and decks. While editing it is a
+picture of itself, so clicks and drags are the editor's; the picture is drawn
+again a moment after the figure, the box or the deck's look changes. In
+**Preview** (F5) and in the saved deck it is live: hover, zoom, pan, the
+legend, animation frames. Only the slide on show is drawn (a browser keeps
+few WebGL drawings at once); the slide that leaves goes back to its picture.
+A swipe that starts on the chart, the wheel over it and a click on it are the
+chart's, not the deck's cue to change slide; the keys still move the deck.
+On a slide with fragments the presentation features take the wheel first.
+
+The **Interactive chart** section of the panel has the figure's JSON (Apply,
+Ctrl+Enter or leaving the box draws it; a mistake is said under the box and
+the slide keeps the chart it had; a figure over 1.5 MB is replaced from a file
+instead), **Replace from a file...**, and three options:
+
+- **Live in the presentation**: off, the slide shows the picture when
+  presented too (`data-plot-live="off"`).
+- **Use the deck's colours and fonts** (on for a new chart,
+  `data-plot-theme="deck"`): a clear ground, the element's own text colour,
+  font and size (the Text and Colour sections, 22px to start with), the deck's
+  accent colours for the series (a trace still in one of Plotly's default
+  colours takes the deck's colour in the same place; a colour set on purpose
+  stays), axis and grid lines in the text colour. Off, the figure looks as
+  it was made.
+- **Plotly's toolbar**: the row of buttons over the chart when the mouse is
+  on it (`data-plot-toolbar="off"` hides it). The links to Plotly's cloud are
+  always off.
+
+Every change is one undo step. The chart is saved as
+
+```html
+<figure data-plot="plotly" data-plot-theme="deck" style="position:absolute; ...">
+  <img data-plot-snapshot data-key="..." src="data:image/svg+xml,..." alt="the figure's title">
+  <script type="application/json" data-plot-figure>{"data": [...], "layout": {...}}</script>
+</figure>
+```
+
+The JSON never runs (a data block, with every `<` written `\u003c`). The
+picture is an SVG made by `Plotly.toImage` in the editor (a PNG at twice the
+size when the SVG would pass 3 MB) and is what shows wherever scripts do not
+run: the slide strip and the Decks drawer (sandboxed frames), the PDF and the
+handout (the printable copy leaves the library out), PowerPoint (the SVG with
+a PNG beside it, as one picture), a deck whose scripts are blocked, and a
+chart that fails to draw. Text in the picture uses the fonts installed on the
+computer, as any SVG shown as a picture does: with a web font the live chart
+and the picture can differ slightly.
+
+To draw it live, a deck with a chart ends with two script tags, written on
+save (and taken out again when the last chart is deleted):
+
+```html
+<script src="deck-plotly.min.js" data-deck-plot="library"></script>
+<script src="deck-plot.js" data-deck-plot="renderer"></script>
+```
+
+`deck-plotly.min.js` is plotly.js 4.3.0 (`app/vendor/plotly.min.js`, the npm
+package `plotly.js-dist-min` byte for byte, copied in by
+`node tools/build-vendor.js`) and `deck-plot.js` is the editor's renderer
+(`app/deck-plot.js`, also in `diapo-format/`). The server copies both beside
+the deck when it is saved or saved as (never for a draft or an export), and
+replaces an older edition of its own there; keep them with the deck, like
+`assets/`. They run without "Trust this deck": see Scripts in decks. A deck
+that got its first chart in this session has no library in its page yet, so
+for Preview the editor puts both into the page it shows as inline scripts
+(never into the file). **Export > Single HTML file** writes both into the
+file, so it plays anywhere on its own (about 5 MB more).
+
+`data-plot` names the library: the element is built so that another one
+(Vega-Lite, Chart.js) can come in as another value with the same two
+children. Charts a deck draws with a script of its own (`[data-fig]`) stay
+the deck's, and still need its trust.
 
 ### Equations and chemical structures
 
@@ -1006,7 +1103,15 @@ So a deck's own scripts are paused until the user trusts the deck:
   SHA-256 of their text: the current editions, hashed by the server at start,
   and every earlier one in `app/known-scripts.json`, made from the git history
   by `py -3 tools/build-known-scripts.py` (`tools/release.py` runs it). An edition
-  pasted in with other blank lines round it counts too. Everything else stays
+  pasted in with other blank lines round it counts too. Two of Diapo's
+  scripts are files beside the deck, not text in it: the library and the
+  renderer of an interactive chart (`deck-plotly.min.js`, `deck-plot.js`). A
+  deck page may load one of them for as long as the file's bytes are an
+  edition of Diapo's (SHA-256 of the file, checked each time the page is
+  served; earlier editions under `files` in `known-scripts.json`): the policy
+  then names that one address. A file of that name with anything else in it
+  is the deck's own script, paused like any other. Written into a page (the
+  single-file export) they are recognised as text, like the rest. Everything else stays
   off: other inline scripts, script files, inline event handlers, `javascript:`
   links, form posts. Any other file a frame could show as a document (an SVG)
   runs no script at all.
@@ -1038,6 +1143,8 @@ deck-editor/
     index.html        the editor shell (look.js sets the Look before the first paint)
     presenter.html    the presenter window, and presenter.js its script
     print/            prep.js and keeper.js, the two scripts of the printable copy (PDF)
+    deck-plot.js      draws interactive charts in a deck (copied beside a deck that has one)
+    vendor/           MathJax, SmilesDrawer and plotly.js, with their licences (tools/build-vendor.js)
     known-scripts.json  hashes of earlier editions of Diapo's scripts (see Scripts in decks)
     brand/            the logo: mark.svg (favicon, no word), logo.svg (the mount with DIAPO, outlined), loader.svg (the loading mark, animated), Anton, its face; icon.ico for the exe and icon-256/512.png for the page and its manifest
     editor.css
@@ -1054,6 +1161,7 @@ deck-editor/
       slides.js       slide strip, thumbnails, slide operations
       insert.js       new elements
       chart.js        charts: the drawing from a table, the panel's Chart section
+      plot.js         interactive charts (Plotly): reading the figure, its picture, the dialog, the panel's section
       crop.js         cropping a picture by hand (the data-crop box, crop mode)
       fonts.js        the font block, Google Fonts URLs, self-hosting, the picker
       export.js       the printable copy, PDF, single-file export
@@ -1093,8 +1201,9 @@ npm test               (the installed Chrome)
 npm run test:firefox   (the same specs in Firefox; once before:
                         npx playwright install firefox)
 npm run test:py        (the Python tests: pptx_chart.py, pptx_import.py, emf_svg.py,
-                        which files a Markdown import may copy, and the
-                        settings file written whole or not at all)
+                        which files a Markdown import may copy, the
+                        settings file written whole or not at all, and which
+                        script files beside a deck count as Diapo's own)
 ```
 
 The tests start `serve.py` on a throw-away workspace made from

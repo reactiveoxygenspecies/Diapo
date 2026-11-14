@@ -95,7 +95,7 @@ export class TextEditor extends EventTarget {
     start(el, at = null) {
         if (el && el.hasAttribute && el.hasAttribute('data-placeholder')) return false;
         if (chartOf(el)) return false;              // a chart's words are its table, in the panel
-        if (el && el.closest && el.closest('[data-math], [data-chem]')) return false;   // their source is in the panel too
+        if (el && el.closest && el.closest('[data-math], [data-chem], [data-plot]')) return false;   // their source is in the panel too
         if (canCrop(el)) return false;              // a double-click on a picture crops it (crop.js)
         // Labels inside inline SVG: the <text> that was hit (or selected exactly) is edited in a box over it.
         const svgText = TextEditor.svgTextAt(el, at);

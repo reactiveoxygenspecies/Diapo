@@ -77,6 +77,9 @@ touches.
     deck-template.md "Charts") and CSS over a chart library, and never use
     `onclick="..."` attributes or `javascript:` links. A `<script
     type="application/json">` data block is not a script: it never runs.
+    The one library Diapo runs as its own is plotly.js for an interactive
+    chart (`figure[data-plot="plotly"]`, below): use that form, never a
+    Plotly `<script>` of your own with a `Plotly.newPlot(...)` call.
     Paste the controller and runtime without re-indenting them: whitespace
     round the whole script is tolerated, inside it is not.
 
@@ -143,6 +146,7 @@ touches.
 | `data-edit` | a text element | Marks text the author intends to be editable (all text is editable anyway). |
 | `data-fig` / `data-svg` / `data-generated` | hosts | Script-rendered content, see deck-template.md. |
 | `data-chart` | `<figure>` | A chart the editor draws and edits (Insert > Chart): an inline `<svg>` plus its table as JSON in `<script type="application/json" data-chart-data>`. A generator writes the figure with the JSON only; the editor draws the `<svg>` when it opens the deck, and Ctrl+S keeps it. deck-template.md has the format. |
+| `data-plot="plotly"` | `<figure>` | An interactive chart (Insert > Interactive chart (Plotly)...): live when presented (hover, zoom, legend), a picture everywhere else. See "Interactive charts (Plotly)" below. |
 | `data-math` / `data-chem` | `<figure>` | An equation (LaTeX) or a chemical structure (SMILES) the editor draws and edits (Insert > Equation, Insert > Chemical structure): the source in the attribute, one inline `<svg>` inside. A generator writes the figure with the source only; the editor draws it on open and Ctrl+S keeps it. Options on structures: `data-chem-colours="off"`, `data-chem-aromatic="circles"`. |
 | `data-auto-advance="8"` | a slide, or `.deck-stage` as the default | The deck moves on by itself after that many seconds (fragments first, one step at a time). When the first slide has a wait (its own or the stage's), the deck starts running as soon as it is opened on its own: a kiosk. A (in the deck) starts and stops it. |
 | `data-loop` | `.deck-stage` | A deck that runs by itself starts again after the last slide. |
@@ -196,3 +200,52 @@ nothing was changed.
    slide 3, P opens the presenter, O the overview, H hides the on-screen
    controls (they fade after 2 s without mouse movement anyway). A deck
    meant to run by itself: A starts it, and it moves on at the set seconds.
+
+## Interactive charts (Plotly)
+
+When the user has a Plotly figure (from Python, R or a notebook) and wants it
+live in the talk, write it exactly like this. Use the editor's own charts
+(`figure[data-chart]`) for anything a column, bar, line, area or pie chart can
+say: they need no library.
+
+```html
+<figure data-plot="plotly" data-plot-theme="deck" data-id="fig-growth"
+        style="position:absolute; left:410px; top:230px; width:1100px; height:620px; margin:0; font-size:22px;">
+  <script type="application/json" data-plot-figure>{"data":[{"type":"scatter","mode":"lines+markers","name":"Control","x":[0,10,20,30],"y":[0.02,0.05,0.11,0.24]}],"layout":{"title":{"text":"Growth over time"},"xaxis":{"title":{"text":"Time (min)"}}}}</script>
+</figure>
+```
+
+and, once per deck, as the last two lines before `</body>` (after the
+controller and the runtime):
+
+```html
+<script src="deck-plotly.min.js" data-deck-plot="library"></script>
+<script src="deck-plot.js" data-deck-plot="renderer"></script>
+```
+
+- The JSON is the figure as `fig.to_json()` gives it: `data` (required),
+  `layout`, optionally `config` and `frames`. Paste it whole, on one line, with
+  every `<` written `\u003c`. Do not put `width`, `height` or `autosize` in
+  the layout to size it: the chart takes the size of the figure element, which
+  needs a width and a height.
+- `data-plot-theme="deck"` gives the chart the deck's look: the figure
+  element's `color`, `font-family` and `font-size` for its text (22px reads
+  well on a 1920x1080 slide), a clear ground, the deck's accent colours for the
+  series. Leave the attribute out to keep the figure's own colours (then give
+  the layout a `paper_bgcolor` that suits the slide).
+- `data-plot-live="off"` shows the picture only; `data-plot-toolbar="off"`
+  hides Plotly's toolbar.
+- Do not write the `<img data-plot-snapshot>` picture yourself: Diapo draws it
+  the first time the deck is opened in the editor and keeps it up to date. Tell
+  the user to open the deck in Diapo and save it once: that draws the pictures
+  (what the PDF, PowerPoint and the slide strip show) and puts
+  `deck-plotly.min.js` and `deck-plot.js` beside the deck. Until then the chart
+  is blank outside the editor. `deck-plot.js` is in this skill's folder and
+  may be copied beside the deck straight away; the library comes with Diapo
+  (`deck-editor/app/vendor/plotly.min.js`, copied as `deck-plotly.min.js`,
+  unchanged).
+- The deck opens in Diapo without the "Trust this deck" bar: these two files
+  are Diapo's own, recognised by their contents. Any change to them, or any
+  other way of loading Plotly, makes them the deck's own scripts.
+- Maps (`scattergeo`, `choropleth`, `scattermap`...) fetch their outlines or
+  tiles from the internet whenever they are drawn; say so to the user.

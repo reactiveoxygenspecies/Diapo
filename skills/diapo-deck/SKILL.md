@@ -87,7 +87,9 @@ current working directory; if that is the editor's own repository, its
 - Leave what the editor made as it is: `figure[data-chart]` (edit its JSON
   table, then open and save in the editor to redraw), `figure[data-math]` and
   `figure[data-chem]` (change the attribute and drop the `<svg>`; the editor
-  draws it again), `div[data-crop]` round
+  draws it again), `figure[data-plot]` (change the JSON in its
+  `script[data-plot-figure]` and delete its `<img data-plot-snapshot>`; the
+  editor draws the picture again), `div[data-crop]` round
   a cropped picture, `data-fit`, `data-locked`, `data-guides`, `data-id`.
 - An older runtime is fine: the editor brings it up to date on the next save.
 - Count existing elements before adding; a slide at its density limit gets a
@@ -224,6 +226,10 @@ Then write the deck:
   as JSON, deck-template.md "Charts"): no script, no library, editable in the
   editor's Chart section. A chart library (`[data-fig]`) only when the kind is
   one the editor cannot draw, and say that Diapo will ask to trust the deck.
+- A Plotly figure the user wants live in the talk (hover, zoom, legend) as
+  `figure[data-plot="plotly"]` holding its JSON, editor-integration.md
+  "Interactive charts (Plotly)": Diapo runs that library as its own, with no
+  trust bar. Never a hand-written `Plotly.newPlot(...)` script.
 - Equations as `figure[data-math]` (LaTeX, mhchem's `\ce{}` for reactions) and
   molecules as `figure[data-chem]` (SMILES), deck-template.md "Equations and
   chemical structures": never a picture of a formula or a hand-drawn SVG

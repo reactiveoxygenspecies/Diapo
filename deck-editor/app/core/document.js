@@ -14,6 +14,7 @@
 
 import { FONTS_ID, emptyFonts, cloneFonts, fontsToCss, cssToFonts, deckFontLinks, applyHostedLinks } from './fonts.js';
 import { MASTER_SELECTOR, readableText } from './dom.js';
+import { syncPlotScripts } from './plot.js';
 
 /* The default stage. A deck can be another size: the Theme panel writes
    `.deck-stage, .deck-stage .slide { width; height }` into the override
@@ -342,7 +343,7 @@ export class Deck extends EventTarget {
         if (text == null) {
             // The words on the slide, not a chart's labels and table or the speaker notes.
             const c = slide.cloneNode(true);
-            c.querySelectorAll('svg, script, style, [data-chart], [data-fig], [data-math], [data-chem], aside.notes').forEach(n => n.remove());
+            c.querySelectorAll('svg, script, style, [data-chart], [data-fig], [data-math], [data-chem], [data-plot], aside.notes').forEach(n => n.remove());
             text = readableText(c);
         }
         const t = text.trim().replace(/\s+/g, ' ');
@@ -444,6 +445,8 @@ export class Deck extends EventTarget {
         root.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
         root.querySelectorAll('[spellcheck]').forEach(n => { if (n.closest('.deck-stage')) n.removeAttribute('spellcheck'); });
         root.querySelectorAll('[data-ed-ground]').forEach(n => n.removeAttribute('data-ed-ground'));
+        // An interactive chart drawn live (Preview) is the library's work, never the file's: the figure and its picture are.
+        root.querySelectorAll('.deck-plot-live, [data-ed-plot], [data-ed-probe], #deck-plot-style').forEach(n => n.remove());
 
         // 2. Runtime content
         root.querySelectorAll('[data-fig]').forEach(h => {
@@ -495,6 +498,7 @@ export class Deck extends EventTarget {
 
         // 4. Splice the regenerated body into the original text
         const body = root.querySelector('body');
+        syncPlotScripts(body);          // a deck with an interactive chart loads the library and its renderer; one without does not
         // The override block is the one thing the editor may add to the head.
         root.querySelectorAll('#' + OVERRIDES_ID + ', #' + FONTS_ID).forEach(n => n.remove());
         const overridesCss = this.overridesText();
@@ -547,7 +551,7 @@ export class Deck extends EventTarget {
         let j = 0;
         for (const el of Array.from(body.children)) {
             if (j < expected.length && sig(el) === expected[j]) { j++; continue; }
-            if (el.id === 'deck-presenter' || el.id === 'deck-runtime') continue;   // added on request through the editor; part of the deck now
+            if (el.id === 'deck-presenter' || el.id === 'deck-runtime' || el.hasAttribute('data-deck-plot')) continue;   // added on request through the editor; part of the deck now
             el.remove();
         }
         // Trailing whitespace is re-added by spliceBody from the source text (the parser

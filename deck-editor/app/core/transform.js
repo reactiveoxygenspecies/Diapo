@@ -138,6 +138,7 @@ export function refitAll(root) {
 export function afterResize(el) {
     const w = win(el);
     if (isChart(el)) writeChart(el);
+    if (el.matches('figure[data-plot]')) window.dispatchEvent(new CustomEvent('editor:plot-stale'));   // its picture is drawn again for the new box (editor.js)
     if (el.dataset.fig && w.Plotly && el._fullLayout) {
         w.Plotly.relayout(el, { width: el.clientWidth, height: el.clientHeight });
     }

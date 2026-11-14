@@ -5,9 +5,10 @@ from exactly what the editor ships:
     diapo-format/deck-base.css        the base CSS block of app/templates/blank.html
     diapo-format/deck-controller.js   the controller <script> of blank.html
     diapo-format/deck-runtime.js      app/deck-runtime.js
+    diapo-format/deck-plot.js         app/deck-plot.js (draws interactive charts)
 
-It also refreshes the skill's copy of the runtime (skills/diapo-deck/
-deck-runtime.js, identical to the app's) and checks that the skill's
+It also refreshes the skill's copies of the runtime and of deck-plot.js
+(skills/diapo-deck/, identical to the app's) and checks that the skill's
 deck-controller.js is still the controller and that its annotated
 deck-base.css still contains every rule of the base block, so the three
 places never drift apart. build-templates.py runs this at the end; on its own:
@@ -85,12 +86,14 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     changed = [name for name, text in (("deck-base.css", base), ("deck-controller.js", controller), ("deck-runtime.js", runtime))
                if write(os.path.join(OUT, name), text)]
-    # The skill's runtime is a byte-for-byte copy of the app's.
-    src, dst = os.path.join(APP, "deck-runtime.js"), os.path.join(SKILL, "deck-runtime.js")
-    raw = open(src, "rb").read()
-    if not os.path.exists(dst) or open(dst, "rb").read() != raw:
-        open(dst, "wb").write(raw)
-        changed.append("skills/diapo-deck/deck-runtime.js")
+    # The skill's runtime is a byte-for-byte copy of the app's; so is deck-plot.js, there and
+    # in the format (serve.py knows that file by its bytes).
+    for name, dst in (("deck-runtime.js", os.path.join(SKILL, "deck-runtime.js")),
+                      ("deck-plot.js", os.path.join(SKILL, "deck-plot.js")), ("deck-plot.js", os.path.join(OUT, "deck-plot.js"))):
+        raw = open(os.path.join(APP, name), "rb").read()
+        if not os.path.exists(dst) or open(dst, "rb").read() != raw:
+            open(dst, "wb").write(raw)
+            changed.append(os.path.relpath(dst, ROOT).replace(os.sep, "/"))
     print("diapo-format: " + (", ".join(changed) + " written" if changed else "up to date"))
     for p in check_skill(base, controller):
         print("warning: " + p)

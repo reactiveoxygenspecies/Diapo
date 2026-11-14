@@ -5,7 +5,7 @@ Diapo is written by Daniele Rossetto and licensed under the MIT Licence
 its own licence. All of them permit commercial use; the obligations they carry
 (keeping a notice, giving attribution) are met as described here.
 
-Last reviewed: 17 October 2026 (MathJax and SmilesDrawer added); before that 20 September 2026, for Diapo 0.1.2.
+Last reviewed: 14 November 2026 (plotly.js added); before that 17 October 2026 (MathJax and SmilesDrawer added); before that 20 September 2026, for Diapo 0.1.2.
 
 | Component | Where | Licence | Obligation |
 |---|---|---|---|
@@ -15,6 +15,7 @@ Last reviewed: 17 October 2026 (MathJax and SmilesDrawer added); before that 20 
 | MathJax 3.2.2 (The MathJax Consortium; mhchem by Martin Hensel) | `deck-editor/app/vendor/mathjax-tex-svg.js` (copied by `tools/build-vendor.js` from the npm package), loaded into the editor to draw equations; decks hold only the SVG it draws | Apache 2.0 | Ship the licence (`app/vendor/LICENSE-mathjax.txt`) and keep its notices; the file is unmodified but for a one-line header |
 | MathJax 4.1.3 with its STIX Two font and mhchem font extension (The MathJax Consortium; glyphs from STIX Two Math, The STIX Fonts Project) | `deck-editor/app/vendor/mathjax4/` (copied by `tools/build-vendor.js` from the npm tarballs), loaded into a frame of the editor for the STIX Two look of equations; decks hold only the SVG it draws | Apache 2.0; the STIX Two glyph outlines SIL OFL 1.1 | Ship the Apache licence (`app/vendor/LICENSE-mathjax.txt`); the OFL allows the outlines in documents (below) |
 | SmilesDrawer 2.4.1 (GDB / Reymond Research Group), with chroma.js (Gregor Aisch) inside | `deck-editor/app/vendor/smiles-drawer.min.js` (copied by `tools/build-vendor.js`), loaded into the editor to draw chemical structures; decks hold only the SVG it draws | MIT; chroma.js BSD-3-Clause, its ColorBrewer colours Apache 2.0 | Keep the copyright and permission notices (`app/vendor/LICENSE-smiles-drawer.txt`, `LICENSE-chroma-js.txt`, summarised below) |
+| plotly.js 4.3.0 (Plotly, Inc.), the full minified bundle with its dependencies inside (d3, regl, MapLibre GL JS and others) | `deck-editor/app/vendor/plotly.min.js` (copied by `tools/build-vendor.js` from the npm package `plotly.js-dist-min`, unmodified), loaded into the editor to preview interactive charts and draw their pictures, and copied beside a deck that has one as `deck-plotly.min.js` (inlined by the single-file export) | MIT; the bundled dependencies MIT, BSD and ISC, their notices kept inside the file | Keep the copyright and permission notice: `app/vendor/LICENSE-plotly.txt`, the header of the file itself (which travels with every copy in a deck), and below |
 | Anton (The Anton Project Authors) | `deck-editor/app/brand/anton-latin.woff2`, the face of the logo; its outlines in `logo.svg` and `logo-dark.svg` | SIL OFL 1.1 | Keep the notice below; the font is not sold on its own and is shipped unmodified |
 | Google Fonts | Referenced by URL from templates and decks; downloaded or embedded into a deck only on request | SIL OFL 1.1, Apache 2.0 or Ubuntu Font Licence, per family | None for referencing; embedding in documents is permitted; the files are not modified |
 | Python (Python Software Foundation) | Runtime of `serve.py`; bundled into `dist/deck-editor.exe` by `build-exe.py` | PSF Licence | Keep the PSF notice when the executable is shipped |
@@ -168,6 +169,22 @@ with the code: the full texts ship beside it, in
 `app/vendor/smiles-drawer.min.js` is the package's `dist/smiles-drawer.min.js`
 with a one-line comment added. It runs in the editor only; a deck receives the
 SVG drawing and the SMILES.
+
+
+## plotly.js 4.3.0
+
+https://github.com/plotly/plotly.js - MIT License - Copyright (c) 2016-2024
+Plotly Technologies Inc. The full text is in `app/vendor/LICENSE-plotly.txt`.
+
+`app/vendor/plotly.min.js` is the npm package `plotly.js-dist-min`'s
+`plotly.min.js`, byte for byte (the server recognises the file by its
+SHA-256, so nothing is added to it). Its header carries the copyright and
+licence line, and the notices of the libraries bundled into it stay inside
+the file. Unlike MathJax and SmilesDrawer it does go into decks: a deck with
+an interactive chart gets a copy beside it (`deck-plotly.min.js`), and the
+single-file export writes it into the page; in both the header is intact.
+`app/deck-plot.js`, the small script that draws those charts, is Diapo's own
+and part of the Diapo Format (MIT).
 
 
 ## Anton

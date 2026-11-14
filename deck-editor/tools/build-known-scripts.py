@@ -18,11 +18,17 @@ Diapo's:
   banner of Diapo's controller, runtime or presenter (older editions that
   predate the templates' history).
 
+- the script files Diapo copies beside a deck (serve.DECK_FILES: the charting
+  library of an interactive chart and the script that draws it), by the
+  SHA-256 of their bytes under `files`, and as inline text (the single-file
+  export writes them into the page).
+
 Each is stored twice: `sha256` as the text stands and `trimmed` as the text
 without its leading and trailing whitespace, so a deck that pasted an edition
 with other blank lines round it is still recognised. Run it before a release;
 it only ever adds hashes.
 """
+import hashlib
 import json
 import os
 import subprocess
@@ -38,6 +44,7 @@ TEMPLATES = "deck-editor/app/templates/"
 FILES = ("deck-editor/app/deck-runtime.js", "deck-editor/app/deck-presenter.js",
          "diapo-format/deck-runtime.js", "diapo-format/deck-controller.js",
          "skills/diapo-deck/deck-runtime.js", "skills/diapo-deck/deck-controller.js")
+BESIDE = tuple("deck-editor/app/" + rel for rel in serve.DECK_FILES.values())
 BANNERS = ("SLIDE PRESENTATION CONTROLLER", "DECK RUNTIME - presentation features", "DECK PRESENTER")
 
 
@@ -47,15 +54,16 @@ def git(root, *args):
 
 def main():
     root = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=EDITOR, capture_output=True, check=True).stdout.decode().strip()
-    exact, trimmed = set(), set()
+    exact, trimmed, files = set(), set(), set()
     try:
         with open(OUT, encoding="utf-8") as f:
             data = json.load(f)
         exact.update(data.get("sha256", []))
         trimmed.update(data.get("trimmed", []))
+        files.update(data.get("files", []))
     except (OSError, ValueError):
         pass
-    before = len(exact) + len(trimmed)
+    before = len(exact) + len(trimmed) + len(files)
 
     def add_page(text, banner_only):
         for src, body in serve.page_scripts(text):
@@ -68,25 +76,30 @@ def main():
             exact.add(serve.script_hash("\n" + text.strip() + "\n"))
         trimmed.add(serve.script_hash(raw.replace("\r\n", "\n").strip()))
 
-    commits = git(root, "log", "--format=%H", "--", "*.html", *FILES).decode().split()
+    commits = git(root, "log", "--format=%H", "--", "*.html", *FILES, *BESIDE).decode().split()
     for sha in commits:
         changed = git(root, "show", "--name-only", "--format=", sha).decode().split("\n")
         for name in filter(None, changed):
-            if not (name.endswith(".html") or name in FILES):
+            if not (name.endswith(".html") or name in FILES or name in BESIDE):
                 continue
             try:
-                raw = git(root, "show", f"{sha}:{name}").decode("utf-8", "replace")
+                blob = git(root, "show", f"{sha}:{name}")
             except subprocess.CalledProcessError:
                 continue                                   # deleted in this commit
+            raw = blob.decode("utf-8", "replace")
+            if name in BESIDE:
+                files.add(hashlib.sha256(blob).hexdigest())
+                exact.update(serve.inline_hashes(raw))
+                continue
             if name in FILES:
                 add_file(raw)
             else:
                 add_page(raw, banner_only=not name.startswith(TEMPLATES))
     with open(OUT, "w", encoding="utf-8", newline="\n") as f:
         json.dump({"about": "SHA-256 of scripts earlier Diapo editions put into decks, as written and trimmed; made by tools/build-known-scripts.py",
-                   "sha256": sorted(exact), "trimmed": sorted(trimmed)}, f, indent=1)
+                   "sha256": sorted(exact), "trimmed": sorted(trimmed), "files": sorted(files)}, f, indent=1)
         f.write("\n")
-    print(f"{len(commits)} commits, {len(exact)} + {len(trimmed)} trimmed hashes ({len(exact) + len(trimmed) - before} new) -> {os.path.relpath(OUT, EDITOR)}")
+    print(f"{len(commits)} commits, {len(exact)} + {len(trimmed)} trimmed hashes and {len(files)} files ({len(exact) + len(trimmed) + len(files) - before} new) -> {os.path.relpath(OUT, EDITOR)}")
 
 
 if __name__ == "__main__":
