@@ -63,9 +63,12 @@ Then, by hand:
 
 ## Not yet
 
-- **CI.** The repository has no remote, so nothing runs the tests on a push.
-  Once it lives somewhere (GitHub, say), a workflow on a Windows runner can
-  run `npm run test:py` and `npx playwright test`; Chrome is already on
-  those runners. Until then `tools/release.py check` is the gate.
+- **CI.** The repository lives on GitHub (github.com/reactiveoxygenspecies/Diapo).
+  `.github/workflows/tests.yml` runs on every push and pull request to `main`
+  on a Windows runner: the generated copies must be current, then
+  `npx playwright test --project=chrome` and `npm run test:py`. It does not
+  replace `tools/release.py check`, which also checks the version and the
+  known-scripts hashes (`build-known-scripts.py` needs the full history, so it
+  stays out of CI); the release is still gated by that command.
 - **Merging** two Diapo processes' settings files; see `save_settings` in
   `serve.py`.

@@ -328,11 +328,12 @@ test('9b safety: requests from other origins, other hosts and non-media uploads 
     expect((await request.get('/api/status', { headers: { Host: 'evil.example:8811' } })).status()).toBe(403);
     expect((await request.get('/deck/' + FILE, { headers: { Host: 'evil.example:8811' } })).status()).toBe(403);
     // The editor's own origin (and localhost) are fine; so is a non-browser client without either header.
-    expect((await request.post('/api/recent?file=' + FILE, { headers: { Origin: 'http://127.0.0.1:8811', 'Sec-Fetch-Site': 'same-origin' } })).status()).toBe(200);
-    expect((await request.post('/api/recent?file=' + FILE, { headers: { Origin: 'http://localhost:8811' } })).status()).toBe(200);
+    const port = +process.env.DIAPO_TEST_PORT || 8811;   // the server's own port (as helpers.js reads it)
+    expect((await request.post('/api/recent?file=' + FILE, { headers: { Origin: 'http://127.0.0.1:' + port, 'Sec-Fetch-Site': 'same-origin' } })).status()).toBe(200);
+    expect((await request.post('/api/recent?file=' + FILE, { headers: { Origin: 'http://localhost:' + port } })).status()).toBe(200);
     expect((await request.post('/api/recent?file=' + FILE)).status()).toBe(200);
     // Uploads: only media, and only a plain file name.
-    const own = { Origin: 'http://127.0.0.1:8811' };
+    const own = { Origin: 'http://127.0.0.1:' + port };
     const bat = await request.post('/api/upload?dir=sample', { headers: own, multipart: { file: { name: 'run.bat', mimeType: 'text/plain', buffer: Buffer.from('echo hi') } } });
     expect(bat.status()).toBe(400);
     expect((await bat.json()).error).toContain('run.bat');
