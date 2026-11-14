@@ -192,6 +192,7 @@ need on the day. It also works from `file://`. Keys in the deck:
 | D | Draw on the slide: a layer over the slide, never saved. Keys 1-5 colours, `[` `]` thinner / thicker, Ctrl+Z undo, C clear this slide, D or Esc done. Strokes are kept per slide while the deck is open and follow a window resize |
 | Space, Right, Down, PgDn | next fragment, then next slide |
 | Left, Up, PgUp | previous fragment, then previous slide |
+| ? (or Shift+/) | A list of these keys over the deck, grouped Move / Show / Draw, in plain words and large type (a `role="dialog"` panel; the runtime builds it, `.deck-keys`, outside the stage). Esc, ? or a click closes it; it opens over draw mode and Esc closes it before it ends the drawing. It is never saved (the editor keeps only the body the file had), printed, exported or drawn in thumbnails. A saved deck opened on its own (not in a frame: neither the editor's Preview nor a presenter preview) also shows "Press ? for keys" for about 4 s, once per page load; Preview's header says "? for keys" instead. The editor's presenter window (`presenter.js`) and the runtime's own presenter window answer ? with the keys they have (arrows, Home / End) |
 | H | Hide the on-screen controls (the chevrons and page number at the bottom), for when the mouse is needed where they sit; H again brings them back. Without it they fade out after 2 s without mouse movement and return on the first move |
 
 - Decks created with **New** have it built in.

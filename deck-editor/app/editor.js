@@ -874,11 +874,14 @@ export function setPreview(on) {
     document.body.classList.toggle('preview', on);
     let hint = document.querySelector('.preview-hint');
     if (on) {
-        if (!hint) { hint = document.createElement('div'); hint.className = 'preview-hint'; hint.textContent = 'Preview | Esc to return to the editor'; document.body.appendChild(hint); }
+        if (!hint) { hint = document.createElement('div'); hint.className = 'preview-hint'; hint.textContent = 'Preview | Esc to return to the editor' + (app.deck.win.deckRuntime ? ' | ? for keys' : ''); document.body.appendChild(hint); }   // the "?" list is the deck runtime's: no script, no list
         hint.classList.remove('fade');
         setTimeout(() => hint.classList.add('fade'), 2500);
         app.zoomMode = 'fit';
-    } else if (hint) hint.remove();
+    } else {
+        if (hint) hint.remove();
+        try { app.deck.win.deckRuntime.closeKeys(); } catch (e) { /* no runtime, or an older one */ }   // the list is not part of the deck being edited
+    }
     app.deck.setEditing(!on);
     applyZoom();
     if (on) app.deck.iframe.focus();

@@ -87,7 +87,7 @@ html, body { width: ${W}px !important; height: auto !important; min-height: 0 !i
 .deck-stage .slide, .deck-stage .slide * { transition: none !important; animation: none !important; }
 .deck-stage [data-fragment] { opacity: 1 !important; visibility: visible !important; }
 ${revealSel} { opacity: 1 !important; visibility: visible !important; filter: none !important; }
-.deck-controls, .deck-overview, .deck-laser, .deck-draw, .deck-stage [data-hidden] { display: none !important; }
+.deck-controls, .deck-overview, .deck-laser, .deck-draw, .deck-keys, .deck-keyhint, .deck-stage [data-hidden] { display: none !important; }
 * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }`;
     }

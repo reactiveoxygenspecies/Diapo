@@ -540,6 +540,11 @@ new SlidePresentation();
                       C clear this slide, D or Esc done
      Space / Right / Down / PgDn   next fragment, then next slide
      Left / Up / PgUp              previous fragment, then previous slide
+     ?                a list of these keys over the deck (never saved or
+                      printed); Esc, ? or a click closes it. A deck opened
+                      on its own in a browser says "Press ? for keys" for 4 s.
+                      (Home / End and H belong to the deck's controller; the
+                      list names them too.)
 
    Markup it understands
      [data-fragment]                    revealed one step at a time
@@ -633,6 +638,94 @@ new SlidePresentation();
         location.hash = '#' + (n + 1);                         // the deck's controller does the rest
     }
 
+    /* ---------- the "?" list of keys ---------- */
+    // Built in whatever document it is asked for (the deck, or the presenter window). Plain words, grouped,
+    // large enough for a projector. It sits outside the stage, so it is never part of a slide, and it is
+    // dropped on save (the editor keeps only what the file had), from print and from thumbnails.
+    var KEY_GROUPS = [
+        ['Move', [['Right  Down  Space  PgDn', 'Next step, then next slide'], ['Left  Up  PgUp', 'Back one step or slide'], ['Home  End', 'First or last slide']]],
+        ['Show', [['P', 'Presenter view in a second window'], ['O', 'Overview of all slides (arrows and Enter to pick)'], ['A', 'Run by itself, on or off'], ['L', 'Laser pointer'], ['H', 'Hide or show the arrows'], ['?', 'This list']]],
+        ['Draw', [['D', 'Draw on the slide, D or Esc when done'], ['1 - 5', 'Pen colour'], ['[   ]', 'Thinner or thicker'], ['Ctrl+Z', 'Undo a stroke'], ['C', 'Clear this slide']]]
+    ];
+    var PRESENTER_KEY_GROUPS = [['Move', [['Right  Down  Space  PgDn', 'Next step, then next slide'], ['Left  Up  PgUp', 'Back one step or slide'], ['Home  End', 'First or last slide']]]];
+    var KEYS_CSS = [
+        '.deck-keys{position:fixed;inset:0;z-index:100003;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.4);font:20px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#f2f2f4;cursor:pointer}',
+        '.deck-keys .dk-panel{max-width:min(1100px,100%);max-height:100%;overflow:auto;box-sizing:border-box;padding:28px 36px 24px;border-radius:16px;background:rgba(18,19,23,.94);box-shadow:0 0 0 1px rgba(255,255,255,.14),0 24px 60px rgba(0,0,0,.55);outline:none;cursor:default}',
+        '.deck-keys .dk-title{margin:0 0 16px;font-size:26px;font-weight:700}',
+        '.deck-keys .dk-cols{display:flex;flex-wrap:wrap;gap:20px 44px}',
+        '.deck-keys .dk-col{flex:1 1 280px;min-width:0}',
+        '.deck-keys h3{margin:0 0 8px;font-size:15px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9ab8ff}',
+        '.deck-keys dl{margin:0}.deck-keys dt{margin:12px 0 2px}.deck-keys dd{margin:0;color:#c8cad1;font-size:18px}',
+        '.deck-keys kbd{display:inline-block;margin:0 5px 0 0;padding:1px 9px;border:1px solid rgba(255,255,255,.28);border-bottom-width:2px;border-radius:6px;background:rgba(255,255,255,.08);font:600 18px/1.4 ui-monospace,Consolas,monospace;color:#fff;white-space:pre}',
+        '.deck-keys .dk-foot{margin:18px 0 0;font-size:16px;color:#9a9da6}',
+        '.deck-keyhint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:100002;padding:9px 18px;border-radius:999px;background:rgba(18,19,23,.86);color:#f2f2f4;font:600 18px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;pointer-events:none;opacity:1;transition:opacity .6s ease}',
+        '.deck-keyhint.fade{opacity:0}',
+        '@media print{.deck-keys,.deck-keyhint{display:none!important}}'
+    ].join('\n');
+    function buildKeys(doc, groups) {
+        var box = doc.createElement('div');
+        box.className = 'deck-keys';
+        var panel = doc.createElement('div');
+        panel.className = 'dk-panel';
+        panel.setAttribute('role', 'dialog');
+        panel.setAttribute('aria-modal', 'true');
+        panel.setAttribute('aria-label', 'Keys');
+        panel.tabIndex = -1;
+        var title = doc.createElement('p'); title.className = 'dk-title'; title.textContent = 'Keys';
+        panel.appendChild(title);
+        var cols = doc.createElement('div'); cols.className = 'dk-cols';
+        groups.forEach(function (g) {
+            var col = doc.createElement('div'); col.className = 'dk-col';
+            var h = doc.createElement('h3'); h.textContent = g[0]; col.appendChild(h);
+            var dl = doc.createElement('dl');
+            g[1].forEach(function (row) {
+                var dt = doc.createElement('dt');
+                row[0].split('  ').forEach(function (k) { var kb = doc.createElement('kbd'); kb.textContent = k; dt.appendChild(kb); dt.appendChild(doc.createTextNode(' ')); });   // a space between the keys, for a screen reader
+                var dd = doc.createElement('dd'); dd.textContent = row[1];
+                dl.appendChild(dt); dl.appendChild(dd);
+            });
+            col.appendChild(dl); cols.appendChild(col);
+        });
+        panel.appendChild(cols);
+        var foot = doc.createElement('p'); foot.className = 'dk-foot'; foot.textContent = 'Esc, ? or a click closes this list.';
+        panel.appendChild(foot);
+        panel.addEventListener('click', function (e) { e.stopPropagation(); });   // a click in the panel keeps it; outside closes
+        box.appendChild(panel);
+        return box;
+    }
+    var keysBox = null, keysFrom = null;
+    function openKeys() {
+        if (keysBox) return;
+        removeHint();
+        keysFrom = document.activeElement;
+        keysBox = buildKeys(document, KEY_GROUPS);
+        keysBox.addEventListener('click', closeKeys);
+        document.body.appendChild(keysBox);
+        keysBox.firstChild.focus();
+    }
+    function closeKeys() {
+        if (!keysBox) return;
+        keysBox.remove();
+        keysBox = null;
+        try { if (keysFrom && keysFrom.focus && keysFrom !== document.body) keysFrom.focus(); } catch (err) { /* gone */ }
+        keysFrom = null;
+    }
+    /* A deck opened on its own (not inside the editor's Preview, nor a presenter frame) says once that "?" exists. */
+    var hintEl = null;
+    function removeHint() { if (hintEl) { hintEl.remove(); hintEl = null; } }
+    (function () {
+        var framed = true;
+        try { framed = window.top !== window; } catch (err) { /* cross-origin parent: framed */ }
+        if (framed || editing()) return;
+        hintEl = document.createElement('div');
+        hintEl.className = 'deck-keyhint';
+        hintEl.setAttribute('role', 'status');
+        hintEl.textContent = 'Press ? for keys';
+        document.body.appendChild(hintEl);
+        setTimeout(function () { if (hintEl) hintEl.classList.add('fade'); }, 4000);
+        setTimeout(removeHint, 4700);
+    })();
+
     /* ---------- base styles for fragments and the overview ---------- */
     var style = document.createElement('style');
     style.id = 'deck-runtime-style';
@@ -670,6 +763,7 @@ new SlidePresentation();
         '.deck-draw-bar button{height:28px;min-width:28px;padding:0 8px;border:2px solid transparent;border-radius:8px;background:#2a2d35;color:#fff;font:inherit;cursor:pointer}',
         '.deck-draw-bar button[data-colour]{width:28px;padding:0}.deck-draw-bar button.on{border-color:#fff}.deck-draw-bar button:hover{filter:brightness(1.15)}',
         '.deck-draw-bar .sep{width:1px;height:20px;background:#3a3d46;margin:0 2px}',
+        KEYS_CSS
     ].join('\n');
     document.head.appendChild(style);
 
@@ -1217,7 +1311,7 @@ new SlidePresentation();
         if (!popup) { alert('The browser blocked the presenter window. Allow pop-ups for this page and press P again.'); return; }
         var d = popup.document;
         d.open();
-        d.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Presenter</title><style>' + CSS + '</style></head><body>' + HTML + '</body></html>');
+        d.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Presenter</title><style>' + CSS + KEYS_CSS + '</style></head><body>' + HTML + '</body></html>');
         d.close();
         ui = {};
         ['cur', 'next', 'end', 'notes', 'time', 'slidetime', 'reset', 'clock', 'now', 'total', 'frag', 'name', 'prev', 'next-btn'].forEach(function (id) { ui[id] = d.getElementById(id); });
@@ -1229,6 +1323,17 @@ new SlidePresentation();
         ui.reset.onclick = function () { started = Date.now(); slideStarted = Date.now(); tick(); };
         ui.time.onclick = ui.reset.onclick;
         d.addEventListener('keydown', function (e) {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            var open = d.querySelector('.deck-keys');
+            if (open && e.key === 'Escape') { open.remove(); e.preventDefault(); return; }
+            if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+                e.preventDefault();
+                if (open) { open.remove(); return; }
+                var box = buildKeys(d, PRESENTER_KEY_GROUPS);
+                box.addEventListener('click', function () { box.remove(); });
+                d.body.appendChild(box); box.firstChild.focus();
+                return;
+            }
             switch (e.key) {
                 case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': e.preventDefault(); next(); break;
                 case 'ArrowLeft': case 'ArrowUp': case 'PageUp': e.preventDefault(); prev(); break;
@@ -1466,6 +1571,9 @@ new SlidePresentation();
         if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
         if ((e.ctrlKey || e.metaKey) && draw && (e.key === 'z' || e.key === 'Z')) { undoStroke(); e.preventDefault(); e.stopImmediatePropagation(); return; }
         if (e.ctrlKey || e.metaKey || e.altKey) return;
+        // The list of keys comes first and leaves the rest alone: it can be opened while drawing or running by itself.
+        if (e.key === '?' || (e.key === '/' && e.shiftKey)) { keysBox ? closeKeys() : openKeys(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+        if (keysBox && e.key === 'Escape') { closeKeys(); e.preventDefault(); e.stopImmediatePropagation(); return; }
         var consumed = true;
         if (autoOn && e.key !== 'a' && e.key !== 'A') setAuto(false);        // a key takes the deck back
         switch (e.key) {
@@ -1499,7 +1607,7 @@ new SlidePresentation();
         if (e.deltaY > 0 ? nextFragment() : prevFragment()) e.stopImmediatePropagation();
     }, { capture: true, passive: true });
 
-    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, version: 12 };
+    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, openKeys: openKeys, closeKeys: closeKeys, version: 13 };
 })();
 </script>
 </body>

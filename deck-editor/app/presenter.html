@@ -37,6 +37,16 @@ button:hover { border-color: var(--ink-3); }
 button.big { font-size: 20px; padding: 6px 18px; }
 .empty { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; color: var(--ink-3); font-size: 16px; text-align: center; padding: 20px; background: var(--bg); }
 .hint { font-size: 12px; color: var(--ink-3); }
+/* The "?" list of keys: the same look as the one over a presented deck (deck-runtime.js). */
+.deck-keys { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,0.4); font-size: 20px; line-height: 1.35; cursor: pointer; }
+.deck-keys .dk-panel { max-width: 640px; max-height: 100%; overflow: auto; padding: 28px 36px 24px; border-radius: 16px; background: rgba(18,19,23,0.94); box-shadow: 0 0 0 1px rgba(255,255,255,0.14), 0 24px 60px rgba(0,0,0,0.55); outline: none; cursor: default; }
+.deck-keys .dk-title { margin: 0 0 16px; font-size: 26px; font-weight: 700; }
+.deck-keys h3 { margin: 0 0 8px; font-size: 15px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #9ab8ff; }
+.deck-keys dl { margin: 0; }
+.deck-keys dt { margin: 12px 0 2px; }
+.deck-keys dd { margin: 0; color: #c8cad1; font-size: 18px; }
+.deck-keys kbd { display: inline-block; margin: 0 5px 0 0; padding: 1px 9px; border: 1px solid rgba(255,255,255,0.28); border-bottom-width: 2px; border-radius: 6px; background: rgba(255,255,255,0.08); font: 600 18px/1.4 ui-monospace, Consolas, monospace; color: #fff; white-space: pre; }
+.deck-keys .dk-foot { margin: 18px 0 0; font-size: 16px; color: var(--ink-3); }
 /* The loader while the editor reconnects: a copy of editor.css's .loader (brand/loader.svg), the
    mount turning three quarters and resting upright; after 300 ms; with reduced motion it breathes. */
 .loader { width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; opacity: 0; animation: loader-in 0.2s 0.3s forwards; }
@@ -63,6 +73,7 @@ button.big { font-size: 20px; padding: 6px 18px; }
     <div class="hint" id="link" hidden><svg class="loader" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><g class="l-turn"><rect x="2" y="2" width="96" height="96" rx="7" fill="#EAE3D0"/><rect x="14" y="26" width="72" height="48" rx="1.5" fill="#141418"/><rect class="l-breathe" x="14" y="26" width="72" height="48" rx="1.5" fill="#F7F5EF"/><circle cx="8" cy="92" r="2.6" fill="#8B8574"/></g></svg>Editor closed or reloading. Reconnecting...</div>
     <div class="grow"></div>
     <div class="count"><b id="now">-</b> / <span id="total">-</span> <span id="name" class="hint"></span></div>
+    <span class="hint">? for keys</span>
     <button class="big" id="btnPrev" title="Previous (Left, PgUp)">&larr;</button>
     <button class="big" id="btnNext" title="Next (Right, Space, PgDn)">&rarr;</button>
   </div>
