@@ -277,7 +277,7 @@ the file self-contained and the DOM predictable for the round trip.
 | Ctrl+P | Export as PDF (Export menu: also a single self-contained HTML file) |
 | F5 / Esc | Preview the deck as-is / back to the editor |
 | P, Shift+F5 | Presenter view in a second window (current and next slide, notes, timer); the same key in a saved deck on its own |
-| ? | Keyboard help |
+| ? | Keyboard help; its second tab, About Diapo, shows the version and checks for updates (see Checking for updates) |
 | Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z | Undo / redo (also with a text edit still open) |
 | Ctrl++ / Ctrl+- / Ctrl+0, Ctrl+wheel | Zoom in / out / fit; Ctrl+wheel zooms around the pointer |
 | Middle button, Space+drag, wheel | Grab and drag the view, pan, scroll the canvas when zoomed in |
@@ -962,10 +962,36 @@ name and skip the dialog.
   accepted (png, jpg, gif, webp, avif, bmp, svg, mp4, webm, mov, mp3, m4a, wav,
   ogg), under a plain file name.
 
+## Checking for updates
+
+The "?" button (or `?`) opens the Keyboard dialog; its **About Diapo** tab, also
+reachable from Ctrl+K ("About Diapo", "Check for updates"), shows the version and
+release date, links to the guide and the changelog, and a **Check for updates**
+button. The click makes the server ask GitHub
+(`api.github.com/repos/reactiveoxygenspecies/Diapo/releases/latest`, 8 s timeout,
+`User-Agent: Diapo/<version>` and nothing else about you) for the newest release.
+Versions are compared as numbers (1.10.0 is above 1.9.0); drafts, pre-releases and
+tags that are not plain version numbers are ignored. The answer is either "You have
+the latest version", or the new version with the date and the start of its notes
+and a button that opens the release page in the normal browser (the editor window
+is a Chrome app window, so `POST /api/open-link` does it through `webbrowser`, and
+only for a fixed github.com/reactiveoxygenspecies/Diapo address). Offline,
+rate-limited, no releases and an unreadable answer each give their own message.
+The dialog also says how to update (a new `diapo.exe`, or `git pull` / the ZIP
+again); decks are not affected.
+
+"Check for updates when Diapo starts" (same tab) is off by default, the
+`update_check.auto` entry of the settings file. When on, the editor asks once at
+start; the server answers only if the last check is over 24 hours old
+(`update_check.last`, written by every check), so at most once a day, and a newer
+release shows a small notice with a link to the About tab. For tests and offline
+use the address can be replaced by the environment variable `DIAPO_UPDATE_URL`
+(a path to a JSON file, or an http(s) address).
+
 ## The settings file
 
 `~/.deck-editor.json` holds the last workspace, the recent decks, the trusted
-decks and the saved themes. It is never half-written: each change goes to a
+decks, the saved themes and the update-check setting. It is never half-written: each change goes to a
 temporary file that then takes its place, one at a time. A file that is not
 valid JSON is moved aside as `.deck-editor.json.broken-<time>`, and one that
 cannot be opened at start is left alone for that session rather than
@@ -980,7 +1006,7 @@ browser could still send it requests. So:
   `localhost:<port>` or `[::1]:<port>`). A page that reaches the server through
   DNS rebinding names another host and is refused.
 - Every request that changes something (save, upload, new, rename, workspace,
-  dialogs, themes, fonts, drafts) must come from the editor's own origin. The
+  dialogs, themes, fonts, drafts, the update check and opening links) must come from the editor's own origin. The
   browser states the origin of such requests in `Origin` and `Sec-Fetch-Site`;
   a request from another site, or from a sandboxed frame, gets `403`.
 - Reads too come only from the editor itself or a window opened on it: a
@@ -1100,7 +1126,8 @@ npm run test:firefox   (the same specs in Firefox; once before:
                         npx playwright install firefox)
 npm run test:py        (the Python tests: pptx_chart.py, pptx_import.py, emf_svg.py,
                         which files a Markdown import may copy, and the
-                        settings file written whole or not at all)
+                        settings file written whole or not at all, and the update check:
+                        version comparison and stubbed GitHub answers)
 ```
 
 The tests start `serve.py` on a throw-away workspace made from

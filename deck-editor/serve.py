@@ -13,7 +13,14 @@ Routes
     GET  /<app file>             editor.css, editor.js, core/*.js, templates/*
     GET  /deck/<path>            any file inside the workspace (the iframe loads decks here); a deck
                                  comes with X-Diapo-Version, a hash of the file (see /api/save)
-    GET  /api/status             {ok, workspace}
+    GET  /api/status             {ok, workspace, app, released, update_auto}
+    POST /api/update-check[?auto=1]  asks GitHub for the latest release (the one request Diapo makes
+                                 about itself) -> {current, latest, newer, url, published, notes};
+                                 auto=1 is the start-up check: {skipped} unless the setting is on and
+                                 the last check is over a day old
+    POST /api/update-settings?auto=0|1  "check for updates when Diapo starts" (off by default)
+    POST /api/open-link?page=release|releases|guide|changelog[&tag=1.3.0]  opens a fixed
+                                 github.com/reactiveoxygenspecies/Diapo page in the normal browser
     GET  /api/list?dir=<path>    *.html files under the workspace, recursive, each with its title and
                                  whether it is a deck (has a .deck-stage)
     POST /api/save?file=<path>[&base=<version>][&overwrite=1]
@@ -115,6 +122,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
+import pathlib
 import struct
 import tempfile
 import import_deck
@@ -252,6 +260,129 @@ SETTINGS = load_settings()
 # The build: bump APP_VERSION and APP_RELEASED with every release (tools/release.py does).
 APP_VERSION = "1.2.0"
 APP_RELEASED = "2026-11-13"
+
+
+# -- Checking for a new release -------------------------------------------------
+# The one request Diapo makes about itself: GET the latest release from GitHub when the user
+# clicks "Check for updates" (or, if they turned it on, once a day at start). Nothing is sent
+# but a generic User-Agent. DIAPO_UPDATE_URL replaces the address (a local JSON file or a stub
+# server), which is how the tests run without the network.
+UPDATE_URL = "https://api.github.com/repos/reactiveoxygenspecies/Diapo/releases/latest"
+RELEASES_BASE = "https://github.com/reactiveoxygenspecies/Diapo"
+UPDATE_TIMEOUT = 8
+UPDATE_MAX_BYTES = 1024 * 1024
+UPDATE_NOTES_CHARS = 1200
+UPDATE_EVERY = 24 * 3600
+
+
+class UpdateError(Exception):
+    """A check that could not finish; the message is shown to the user as it is."""
+
+
+def parse_version(text):
+    """'v1.10.0' -> (1, 10, 0); None for anything that is not plain dotted numbers (a tag like
+    1.3.0-rc1 is not a release to offer)."""
+    m = re.fullmatch(r"v?(\d+(?:\.\d+){0,3})", str(text or "").strip())
+    return tuple(int(x) for x in m.group(1).split(".")) if m else None
+
+
+def version_newer(latest, current):
+    """True when `latest` is a higher version than `current`: compared as numbers (1.10.0 is
+    above 1.9.0), a missing part counting as 0 (1.3 equals 1.3.0)."""
+    a, b = parse_version(latest), parse_version(current)
+    if not a or not b:
+        return False
+    n = max(len(a), len(b))
+    return a + (0,) * (n - len(a)) > b + (0,) * (n - len(b))
+
+
+def plain_notes(text, limit=UPDATE_NOTES_CHARS):
+    """Release notes (Markdown) as plain text of a reasonable length."""
+    t = str(text or "").replace("\r\n", "\n")
+    t = re.sub(r"<[^>]+>", "", t)                                  # tags
+    t = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", t)                     # images
+    t = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", t)                 # links keep their text
+    t = re.sub(r"^\s{0,3}#{1,6}\s*", "", t, flags=re.M)            # heading marks
+    t = re.sub(r"^\s*[-*+]\s+", "- ", t, flags=re.M)
+    t = re.sub(r"(\*\*|__|`)", "", t)
+    t = re.sub(r"\n{3,}", "\n\n", t).strip()
+    if len(t) > limit:
+        t = t[:limit].rsplit(" ", 1)[0].rstrip() + "..."
+    return t
+
+
+def fetch_latest_release():
+    """The newest published release (not a draft, not a pre-release) as the GitHub API's JSON
+    object, or None when there is none. Raises UpdateError with a message for the user."""
+    url = os.environ.get("DIAPO_UPDATE_URL") or UPDATE_URL
+    if not re.match(r"[a-z][a-z0-9+.-]+://", url, re.I):            # a plain path to a JSON file
+        url = pathlib.Path(url).resolve().as_uri()
+    if urllib.parse.urlparse(url).scheme not in ("https", "http", "file"):
+        raise UpdateError("The update address is not one Diapo can read.")
+    req = urllib.request.Request(url, headers={"User-Agent": "Diapo/" + APP_VERSION, "Accept": "application/vnd.github+json"})
+    try:
+        with urllib.request.urlopen(req, timeout=UPDATE_TIMEOUT) as r:
+            raw = r.read(UPDATE_MAX_BYTES + 1)
+    except urllib.error.HTTPError as e:
+        if e.code in (403, 429):
+            raise UpdateError("GitHub is limiting requests from this connection right now. Try again in a while.")
+        if e.code == 404:
+            return None                                             # no release published (yet)
+        raise UpdateError(f"GitHub answered with an error ({e.code}). Try again later.")
+    except (urllib.error.URLError, OSError, TimeoutError):          # a socket timeout too
+        raise UpdateError("Could not reach GitHub. Check your internet connection and try again.")
+    if len(raw) > UPDATE_MAX_BYTES:
+        raise UpdateError("GitHub's answer was not what Diapo expected.")
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except ValueError:
+        raise UpdateError("GitHub's answer was not what Diapo expected.")
+    # /releases/latest is one object; a list (a stub, or /releases) is searched for the highest.
+    items = data if isinstance(data, list) else [data]
+    if not any(isinstance(r, dict) for r in items):
+        raise UpdateError("GitHub's answer was not what Diapo expected.")
+    best = None
+    for rel in items:
+        if not isinstance(rel, dict) or rel.get("draft") or rel.get("prerelease") or not parse_version(rel.get("tag_name")):
+            continue
+        if best is None or version_newer(rel["tag_name"], best["tag_name"]):
+            best = rel
+    return best
+
+
+def update_check():
+    """The answer for the editor: {current, latest, newer, url, published, notes}."""
+    rel = fetch_latest_release()
+    out = {"current": APP_VERSION, "latest": None, "newer": False,
+           "url": RELEASES_BASE + "/releases", "published": "", "notes": ""}
+    if rel:
+        tag = str(rel["tag_name"]).strip()
+        out.update(latest=tag.lstrip("v"), newer=version_newer(tag, APP_VERSION),
+                   published=str(rel.get("published_at") or "")[:10], notes=plain_notes(rel.get("body")))
+        out["url"] = f"{RELEASES_BASE}/releases/tag/{urllib.parse.quote(tag)}"
+    with settings_change() as s:
+        s.setdefault("update_check", {})["last"] = int(time.time())
+    return out
+
+
+def update_due():
+    """True when the start-up check is switched on and a day has passed since the last one."""
+    with SETTINGS_LOCK:
+        u = SETTINGS.get("update_check")
+        u = u if isinstance(u, dict) else {}
+        return bool(u.get("auto")) and time.time() - float(u.get("last") or 0) >= UPDATE_EVERY
+
+
+LINK_PAGES = {"releases": "/releases", "guide": "/blob/main/deck-editor/GUIDE.md", "changelog": "/blob/main/deck-editor/CHANGELOG.md"}
+
+
+def link_url(page, tag=""):
+    """One of a few fixed github.com/reactiveoxygenspecies/Diapo addresses, never one the page
+    supplies, so this route cannot be used to open anything else."""
+    v = parse_version(tag)
+    if page == "release" and v:
+        return f"{RELEASES_BASE}/releases/tag/v{'.'.join(map(str, v))}"
+    return RELEASES_BASE + LINK_PAGES.get(page, "/releases")
 
 
 def recent_decks():
@@ -1523,7 +1654,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     themes = dict(SETTINGS.get("themes", {}))
                 return self._json({"ok": True, "themes": themes})
             if route == "/api/status":
-                return self._json({"ok": True, "workspace": WORKSPACE, "recent": recent_decks(), "version": 1, "app": APP_VERSION})
+                return self._json({"ok": True, "workspace": WORKSPACE, "recent": recent_decks(), "version": 1, "app": APP_VERSION, "released": APP_RELEASED,
+                                   "update_auto": bool((SETTINGS.get("update_check") or {}).get("auto"))})
             if route == "/api/list":
                 d = safe_path(self._query().get("dir", ""))
                 if not os.path.isdir(d):
@@ -1600,6 +1732,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     else:
                         trusted.pop(full, None)
                 return self._json(self._trust_reply(full, q.get("draft") == "1"))
+            if route == "/api/update-check":
+                if q.get("auto") == "1" and not update_due():
+                    return self._json({"ok": True, "skipped": True})
+                try:
+                    return self._json({"ok": True, **update_check()})
+                except UpdateError as e:
+                    return self._fail(str(e), 502)
+            if route == "/api/update-settings":
+                on = q.get("auto") == "1"
+                with settings_change() as s:
+                    s.setdefault("update_check", {})["auto"] = on
+                return self._json({"ok": True, "update_auto": on})
+            if route == "/api/open-link":
+                url = link_url(q.get("page", ""), q.get("tag", ""))
+                if not os.environ.get("DECK_EDITOR_NO_DIALOG"):      # the tests never open a window
+                    webbrowser.open(url)
+                return self._json({"ok": True, "url": url})
             if route == "/api/save":
                 return self.api_save(q)
             if route == "/api/upload":

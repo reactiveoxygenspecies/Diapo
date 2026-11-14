@@ -32,7 +32,7 @@ module.exports = defineConfig({
     webServer: {
         command: `${process.platform === 'win32' ? 'py -3' : 'python3'} serve.py "${WORKSPACE}" ${PORT} --no-open --settings "${path.join(WORKSPACE, 'settings.json')}"`,
         url: `http://127.0.0.1:${PORT}/api/status`,
-        env: { ...process.env, DECK_EDITOR_NO_DIALOG: '1' },     // a dialog would hang a test; the typed-path fallback is tested instead
+        env: { ...process.env, DECK_EDITOR_NO_DIALOG: '1', DIAPO_UPDATE_URL: path.join(WORKSPACE, 'update-stub.json') },     // a dialog would hang a test; the typed-path fallback is tested instead
         reuseExistingServer: false,
         timeout: 15000,
     },

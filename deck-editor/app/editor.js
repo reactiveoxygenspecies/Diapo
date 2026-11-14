@@ -897,18 +897,112 @@ const KEYS = [
     ['Slides', [['PgUp / PgDn', 'Previous / next slide'], ['Home / End', 'First / last slide'], ['Ctrl+M', 'New slide (layout picker; Ctrl+Shift+M: blank)'], ['Ctrl+D', 'Duplicate (slide or selection)'], ['Ctrl+Up / Down', 'Move the slide up / down']]],
     ['Canvas', [['Click', 'Select'], ['Shift+click', 'Add to the selection'], ['Ctrl+click', 'Select the exact element under the cursor (a plain drag then moves just that)'], ['Alt+drag', 'Duplicate what you drag'], ['Ctrl while dragging', 'Disable snapping'], ['Shift / Alt while resizing', 'Keep the aspect ratio (corners) / resize about the centre; both together, both'], ['Right-click', 'Element menu'], ['Drag on empty space', 'Marquee select'], ['Double-click / Enter', 'Edit text (Esc when done; Ctrl+B / I / U, Ctrl+Shift+X strike, Ctrl+Shift+= superscript, Ctrl+= subscript while editing)'], ['Arrows', 'Nudge 1px (Shift: 10px)'], ['Delete', 'Delete the selection (Hide is in the panel and the menu)'], ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste, also across slides; images and text from elsewhere paste too'], ['Ctrl+Alt+C / Ctrl+Alt+V', 'Copy the look of an element (colours, border, type, padding) / put it on the selection'], ['Ctrl+G / Ctrl+Shift+G', 'Group / ungroup'], ['Ctrl+] / Ctrl+[', 'Bring forward / send backward (Shift: to front / to back)'], ['Tab', 'Next sibling'], ['Ctrl+F / Ctrl+H', 'Find / find and replace across the deck (Enter / Shift+Enter: next / previous match; Esc closes)'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'], ['Ctrl++ / Ctrl+- / Ctrl+0', 'Zoom in / out / fit'], ['Space+drag, middle button, wheel', 'Pan when zoomed in (the middle button grabs the view)'], ['Ctrl+\\', 'Hide / show both side panels (drag their edges to resize)']]],
 ];
-function showHelp(on) {
-    let h = document.querySelector('.help');
+/* The "?" dialog: the keyboard map, and a tab "About Diapo" (version, checking for a new
+   release, links). tab: 'keys' or 'about'. The shortcuts stay one keypress away: the dialog
+   opens on the keyboard tab, and the tab strip is two plain buttons. */
+let helpTab = 'keys';
+function showHelp(on, tab) {
+    let h = document.querySelector('.help:not(.versions)');
     if (!on) { if (h) h.remove(); return; }
-    if (h) return;
+    if (h && !tab) return;
+    if (h) h.remove();
+    helpTab = tab || 'keys';
     h = document.createElement('div');
     h.className = 'help';
-    h.setAttribute('role', 'dialog'); h.setAttribute('aria-modal', 'true'); h.setAttribute('aria-label', 'Keyboard shortcuts');
-    h.innerHTML = `<div class="help-card"><h2>Keyboard</h2>${KEYS.map(([title, rows]) => `<h3>${title}</h3><table>${rows.map(([k, d]) => `<tr><td>${k.split(' / ').map(x => x.split(/\+(?=.)/).map(y => `<kbd>${y}</kbd>`).join('+')).join(' / ')}</td><td>${d}</td></tr>`).join('')}</table>`).join('')}</div>`;
-    h.addEventListener('click', (e) => { if (e.target === h) showHelp(false); });
+    h.setAttribute('role', 'dialog'); h.setAttribute('aria-modal', 'true'); h.setAttribute('aria-label', helpTab === 'about' ? 'About Diapo' : 'Keyboard shortcuts');
+    const keys = KEYS.map(([title, rows]) => `<h3>${title}</h3><table>${rows.map(([k, d]) => `<tr><td>${k.split(' / ').map(x => x.split(/\+(?=.)/).map(y => `<kbd>${y}</kbd>`).join('+')).join(' / ')}</td><td>${d}</td></tr>`).join('')}</table>`).join('');
+    h.innerHTML = `<div class="help-card">
+        <div class="help-tabs" role="tablist"><button role="tab" data-tab="keys" class="${helpTab === 'keys' ? 'on' : ''}" aria-selected="${helpTab === 'keys'}">Keyboard</button><button role="tab" data-tab="about" class="${helpTab === 'about' ? 'on' : ''}" aria-selected="${helpTab === 'about'}">About Diapo</button></div>
+        <div id="helpKeys" ${helpTab === 'keys' ? '' : 'hidden'}><h2>Keyboard</h2>${keys}</div>
+        <div id="helpAbout" ${helpTab === 'about' ? '' : 'hidden'}>${aboutHtml()}</div></div>`;
+    h.addEventListener('click', (e) => {
+        if (e.target === h) { showHelp(false); return; }
+        const t = e.target.closest('[data-tab]');
+        if (t) { showHelp(true, t.dataset.tab); return; }
+        const l = e.target.closest('[data-link]');
+        if (l) { openLink(l.dataset.link); return; }
+        if (e.target.closest('#aboutCheck')) checkForUpdates();
+        const g = e.target.closest('#aboutGet');
+        if (g) openLink('release', g.dataset.tag);
+    });
+    h.addEventListener('change', async (e) => {
+        if (e.target.id !== 'aboutAuto') return;
+        try { app.updateAuto = (await api.updateAuto(e.target.checked)).update_auto; }
+        catch (err) { e.target.checked = !e.target.checked; toast('Could not save that setting: ' + err.message, { error: true }); }
+    });
     document.body.appendChild(h);
+    if (helpTab === 'about') showUpdateResult();
 }
-$('btnHelp').addEventListener('click', () => showHelp(true));
+
+/* ------------------------------------------------------------
+   About Diapo and updates. The only time Diapo goes online on its own account is a click on
+   "Check for updates" (the server asks GitHub for the latest release), or, when the user
+   switched it on, once a day at start.
+   ------------------------------------------------------------ */
+app.version = ''; app.released = ''; app.updateAuto = false;
+app.updateResult = null;                     // the last answer: {current, latest, newer, url, published, notes}, {busy} or {error}
+const niceDate = (iso) => { const d = new Date(iso + 'T12:00:00'); return isNaN(d) ? iso : d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }); };
+const openLink = (page, tag = '') => api.openLink(page, tag).catch(err => toast('Could not open the browser: ' + err.message, { error: true }));
+
+function aboutHtml() {
+    return `<h2>Diapo ${escapeHtml(app.version || '')}</h2>
+        <p class="muted">${app.released ? 'Released ' + escapeHtml(niceDate(app.released)) + '. ' : ''}Slides that are plain HTML files, edited on your own computer.</p>
+        <div class="row about-row"><button class="tb-btn" id="aboutCheck">Check for updates</button><span class="spacer"></span>
+            <button class="mini-btn" data-link="guide">Guide</button><button class="mini-btn" data-link="changelog">Changelog</button></div>
+        <div id="aboutResult" class="about-result" role="status" aria-live="polite"></div>
+        <label class="about-auto"><input type="checkbox" id="aboutAuto" ${app.updateAuto ? 'checked' : ''}> Check for updates when Diapo starts</label>
+        <p class="muted about-note">Off by default. Diapo asks GitHub for the latest release and sends nothing about you or your decks. A click on the button does the same, once.</p>`;
+}
+
+/* Fills the result area of the About tab from app.updateResult. */
+function showUpdateResult() {
+    const box = document.getElementById('aboutResult');
+    const r = app.updateResult;
+    if (!box || !r) return;
+    if (r.busy) { box.innerHTML = '<p>Checking...</p>'; return; }
+    if (r.error) { box.innerHTML = `<p class="about-bad">${escapeHtml(r.error)}</p>`; return; }
+    if (!r.latest) { box.innerHTML = `<p>No release has been published yet, so there is nothing newer than ${escapeHtml(r.current)}.</p>`; return; }
+    if (!r.newer) { box.innerHTML = `<p class="about-good">You have the latest version (${escapeHtml(r.current)}).</p>`; return; }
+    const notes = r.notes ? `<pre class="about-notes">${escapeHtml(r.notes.length > 500 ? r.notes.slice(0, 500).replace(/\s+\S*$/, '') + '...' : r.notes)}</pre>` : '';
+    box.innerHTML = `<p class="about-good"><b>Diapo ${escapeHtml(r.latest)} is available</b>${r.published ? ' (released ' + escapeHtml(niceDate(r.published)) + ')' : ''}. You have ${escapeHtml(r.current)}.</p>${notes}
+        <div class="row"><button class="tb-btn primary" id="aboutGet" data-tag="${escapeHtml(r.latest)}">Open the release page</button></div>
+        <p class="muted about-note">To update: with the Windows program, download the new <code>diapo.exe</code> from that page and use it in place of the old one. With a copy of the repository, run <code>git pull</code>, or download the ZIP again. Your decks are not touched either way.</p>`;
+}
+
+async function checkForUpdates() {
+    app.updateResult = { busy: true };
+    showUpdateResult();
+    try { app.updateResult = await api.updateCheck(); }
+    catch (err) { app.updateResult = { error: err.message }; }
+    showUpdateResult();
+    if (app.updateResult.newer) document.querySelector('.update-notice')?.remove();
+}
+
+/* A small notice that blocks nothing; it leads to the About tab. */
+function showUpdateNotice(latest) {
+    if (document.querySelector('.update-notice')) return;
+    const n = document.createElement('div');
+    n.className = 'update-notice'; n.setAttribute('role', 'status');
+    n.innerHTML = `<span>Diapo ${escapeHtml(latest)} is available.</span><button class="mini-btn" data-a="see">See what's new</button><button class="mini-btn" data-a="x" aria-label="Dismiss" title="Dismiss">&times;</button>`;
+    n.addEventListener('click', (e) => {
+        const a = e.target.closest('[data-a]'); if (!a) return;
+        n.remove();
+        if (a.dataset.a === 'see') showHelp(true, 'about');
+    });
+    document.body.appendChild(n);
+}
+
+/* The start-up check, when the user turned it on; the server decides whether a day has passed. */
+async function autoUpdateCheck() {
+    if (!app.updateAuto) return;
+    try {
+        const r = await api.updateCheck({ auto: true });
+        if (r.skipped) return;
+        app.updateResult = r;
+        if (r.newer) showUpdateNotice(r.latest);
+    } catch (err) { /* quiet: the user did not ask for this one */ }
+}
+$('btnHelp').addEventListener('click', () => showHelp(true, 'keys'));
 
 /* Previous versions of the open deck (the backups the save keeps): each with its time, title
    and slide count; "Open a copy" puts the version beside the deck as its own file and opens
@@ -977,7 +1071,7 @@ function onKey(e) {
         if (app.iconPicker && app.iconPicker.isOpen) { app.iconPicker.close(); return stop(e); }
         if (app.preview) { setPreview(false); return stop(e); }
         if (app.textEdit.active) { app.textEdit.commit(); return stop(e); }
-        if (document.querySelector('.help')) { showHelp(false); return stop(e); }
+        if (document.querySelector('.help')) { document.querySelector('.help').remove(); return stop(e); }
         if (!$('drawer').hidden) { showDrawer(false); return stop(e); }
         if (app.strip.picker) { app.strip.closeLayoutPicker(); return stop(e); }
         if (app.themeMode) { if (typing && t.closest('#themeBody')) t.blur(); else setThemeMode(false); return stop(e); }
@@ -1027,7 +1121,7 @@ function onKey(e) {
         if ((k === 'Enter' || k === ' ') && !control.matches('button, a[href], summary')) { stop(e); control.click(); }
         return;
     }
-    if (k === '?') { showHelp(!document.querySelector('.help')); return stop(e); }
+    if (k === '?') { showHelp(!document.querySelector('.help:not(.versions)'), 'keys'); return stop(e); }
     if (ctrl && (k === '=' || k === '+')) { stop(e); zoomStep(1); return; }
     if (ctrl && k === '-') { stop(e); zoomStep(-1); return; }
     if (ctrl && k === '0') { stop(e); setZoom('fit'); return; }
@@ -1427,7 +1521,9 @@ function paletteEntries() {
     for (const t of templateList) out.push({ group: 'Decks', label: 'New deck from the ' + t.name + ' template...', keywords: 'template design theme ' + (t.tagline || ''), quiet: true, run: () => newDeckFrom(t.slug) });
     out.push({ group: 'Decks', label: 'Import a PowerPoint or Markdown file...', run: click('#btnImport') });
     out.push({ group: 'Decks', label: 'Try the sample deck', run: () => openSampleDeck() });
-    out.push({ group: 'Help', label: 'Keyboard map', hint: '?', run: () => showHelp(true) });
+    out.push({ group: 'Help', label: 'Keyboard map', hint: '?', run: () => showHelp(true, 'keys') });
+    out.push({ group: 'Help', label: 'About Diapo', keywords: 'version release', run: () => showHelp(true, 'about') });
+    out.push({ group: 'Help', label: 'Check for updates', keywords: 'new release version upgrade', run: () => { showHelp(true, 'about'); checkForUpdates(); } });
     out.push({ group: 'Help', label: 'Look (light / dark)', run: click('#btnLook') });
     out.push({ group: 'View', label: (app.spellcheck ? 'Turn off' : 'Turn on') + ' spelling check while typing', keywords: 'spellcheck spell', run: () => setSpell(!app.spellcheck) });
     return out;
@@ -1685,6 +1781,8 @@ async function boot() {
         const s = await api.status();
         app.workspace = s.workspace;
         if (s.app) $('brandVersion').textContent = 'v' + s.app;      // the margin print carries the build number
+        app.version = s.app || ''; app.released = s.released || ''; app.updateAuto = !!s.update_auto;
+        autoUpdateCheck();
         showStatusFolder();
     } catch (err) {
         toast('The server is not running. Start it with serve.py.', { error: true, ms: 8000 });
