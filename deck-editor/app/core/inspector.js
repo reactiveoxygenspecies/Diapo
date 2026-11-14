@@ -108,7 +108,7 @@ export class Inspector {
           </section>
           <section class="insp-section">
             <h4>Speaker notes</h4>
-            <textarea id="inspNotes" class="insp-notes" rows="6" placeholder="Notes for the presenter view" spellcheck="false"></textarea>
+            <textarea id="inspNotes" class="insp-notes" rows="6" placeholder="Notes for the presenter view" spellcheck="true"></textarea>
           </section>
         </div>
         <div data-when="some">

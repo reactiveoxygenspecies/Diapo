@@ -1153,3 +1153,17 @@ body.resizing-panels #deckFrame { pointer-events: none; }
 /* Select what contains the element, or what is inside it: two small arrows by its name. */
 .insp-nav { display: inline-flex; gap: 2px; float: right; }
 .insp-nav .mini-btn { width: 22px; height: 22px; padding: 0; justify-content: center; }
+
+/* Find and replace (Ctrl+F / Ctrl+H) */
+.findbar { position: fixed; z-index: 80; width: 380px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--bg-2); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.28); font-size: 12px; }
+.find-row { display: flex; align-items: center; gap: 6px; }
+.find-row input[type="text"] { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: 13px var(--ui-font); }
+.find-row input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.find-count { flex: none; min-width: 52px; text-align: right; color: var(--ink-3); font-size: 12px; }
+.find-opts { flex-wrap: wrap; gap: 4px 12px; }
+.find-opts label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.find-note { font-size: 11px; color: var(--ink-3); }
+.find-replace .mini-btn { flex: none; }
+.find-boxes { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.find-box { position: absolute; background: rgba(255, 214, 0, 0.45); border-radius: 2px; }
+.find-box.current { background: rgba(255, 140, 0, 0.7); }
