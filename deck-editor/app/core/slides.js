@@ -147,10 +147,8 @@ export class SlideStrip extends EventTarget {
             if (!e.target.closest('.strip-menu')) this._closeMenu();
             this.ctx = !!(e.target.closest && e.target.closest('#stripList, .strip-menu'));
         }, true);
-        this.deck.addEventListener('ready', () => {
-            this.sel.clear();
-            this.deck.doc.addEventListener('pointerdown', () => { this.ctx = false; }, true);
-        });
+        this.deck.addEventListener('ready', () => this.sel.clear());
+        this.deck.onNewDocument((doc) => doc.addEventListener('pointerdown', () => { this.ctx = false; }, true));
         this.deck.addEventListener('slide', () => { if (this.sel.size && !this.sel.has(this.deck.currentSlide)) this.sel.clear(); this.highlight(); });
         document.addEventListener('pointerdown', (e) => { if (this.picker && !e.target.closest('.layout-picker') && e.target !== this.addButton) this.closeLayoutPicker(); }, true);
     }

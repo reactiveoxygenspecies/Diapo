@@ -31,7 +31,7 @@ export class Problems extends EventTarget {
     }
 
     _bind() {
-        this.deck.addEventListener('ready', () => this._onReady());
+        this.deck.addEventListener('ready', (e) => this._onReady(e.detail && e.detail.resumed));
         // The list follows the document: a deleted element stops being a problem, and an undo
         // that brings a broken picture back makes it one again. A step is cheap to check but
         // typing or dragging fires many, so wait for a pause.
@@ -43,19 +43,26 @@ export class Problems extends EventTarget {
         document.addEventListener('pointerdown', (e) => { if (this.panel && !e.target.closest('.problems, #problemsBadge')) this.close(); }, true);
     }
 
-    _onReady() {
-        this.items = [];
-        this.close();
+    _onReady(resumed) {
+        // A deck in a background tab keeps its document (tabs.js), and so its list: listening
+        // again would count every error twice.
+        if (!this._byDoc) this._byDoc = new WeakMap();
+        if (this._doc) this._byDoc.set(this._doc, this.items);
         const doc = this.deck.doc, win = this.deck.win;
+        this._doc = doc;
+        this.close();
+        if (resumed) { this.items = this._byDoc.get(doc) || []; this.render(); return; }
+        this.items = [];
         // Resources that failed before we could listen: images know; stylesheets have no sheet.
         this._scanImages(true);
         for (const link of doc.querySelectorAll('link[rel=stylesheet][href]')) {
             if (!link.sheet && !/fonts\.googleapis/.test(link.href)) this.add({ kind: 'missing', what: 'stylesheet', url: link.getAttribute('href') });
         }
         // Later failures (a script inserting an image, a video), and the deck's own errors.
+        // A parked deck's own errors (its tab in the background) are not this deck's problems.
         doc.addEventListener('error', (e) => {
             const t = e.target;
-            if (!t || !t.tagName) return;
+            if (!t || !t.tagName || this.deck.doc !== doc) return;
             const tag = t.tagName.toLowerCase();
             if (!['img', 'script', 'link', 'video', 'audio', 'source', 'iframe'].includes(tag)) return;
             const url = t.getAttribute('src') || t.getAttribute('href') || '';
@@ -65,10 +72,12 @@ export class Problems extends EventTarget {
         }, true);
         win.addEventListener('error', (e) => {
             if (e.target && e.target !== win && e.target.tagName) return;      // a resource error, handled above
+            if (this.deck.doc !== doc) return;
             this.add({ kind: 'script', message: e.message || 'error', where: e.filename ? e.filename.split('/').pop() + (e.lineno ? ':' + e.lineno : '') : '' });
         });
         win.addEventListener('unhandledrejection', (e) => {
             const r = e.reason;
+            if (this.deck.doc !== doc) return;
             this.add({ kind: 'script', message: (r && r.message) || String(r) || 'rejected promise', where: '' });
         });
         this.render();

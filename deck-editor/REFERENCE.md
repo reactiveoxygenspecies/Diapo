@@ -1229,6 +1229,17 @@ name and skip the dialog.
   to restore or discard the draft; saving removes it, and so does undoing back
   to the saved state. (The draft is a complete deck file, so structural edits
   such as added slides survive too.)
+- **Decks in tabs keep their undo history.** Several decks can be open at once,
+  one tab each. Leaving a tab writes its draft (when it has unsaved edits) and
+  keeps the deck itself alive, hidden (`core/tabs.js`, `Deck.park`), with its
+  undo and redo steps: back on that tab, Ctrl+Z and Ctrl+Y go on as if it had
+  never been left, and undoing back to the saved state makes it clean and
+  removes its draft. Up to four decks are kept so in the background; past that
+  the one left longest ago is let go, and its tab comes back from its draft with
+  an empty history. A deck without unsaved edits
+  whose file changed on disk while it was in the background is read again,
+  history dropped. Closing a tab drops its history, and so does reloading the
+  editor page. Each deck keeps its last 200 undo steps.
 - **Rename** (File menu for the open deck, or a deck's row in the Decks drawer) takes the deck's history along: its previous
   versions and draft in `.deck-editor/`, its trust (scripts in decks) and its
   place in Recent. A change of case only works too.
@@ -1366,7 +1377,8 @@ deck-editor/
     core/
       api.js          the only module that talks to serve.py
       document.js     deck loading, slide model, navigation, serialisation
-      history.js      undo/redo command stack
+      history.js      undo/redo command stack (200 steps; parked with its deck's tab)
+      tabs.js         deck tabs: switching, closing, the decks kept alive in the background
       dom.js          how deck elements are classified
       selection.js    hit testing, selection, drag / resize / rotate, guides
       transform.js    move / size / rotate primitives, snapping maths

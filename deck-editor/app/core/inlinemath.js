@@ -37,9 +37,9 @@ export class InlineMath {
         this.target = null;       // { span } to change, or { range } to put a new one in
         this.seq = 0;
         this.timer = 0;
-        this.deck.addEventListener('ready', () => {
+        this.deck.onNewDocument((doc) => {
             // A press elsewhere in the text closes the popover (the press on an equation opens it: textedit.js).
-            this.deck.doc.addEventListener('pointerdown', (e) => {
+            doc.addEventListener('pointerdown', (e) => {
                 if (this.pop && !(e.target.closest && e.target.closest(INLINE_MATH))) this.close({ refocus: false });
             }, true);
         });

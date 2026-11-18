@@ -61,9 +61,9 @@ export class EditOps {
         };
         document.addEventListener('copy', onCopy);
         document.addEventListener('paste', onPaste);
-        this.deck.addEventListener('ready', () => {
-            this.deck.doc.addEventListener('copy', onCopy);
-            this.deck.doc.addEventListener('paste', onPaste);
+        this.deck.onNewDocument((doc) => {
+            doc.addEventListener('copy', onCopy);
+            doc.addEventListener('paste', onPaste);
         });
     }
 

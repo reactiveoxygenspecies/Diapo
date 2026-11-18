@@ -140,6 +140,12 @@ html.deck-editing [contenteditable="true"] span[data-math] { cursor: pointer; bo
 html.deck-editing [contenteditable="true"] span[data-math]:hover { background: rgba(70, 120, 255, 0.16); }
 `;
 
+/* What the stage observer watches: slide changes and every edit (see load). */
+const OBSERVE = { attributes: true, attributeFilter: ['class', 'style'], childList: true, subtree: true, characterData: true };
+/* Fields of a Deck that are the editor's, not one document's: a parked deck leaves them
+   (see park). Everything else set on the object belongs to the open document. */
+const SHARED_FIELDS = new Set(['playEntrances', 'animationCssProvider', '_navToken']);
+
 export class Deck extends EventTarget {
     constructor(iframe) {
         super();
@@ -221,7 +227,11 @@ export class Deck extends EventTarget {
             .then(r => { if (!r.ok) return ''; this.diskVersion = r.headers.get('X-Diapo-Version') || ''; return r.text(); })
             .catch(() => '');
         await new Promise((resolve, reject) => {
-            const onLoad = () => { iframe.removeEventListener('load', onLoad); resolve(); };
+            // A frame made a moment ago (see park) may still report its first, empty page.
+            const onLoad = () => {
+                try { if (iframe.contentWindow.location.href === 'about:blank') return; } catch (e) { /* not ours to read: it is the deck */ }
+                iframe.removeEventListener('load', onLoad); resolve();
+            };
             iframe.addEventListener('load', onLoad);
             iframe.src = url;
             setTimeout(() => reject(new Error('the deck took too long to load')), 30000);
@@ -260,7 +270,7 @@ export class Deck extends EventTarget {
             }
             this.dispatchEvent(new CustomEvent('mutate', { detail: records }));
         });
-        this.observer.observe(this.stage, { attributes: true, attributeFilter: ['class', 'style'], childList: true, subtree: true, characterData: true });
+        this.observer.observe(this.stage, OBSERVE);
 
         // A deck whose own controller does not run (its scripts are paused until the user trusts
         // the deck, see serve.py) never marks the first slide .visible, so its reveal elements
@@ -284,6 +294,58 @@ export class Deck extends EventTarget {
         this._deckStyles = null;
         this.file = null;
         this._size = null;
+    }
+
+    /* ------------------------------------------------------------
+       Parking (tabs.js): a deck whose tab goes to the background keeps its document,
+       hidden, so its undo history (which points at that document's elements) still
+       applies when the tab comes back. park() hides the frame and gives the editor a
+       fresh one for the next deck; resume() shows a parked frame again with everything
+       this object knew about it. The document is the same one, so listeners the editor
+       bound to it stay bound: 'ready' then says { resumed: true } (see onNewDocument).
+       ------------------------------------------------------------ */
+    park() {
+        if (!this.isOpen) return null;
+        if (this.observer) this.observer.disconnect();
+        ++this._navToken;                    // a slide change on its way does not land in the next deck
+        this._navPending = null;
+        const state = {};
+        for (const k of Object.keys(this)) if (!SHARED_FIELDS.has(k)) state[k] = this[k];
+        const old = this.iframe;
+        old.removeAttribute('id');
+        old.hidden = true;
+        old.tabIndex = -1;
+        const frame = old.ownerDocument.createElement('iframe');
+        frame.id = 'deckFrame';
+        frame.title = old.title;
+        old.parentNode.insertBefore(frame, old);          // never move a frame: that would reload it
+        this.dispose();
+        this.iframe = frame;
+        this.trust = null;
+        return { iframe: old, state };
+    }
+    resume(parked) {
+        const current = this.iframe;
+        this.dispose();
+        for (const k of Object.keys(this)) if (!SHARED_FIELDS.has(k)) delete this[k];
+        Object.assign(this, parked.state);
+        const frame = parked.iframe;
+        frame.id = 'deckFrame';
+        frame.hidden = false;
+        frame.removeAttribute('tabindex');
+        if (current && current !== frame) current.remove();   // the frame shown until now held no parked deck
+        this._size = null;
+        this._lastIndex = this.current;
+        if (this.observer && this.stage) this.observer.observe(this.stage, OBSERVE);
+        return this;
+    }
+    /* A parked deck that will not come back (its tab closed, or too many parked). */
+    static discardParked(parked) {
+        if (parked && parked.iframe) parked.iframe.remove();
+    }
+    /* Binds fn(doc, win) to every newly loaded document, not again to a parked one coming back. */
+    onNewDocument(fn) {
+        this.addEventListener('ready', (e) => { if (!(e.detail && e.detail.resumed)) fn(this.doc, this.win); });
     }
 
     get isOpen() { return !!this.stage; }

@@ -749,8 +749,7 @@ export class TextEditor extends EventTarget {
         window.addEventListener('editor:zoom', () => this._placeSvgBox());
         this.canvas.addEventListener('scroll', () => this._placeSvgBox());
 
-        this.deck.addEventListener('ready', () => {
-            const doc = this.deck.doc, win = this.deck.win;
+        this.deck.onNewDocument((doc, win) => {
             // A press in the deck outside the edited element ends the edit and selects what was pressed.
             doc.addEventListener('pointerdown', (e) => {
                 if (!this.el) return;
