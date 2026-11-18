@@ -537,6 +537,19 @@ html[data-look="ink"] .canvas-loading .loader, html[data-look="slate"] .canvas-l
 .help-card .muted { color: var(--ink-3); }
 .help-card #helpAbout .row { display: flex; gap: 8px; margin-top: 8px; }
 .about-bad { color: var(--warn); }
+.publish-card { width: 640px; }
+.publish-card .pub-label { display: block; font-size: 12px; color: var(--ink-2); margin: 12px 0 4px; }
+.publish-card .pub-row { display: flex; gap: 8px; }
+.publish-card .pub-row input { flex: 1; min-width: 0; font: 12.5px var(--ui-mono); padding: 5px 8px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--bg); color: var(--ink); }
+.publish-card .row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.publish-card .pub-hint { font-size: 12px; margin: 10px 0 4px; }
+.publish-card .pub-warn { font-size: 12.5px; margin: 10px 0; }
+.publish-card .pub-ask { margin: 10px 0; padding: 8px 12px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--bg); font-size: 12.5px; }
+.publish-card .pub-ask p { margin: 0 0 8px; }
+.publish-card .pub-path { word-break: break-all; }
+.publish-card .pub-steps { padding-left: 20px; font-size: 13px; line-height: 1.5; }
+.publish-card .pub-steps li { margin: 8px 0; }
+.publish-card .pub-steps .mini-btn { display: inline-flex; vertical-align: baseline; }
 .about-notes { max-height: 160px; overflow: auto; margin: 8px 0; padding: 8px 10px; white-space: pre-wrap; font: 12px/1.45 var(--ui-mono); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
 .about-auto { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; }
 .about-note { font-size: 12px; margin: 6px 0; }

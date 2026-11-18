@@ -72,6 +72,12 @@ export const api = {
        dialog, unless dialog is false (then a default name next to the deck). */
     exportStandalone: (file, html, { to = null, dialog = true, fonts = true } = {}) =>
         call('POST', '/api/export?' + q({ file, ...(to ? { to } : {}), dialog: dialog ? 1 : 0, fonts: fonts ? 1 : 0 }), html, { 'Content-Type': 'text/html; charset=utf-8' }),
+    /* Export > Publish: a folder for a free web host (serve.py write_publish_folder). */
+    publishPlan: (file) => call('GET', '/api/publish/plan?' + q({ file })),
+    publishPick: (file) => call('POST', '/api/publish/pick?' + q({ file })),
+    publish: (file, html, { to = '', overwrite = false, fonts = false, zip = false } = {}) =>
+        call('POST', '/api/publish?' + q({ file, ...(to ? { to } : {}), ...(overwrite ? { overwrite: 1 } : {}), ...(fonts ? { fonts: 1 } : {}), ...(zip ? { zip: 1 } : {}) }), html, { 'Content-Type': 'text/html; charset=utf-8' }),
+    publishReveal: (path) => call('POST', '/api/publish/reveal?' + q({ path })),
     pptx: (file, spec, { to = null, dialog = true } = {}) =>
         call('POST', '/api/export/pptx?' + q({ file, ...(to ? { to } : {}), dialog: dialog ? 1 : 0 }), JSON.stringify(spec), { 'Content-Type': 'application/json' }),
     pdf: (file, html, { to = null, dialog = true, w = 0, h = 0 } = {}) =>

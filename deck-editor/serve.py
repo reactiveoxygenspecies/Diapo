@@ -75,6 +75,16 @@ Routes
                                  into the new folder, and makes that folder the workspace when it is
                                  outside; returns {file, workspace, copied, notes}
 
+    GET  /api/publish/plan?file= {dest, exists, nonEmpty}: where Export > Publish... would write by default
+    POST /api/publish/pick?file= native folder dialog for the destination -> {path} or {cancelled}
+    POST /api/publish?file=&to=[&overwrite=1][&fonts=1][&zip=1]  body = HTML; writes a folder ready for a
+                                 free web host: the deck as index.html and every local file it uses
+                                 (nothing of the editor's), optionally with Google Fonts downloaded into
+                                 it and a .zip beside it; 409 (reason "not-empty") before touching a
+                                 folder that has files in it; returns {path, zip, files, bytes, notes}
+    POST /api/publish/reveal?path=  shows a folder this session published in Explorer / Finder
+                                 (any other path is refused)
+
 The last workspace and the recent decks are kept in ~/.deck-editor.json.
 
 The editor opens in its own window: the Chrome or Edge of this machine (the
@@ -376,9 +386,15 @@ def update_due():
 LINK_PAGES = {"releases": "/releases", "guide": "/blob/main/deck-editor/GUIDE.md", "changelog": "/blob/main/deck-editor/CHANGELOG.md"}
 
 
+# The two free hosts the Publish dialog points to: fixed pages, like the GitHub ones above.
+HOST_LINKS = {"netlify-drop": "https://app.netlify.com/drop", "github-new": "https://github.com/new"}
+
+
 def link_url(page, tag=""):
     """One of a few fixed github.com/reactiveoxygenspecies/Diapo addresses, never one the page
     supplies, so this route cannot be used to open anything else."""
+    if page in HOST_LINKS:
+        return HOST_LINKS[page]
     v = parse_version(tag)
     if page == "release" and v:
         return f"{RELEASES_BASE}/releases/tag/v{'.'.join(map(str, v))}"
@@ -1470,10 +1486,11 @@ class Inliner:
         return html
 
 
-def local_refs(html, deck_dir):
+def local_refs(html, deck_dir, outside=None):
     """Relative paths of the files a deck loads from its own folder tree: src / href / poster /
     data-svg attributes and url() in styles. Only paths below the deck folder count (no ".." and
-    nothing absolute); missing files are reported, not copied."""
+    nothing absolute); missing files are reported, not copied. `outside`, when given, collects
+    the references that leave the deck folder (a publish says it left them out)."""
     found, missing = [], []
     def consider(ref):
         ref = (ref or "").strip().replace("&amp;", "&")
@@ -1481,6 +1498,8 @@ def local_refs(html, deck_dir):
             return
         clean = urllib.parse.unquote(ref.split("#", 1)[0].split("?", 1)[0]).replace("\\", "/")
         if clean.startswith("/") or ".." in clean.split("/") or re.match(r"^[A-Za-z]:", clean):
+            if outside is not None and clean not in outside:
+                outside.append(clean)
             return
         if not os.path.isfile(os.path.join(deck_dir, clean.replace("/", os.sep))):
             if clean not in missing:
@@ -1611,6 +1630,198 @@ def export_target(q, deck_full, default_name, ext):
     if not p.lower().endswith(ext):
         p += ext
     return p, False
+
+
+# ------------------------------------------------------------------
+# Publish: a folder ready for a free web host.
+#
+# Diapo hosts nothing and makes no request of its own for this: it writes the deck as
+# index.html with every local file it uses beside it (nothing of the editor's), and the
+# dialog explains how to put the folder on a host the user owns.
+# ------------------------------------------------------------------
+class PublishError(Exception):
+    def __init__(self, message, status=400, reason=""):
+        super().__init__(message)
+        self.status, self.reason = status, reason
+
+
+PUBLISHED = set()          # folders written in this session: the only ones /api/publish/reveal opens
+CSS_REF_RE = re.compile(r"""url\(\s*["']?([^"')]+?)["']?\s*\)|@import\s+["']([^"']+)["']""", re.I)
+GOOGLE_LINK_RE = re.compile(r"<link\b[^>]*>", re.I)
+GOOGLE_IMPORT_RE = re.compile(r"""@import\s+(?:url\(\s*)?["']?(https://fonts\.googleapis\.com/[^"')\s;]+)["']?\s*\)?\s*;""", re.I)
+
+
+def publish_default_dest(deck_full):
+    """<deck folder name>-site, next to the deck's folder."""
+    folder = os.path.dirname(deck_full)
+    name = os.path.basename(folder) or os.path.splitext(os.path.basename(deck_full))[0]
+    return os.path.join(os.path.dirname(folder), name + "-site")
+
+
+def publish_dest(deck_full, to):
+    """The folder the user asked for: absolute, or a name beside the deck's folder."""
+    to = (to or "").strip().strip('"')
+    if not to:
+        return publish_default_dest(deck_full)
+    if re.match(r"^[A-Za-z]:(?![\\/])", to):
+        raise PublishError("give a full path (C:\\...) or a folder name")      # C:name: drive C's current folder
+    to = os.path.expanduser(to)
+    if not (os.path.isabs(to) or re.match(r"^[A-Za-z]:", to)):
+        to = os.path.join(os.path.dirname(os.path.dirname(deck_full)), to)
+    return os.path.realpath(to)
+
+
+def publish_excluded(rel):
+    """Files that belong to the editor, not to the site: .deck-editor folders, other dot-folders
+    and dot-files (.git, .env), backups and the unsaved-draft sidecar."""
+    parts = rel.split("/")
+    name = parts[-1].lower()
+    return (any(p.startswith(".") for p in parts) or name.endswith((".bak", ".~draft", ".tmp"))
+            or bool(re.search(r"\.~\d+\.bak$", name)))
+
+
+def publish_css_refs(path, rel):
+    """Files a copied stylesheet loads (url(), @import), as paths relative to the deck folder."""
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            css = f.read()
+    except OSError:
+        return []
+    out = []
+    base = rel.rsplit("/", 1)[0] if "/" in rel else ""
+    for m in CSS_REF_RE.finditer(css):
+        ref = (m.group(1) or m.group(2) or "").strip()
+        if not ref or SKIP_URL.match(ref):
+            continue
+        clean = urllib.parse.unquote(ref.split("#", 1)[0].split("?", 1)[0]).replace("\\", "/")
+        if not clean or clean.startswith("/") or re.match(r"^[A-Za-z]:", clean):
+            continue
+        out.append(os.path.normpath(os.path.join(base, clean)).replace(os.sep, "/"))
+    return out
+
+
+def publish_google_fonts(page, dest, notes):
+    """Google Fonts links (and @imports) in the page become @font-face rules whose files are
+    downloaded into <dest>/fonts/. Returns (page, files downloaded). Offline, the link stays."""
+    count = [0]
+    index = os.path.join(dest, "index.html")
+
+    def hosted(href):
+        css, n, _size = host_google_fonts([href], index, False)
+        count[0] += n
+        return css
+
+    def link(m):
+        tag = m.group(0)
+        href = re.search(r"""\shref\s*=\s*["']([^"']+)["']""", tag, re.I)
+        if not href or "fonts.googleapis.com/css" not in href.group(1) or not re.search(r"rel\s*=\s*[\"']?stylesheet", tag, re.I):
+            return tag
+        url = href.group(1).replace("&amp;", "&")
+        try:
+            css = hosted(url)
+        except Exception as e:  # noqa: BLE001 - offline: the link stays and the dialog says so
+            notes.append("Google Fonts could not be downloaded, the link is kept: " + str(e).splitlines()[0])
+            return tag
+        return "<style data-hosted-fonts=\"" + href.group(1).replace('"', "&quot;") + "\">\n" + css + "\n</style>"
+
+    def imp(m):
+        try:
+            return hosted(m.group(1).replace("&amp;", "&"))
+        except Exception as e:  # noqa: BLE001
+            notes.append("Google Fonts could not be downloaded, the @import is kept: " + str(e).splitlines()[0])
+            return m.group(0)
+
+    page = GOOGLE_LINK_RE.sub(link, page)
+    page = GOOGLE_IMPORT_RE.sub(imp, page)
+    return page, count[0]
+
+
+def write_publish_folder(deck_full, page, to="", overwrite=False, fonts=False, make_zip=False):
+    """Write <dest>/index.html (the deck as `page`) and every local file it references.
+    Returns {path, zip, files, bytes, notes, fonts}; raises PublishError (reason "not-empty",
+    status 409, before anything is written, when the folder already has files in it)."""
+    deck_dir = os.path.realpath(os.path.dirname(deck_full))
+    dest = publish_dest(deck_full, to)
+    if os.path.isfile(dest):
+        raise PublishError("that is a file, not a folder")
+    if deck_dir == dest or deck_dir.startswith(dest + os.sep):
+        raise PublishError("the site cannot go in the deck's own folder (or one above it): choose a new folder")
+    zip_path = dest + ".zip"
+    nonempty = os.path.isdir(dest) and bool(os.listdir(dest))
+    if (nonempty or (make_zip and os.path.exists(zip_path))) and not overwrite:
+        what = "already has files in it" if nonempty else "has a .zip of that name beside it"
+        raise PublishError(f"{dest} {what}", 409, "not-empty")
+    outside, notes = [], []
+    refs, missing = local_refs(page, deck_dir, outside)
+    # Stylesheets can load pictures and fonts of their own.
+    i = 0
+    while i < len(refs):
+        if refs[i].lower().endswith(".css"):
+            for extra in publish_css_refs(os.path.join(deck_dir, refs[i].replace("/", os.sep)), refs[i]):
+                if extra.startswith("..") or extra in refs:
+                    continue
+                if os.path.isfile(os.path.join(deck_dir, extra.replace("/", os.sep))):
+                    refs.append(extra)
+                elif extra not in missing:
+                    missing.append(extra)
+        i += 1
+    os.makedirs(dest, exist_ok=True)
+    written = []                                              # paths in the site, "/"-separated
+
+    def put(rel, source):
+        target = os.path.join(dest, rel.replace("/", os.sep))
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copyfile(source, target + ".tmp")
+        os.replace(target + ".tmp", target)
+        written.append(rel)
+
+    for rel in refs:
+        source = os.path.realpath(os.path.join(deck_dir, rel.replace("/", os.sep)))
+        if publish_excluded(rel):
+            notes.append(f"the deck uses {rel}, which belongs to the editor: left out")
+        elif not source.startswith(deck_dir + os.sep):
+            notes.append(f"outside the deck folder, left out: {rel}")
+        elif rel in DECK_FILES and file_sha256(source) in known_file_hashes() and os.path.isfile(os.path.join(APP_DIR, DECK_FILES[rel])):
+            put(rel, os.path.join(APP_DIR, DECK_FILES[rel]))       # Diapo's own chart files: the current edition
+        else:
+            put(rel, source)
+    for rel in missing:
+        if rel in DECK_FILES and os.path.isfile(os.path.join(APP_DIR, DECK_FILES[rel])):
+            put(rel, os.path.join(APP_DIR, DECK_FILES[rel]))       # a chart added since the last save
+        elif not publish_excluded(rel):
+            notes.append(f"not found next to the deck, not copied: {rel}")
+    notes += [f"outside the deck folder, left out: {r}" for r in outside]
+    n_fonts = 0
+    if fonts:
+        page, n_fonts = publish_google_fonts(page, dest, notes)
+        if n_fonts:
+            written += sorted("fonts/" + f for f in os.listdir(os.path.join(dest, "fonts")) if "fonts/" + f not in written)
+    data = page.encode("utf-8")
+    with open(os.path.join(dest, "index.html.tmp"), "wb") as f:
+        f.write(data)
+    os.replace(os.path.join(dest, "index.html.tmp"), os.path.join(dest, "index.html"))
+    written.insert(0, "index.html")
+    total = sum(os.path.getsize(os.path.join(dest, w.replace("/", os.sep))) for w in written)
+    zipped = ""
+    if make_zip:
+        import zipfile
+        with zipfile.ZipFile(zip_path + ".tmp", "w", zipfile.ZIP_DEFLATED) as z:
+            for w in written:
+                z.write(os.path.join(dest, w.replace("/", os.sep)), w)
+        os.replace(zip_path + ".tmp", zip_path)
+        zipped = zip_path
+    PUBLISHED.add(dest)
+    return {"path": dest, "zip": zipped, "files": len(written), "bytes": total, "notes": notes, "fonts": n_fonts}
+
+
+def reveal_folder(path):
+    """Show a folder in Explorer / Finder / the file manager."""
+    if os.environ.get("DECK_EDITOR_NO_DIALOG"):               # the tests never open a window
+        return
+    if sys.platform == "win32":
+        os.startfile(path)                                     # noqa: S606 - a folder this session just wrote
+    else:
+        subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", path])
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -1756,6 +1967,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 if not os.path.isdir(d):
                     return self._fail("no such folder", 404)
                 return self._json({"ok": True, "dir": rel_path(d) if d != WORKSPACE else "", "files": list_tree(d)})
+            if route == "/api/publish/plan":
+                full = safe_path(self._query().get("file", ""))
+                if not os.path.isfile(full):
+                    return self._fail("no such deck", 404)
+                dest = publish_default_dest(full)
+                return self._json({"ok": True, "dest": dest, "exists": os.path.exists(dest), "nonEmpty": os.path.isdir(dest) and bool(os.listdir(dest))})
             if route == "/api/fonts/google":
                 fam = self._query().get("family", "").strip()
                 if not fam:
@@ -1922,6 +2139,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return self.api_import(q)
             if route == "/api/saveas":
                 return self.api_saveas(q)
+            if route == "/api/publish":
+                return self.api_publish(q)
+            if route == "/api/publish/pick":
+                full = safe_path(q.get("file", ""))
+                try:
+                    p = native_pick("folder", os.path.dirname(os.path.dirname(full)))
+                except RuntimeError:
+                    return self._fail(NO_DIALOG + ": type the folder's path instead", 501)
+                return self._json({"ok": True, "path": os.path.realpath(p)} if p else {"ok": True, "cancelled": True})
+            if route == "/api/publish/reveal":
+                path = os.path.realpath(q.get("path", ""))
+                if path not in PUBLISHED or not os.path.isdir(path):
+                    return self._fail("only a folder just published can be shown", 403)
+                reveal_folder(path)
+                return self._json({"ok": True})
             if route == "/api/import/pick":
                 # Only the dialog: the editor converts with /api/import?path=, so it can show
                 # that it is busy while converting rather than while the dialog is open.
@@ -2105,6 +2337,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             set_workspace(tgt_dir)
         print(f"saved as {target} ({len(body)} bytes, {copied} files copied)")
         return self._json({"ok": True, "file": rel_path(target), "path": target, "workspace": WORKSPACE, "copied": copied, "notes": notes})
+
+    def api_publish(self, q):
+        """The live deck as a folder for a free web host (write_publish_folder)."""
+        full = safe_path(q.get("file", ""))
+        if not os.path.isfile(full):
+            return self._fail("no such deck", 404)
+        body = self._body()
+        if not is_deck_html(body):
+            return self._fail("refusing to publish: the content does not look like a deck (no deck-stage)")
+        try:
+            r = write_publish_folder(full, body.decode("utf-8", "replace"), q.get("to", ""), overwrite=q.get("overwrite") == "1",
+                                     fonts=q.get("fonts") == "1", make_zip=q.get("zip") == "1")
+        except PublishError as e:
+            self.close_connection = True
+            return self._json({"ok": False, "error": str(e), "reason": e.reason}, e.status)
+        print(f"published {r['path']} ({r['files']} files, {r['bytes']} bytes)")
+        return self._json({"ok": True, **r})
 
     def api_export(self, q):
         """body = the deck as the editor would save it -> one self-contained .html file."""

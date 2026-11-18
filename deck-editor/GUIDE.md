@@ -71,6 +71,10 @@ any browser, without Diapo, and presents on its own.
   your speaker notes under each slide.
 - **Export > Single HTML file** puts everything (pictures, fonts) into one file
   to send by email or put online.
+- **Export > Publish** is for "a link" after a talk. Diapo hosts nothing: it
+  writes a folder (the deck as `index.html` and the files it uses) and shows
+  how to put it on a free host you own: drag the folder onto Netlify Drop, or
+  upload it to a new GitHub repository and turn on Pages.
 - **Save as** (Ctrl+Shift+S) copies the deck with its pictures to another name
   or folder.
 
