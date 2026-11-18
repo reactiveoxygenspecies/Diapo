@@ -221,7 +221,7 @@ test('File menu: new, open, import, save, save as, previous versions, rename, du
     await page.click('#btnExport');
     const exp = page.locator('#exportMenu .tb-dropdown');
     await expect(exp).toBeVisible();
-    expect(await exp.locator('[data-x]').evaluateAll(bs => bs.map(b => b.dataset.x))).toEqual(['pdf', 'handout', 'html', 'pptx']);
+    expect(await exp.locator('[data-x]').evaluateAll(bs => bs.map(b => b.dataset.x))).toEqual(['pdf', 'handout', 'html', 'publish', 'pptx']);
     await expect(exp).not.toContainText('Save as');
     await expect(exp).not.toContainText('Previous versions');
     await noJargon(page, 'deck open, Export menu');
