@@ -366,10 +366,10 @@ export class ThemePanel {
         acts.querySelector('[data-act=embed]').textContent = fonts.faces && online ? 'Embed again' : 'Embed in the file';
         let hint = '';
         if (!rows.size) hint = '';
-        else if (!fonts.faces && !online) hint = ownFiles ? 'Your font files are in fonts/ next to the deck: keep the folder together when you copy it, or embed them.' : 'Your font files are inside the HTML: the deck needs nothing else.';
+        else if (!fonts.faces && !online) hint = ownFiles ? 'Your font files are in fonts/ next to the deck: keep the folder together when you copy it, or embed them.' : 'Your font files are inside the deck file: the deck needs nothing else.';
         else if (!fonts.faces) hint = 'These fonts load from Google when the deck opens, so presenting without a connection falls back to system fonts. Download or embed them to make the deck self-contained.';
         else if (online) hint = `${online} ${online === 1 ? 'family still loads' : 'families still load'} from Google. Download or embed again to include ${online === 1 ? 'it' : 'them'}.`;
-        else hint = faces.size && [...faces.values()].some(f => f.embedded) ? 'The font files are inside the HTML: the deck needs nothing else.' : 'The font files are in fonts/ next to the deck: keep the folder together when you copy it.';
+        else hint = faces.size && [...faces.values()].some(f => f.embedded) ? 'The font files are inside the deck file: the deck needs nothing else.' : 'The font files are in fonts/ next to the deck: keep the folder together when you copy it.';
         this.$('thFontHint').textContent = hint;
     }
     async _hostFonts(embed) {

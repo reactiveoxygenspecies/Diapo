@@ -87,20 +87,20 @@
           </div>
           <div>
             <div class="tb-dropdown-label">Shapes</div>
-            <button data-insert="rect">Rectangle</button>
-            <button data-insert="rounded">Rounded rectangle</button>
-            <button data-insert="ellipse">Ellipse</button>
-            <button data-insert="shape:triangle">Triangle</button>
-            <button data-insert="shape:diamond">Diamond</button>
-            <button data-insert="shape:hexagon">Hexagon</button>
-            <button data-insert="shape:star">Star</button>
-            <button data-insert="shape:block-arrow">Block arrow</button>
-            <button data-insert="shape:chevron">Chevron</button>
-            <button data-insert="shape:bubble">Speech bubble</button>
-            <button data-insert="line">Line</button>
-            <button data-insert="arrow" title="Drag on the slide to draw it">Arrow</button>
-            <button data-insert="curved" title="Drag on the slide; drag the dot in the middle to bend it">Curved arrow</button>
-            <button data-insert="double">Double arrow</button>
+            <button data-insert="rect"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><rect x="3" y="5.5" width="14" height="9"/></svg>Rectangle</button>
+            <button data-insert="rounded"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><rect x="3" y="5.5" width="14" height="9" rx="3"/></svg>Rounded rectangle</button>
+            <button data-insert="ellipse"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><ellipse cx="10" cy="10" rx="7" ry="5"/></svg>Ellipse</button>
+            <button data-insert="shape:triangle"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M10 4 17 16H3z"/></svg>Triangle</button>
+            <button data-insert="shape:diamond"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M10 3 17 10 10 17 3 10z"/></svg>Diamond</button>
+            <button data-insert="shape:hexagon"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M6 4h8l4 6-4 6H6l-4-6z"/></svg>Hexagon</button>
+            <button data-insert="shape:star"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="m10 2.8 2.2 4.7 5.1.6-3.8 3.5 1 5.1L10 14.2 5.5 16.7l1-5.1L2.7 8.1l5.1-.6z"/></svg>Star</button>
+            <button data-insert="shape:block-arrow"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M3 8h8V4.5L17 10l-6 5.5V12H3z"/></svg>Block arrow</button>
+            <button data-insert="shape:chevron"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M3 4h8l5 6-5 6H3l5-6z"/></svg>Chevron</button>
+            <button data-insert="shape:bubble"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M4 4h12a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H9l-4 3.5V13H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/></svg>Speech bubble</button>
+            <button data-insert="line"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M3.5 16.5 16.5 3.5"/></svg>Line</button>
+            <button data-insert="arrow" title="Drag on the slide to draw it"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M3.5 16.5 16 4m0 0H9.5M16 4v6.5"/></svg>Arrow</button>
+            <button data-insert="curved" title="Drag on the slide; drag the dot in the middle to bend it"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M3.5 15.5C4 8 9 5 15.5 5m0 0-3.5-3m3.5 3-3.5 3"/></svg>Curved arrow</button>
+            <button data-insert="double"><svg class="mi" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M3 10h14M3 10l3.5-3.2M3 10l3.5 3.2M17 10l-3.5-3.2M17 10l-3.5 3.2"/></svg>Double arrow</button>
           </div>
         </div>
         <hr>
@@ -185,9 +185,9 @@
       <div class="home">
         <!-- The logo: the word reversed out of the mount's window, the margin print (the version, set by editor.js) and the date stamp (set to this month by editor.js). -->
         <h1 class="mount" aria-label="Diapo">
-          <span class="mount-print a">36 × 24</span><span class="mount-print b" id="brandVersion">N° 001</span>
+          <span class="mount-print a" aria-hidden="true">36 × 24</span><span class="mount-print b" id="brandVersion" aria-hidden="true">N° 001</span>
           <span class="mount-win"><span>DIAPO</span></span>
-          <span class="mount-print c">DIAPOSITIVE</span><span class="mount-stamp" id="brandStamp">SEP 26</span>
+          <span class="mount-print c" aria-hidden="true">DIAPOSITIVE</span><span class="mount-stamp" id="brandStamp" aria-hidden="true">SEP 26</span>
           <i class="mount-notch"></i>
         </h1>
         <p>Start a new deck, open one, or take the tour.</p>
@@ -274,7 +274,7 @@
       <button class="mini-btn" id="btnPickFolder" title="Choose the folder that holds your decks">Change folder&hellip;</button>
       <button class="mini-btn" id="btnRefresh" title="Reload the list">&#8635;</button>
     </div>
-    <input id="drawerFilter" class="drawer-filter" type="search" placeholder="Filter decks in this folder" autocomplete="off">
+    <input id="drawerFilter" class="drawer-filter" type="search" aria-label="Filter decks in this folder" placeholder="Filter decks in this folder" autocomplete="off">
     <div id="drawerList" class="drawer-list"></div>
     </div>
   </div>

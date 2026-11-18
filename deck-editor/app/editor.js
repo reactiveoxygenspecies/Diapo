@@ -39,6 +39,7 @@ import { TemplateGallery } from './core/gallery.js';
 import { loader } from './core/loader.js';
 import { DeckTabs } from './core/tabs.js';
 import { FileDrop } from './core/filedrop.js';
+import { keepNamed } from './core/a11y.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -1201,7 +1202,7 @@ async function showVersions() {
     const kb = (n) => n < 1024 * 1024 ? Math.round(n / 1024) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
     h.innerHTML = `<div class="help-card versions-card">
         <h2>Previous versions</h2>
-        <p>What the deck was before each of the last ${list.length} saves (the save keeps the version it replaces in <code>.deck-editor/</code>). Restoring keeps the current version as the newest of these.</p>
+        <p>What the deck was before each of the last ${list.length} saves (each save keeps the version it replaces, in a hidden folder beside the deck). Restoring keeps the current version as the newest of these.</p>
         ${list.length ? `<table>${list.map((v, i) => `<tr data-v="${escapeHtml(v.version)}">
             <td><b>${when(v.mtime)}</b>${i === 0 ? ' <span class="muted">(before the last save)</span>' : ''}</td>
             <td>${escapeHtml(v.title || '(untitled)')} · ${v.slides} slide${v.slides === 1 ? '' : 's'} · ${kb(v.bytes)}</td>
@@ -1475,6 +1476,7 @@ app.deck.addEventListener('overrides', () => {
 app.toast = toast;
 app.selection = new Selection(app, { overlay: $('overlay'), wrap: $('stageWrap'), canvas: $('canvas') });
 app.inspector = new Inspector(app, $('inspectorBody'));
+keepNamed($('inspector'));
 app.textEdit = new TextEditor(app, { overlay: $('overlay'), wrap: $('stageWrap'), canvas: $('canvas') });
 app.inlineMath = new InlineMath(app);
 // The panel's type fields follow the part of the text that is selected while editing in place.
@@ -1523,7 +1525,7 @@ function showExportMenu(on) {
     dd.hidden = !on;
     if (!on) return;
     const n = app.deck.isOpen ? app.exporter.pageCount() : 0;
-    $('exportHint').textContent = `${n} slide${n === 1 ? '' : 's'} (skipped ones left out), unsaved edits included. PDF: one ${app.deck.stageW} x ${app.deck.stageH} page per slide, printed with the Chrome or Edge on this computer. Single file: scripts, styles, images and fonts embedded, opens anywhere. PowerPoint: editable text boxes, tables, charts and notes; drawings as pictures.`;
+    $('exportHint').textContent = `${n} slide${n === 1 ? '' : 's'} (skipped ones left out), unsaved edits included. PDF: one ${app.deck.stageW} x ${app.deck.stageH} page per slide, printed with the Chrome or Edge on this computer. Single file: scripts, styles, images and fonts embedded, opens anywhere. PowerPoint: editable text boxes, tables, charts and notes; drawings as pictures. Publish: a folder to put on a free web host you own, to get a link.`;
 }
 $('btnExport').addEventListener('click', () => { if (app.deck.isOpen) showExportMenu($('exportMenu').querySelector('.tb-dropdown').hidden); });
 document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#exportMenu')) showExportMenu(false); }, true);
