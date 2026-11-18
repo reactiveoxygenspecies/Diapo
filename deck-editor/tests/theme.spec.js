@@ -17,7 +17,7 @@ test('11 theme: variables, base styles and custom CSS go into one override block
     await field.dispatchEvent('change');
     const eyebrow = await page.evaluate(() => window.deckEditor.deck.win.getComputedStyle(window.deckEditor.deck.doc.querySelector('.eyebrow')).color);
     expect(eyebrow).toBe('rgb(142, 28, 47)');
-    const size = page.locator('.theme-base tr[data-sel="h1"] td[data-prop="font-size"] input');
+    const size = page.locator('.theme-base [data-sel="h1"] [data-prop="font-size"] input');
     await size.fill('90');
     await size.dispatchEvent('change');
     await page.locator('#thCss').fill('.slide p { letter-spacing: 1px; }');
@@ -346,7 +346,7 @@ test('37 theme colours: a colour added in the Theme panel is a :root variable in
     // Taken names are refused; an empty name gets a generated one.
     await page.fill('#thNewName', 'brand-2');
     await page.click('[data-act="addcolour"]');
-    await expect(page.locator('.toast')).toContainText('already a variable');
+    await expect(page.locator('.toast')).toContainText('already a colour');
     await page.fill('#thNewName', '');
     await page.click('[data-act="addcolour"]');
     await page.waitForTimeout(200);
@@ -397,7 +397,7 @@ test('38 motion: the Theme panel drives the reveal (duration, easing, stagger, d
     expect(s.duration).toBe('1.2s, 1.2s');
     expect(s.timing).toBe('linear, linear');
     expect(s.rules).toContain('&:not(.visible) .reveal');                // this fixture predates --stagger / --reveal-y
-    await expect(page.locator('#thMotionHint')).toContainText('predates');
+    await expect(page.locator('#thMotionHint')).toContainText('older than the stagger and distance settings');
     // Transition: deck default and duration are attributes on the stage; Play animates both slides.
     await page.selectOption('#thTrans', 'slide');
     await setRange('#thTransDur', '0.8');

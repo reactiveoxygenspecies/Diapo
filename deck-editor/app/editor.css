@@ -902,12 +902,12 @@ select option { background: var(--bg-2); color: var(--ink); }
 .theme-slider .insp-clear { right: -4px; top: -4px; }
 .theme-slider.set .insp-clear { display: block; }
 .theme-row select, .theme-row input[type=text] { flex: 1; min-width: 0; height: 26px; padding: 0 6px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); font: inherit; font-size: 12px; background: var(--bg-2); }
-.theme-var { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 8px; margin: 4px 0; position: relative; padding: 3px 4px; border-radius: var(--radius-sm); border: 1px solid transparent; }
+.theme-var { display: grid; grid-template-columns: 112px 1fr; align-items: center; gap: 8px; margin: 4px 0; position: relative; padding: 3px 4px; border-radius: var(--radius-sm); border: 1px solid transparent; }
 .theme-var.set { border-color: var(--accent); background: var(--accent-soft); }
 .theme-var.added > label { color: var(--accent); }
 .theme-add { margin-top: 8px; }
 .theme-add input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line-2); border-radius: 5px; background: var(--bg-2); cursor: pointer; flex: none; }
-.theme-var > label { font: 11px var(--ui-mono); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.theme-var > label { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .theme-var .insp-clear { right: -4px; top: -4px; }
 .theme-var.set .insp-clear { display: block; }
 .theme-var input[type=text], .theme-var select, .theme-var input[type=number] { width: 100%; min-width: 0; height: 26px; padding: 0 6px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); font: inherit; font-size: 12px; background: var(--bg-2); }
@@ -919,20 +919,36 @@ select option { background: var(--bg-2); color: var(--ink); }
 .theme-size input[type=number] { width: 74px; flex: none; }
 .theme-size .unit { font-size: 11px; color: var(--ink-3); }
 .theme-length .unit { font-size: 11px; color: var(--ink-3); width: 24px; }
-.theme-base { width: 100%; border-collapse: collapse; font-size: 11px; }
-.theme-base th { text-align: left; font-weight: 500; color: var(--ink-2); padding: 3px 2px; white-space: nowrap; }
-.theme-base tr > th:first-child { width: 70px; }
-.theme-base td { padding: 2px; border-radius: 4px; }
-.theme-base td.set { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
-.theme-base td input, .theme-base td select { width: 100%; min-width: 46px; height: 24px; padding: 0 4px; border: 1px solid var(--line-2); border-radius: 5px; font: inherit; font-size: 11px; background: var(--bg-2); }
-.theme-base td .theme-colour input[type=color] { width: 24px; height: 24px; }
-.theme-base td .theme-colour input[type=text] { min-width: 0; width: 60px; }
+/* Base text styles: one block per kind of text, its fields on two lines (nothing scrolls sideways at the panel's 400px). */
+.theme-base { display: flex; flex-direction: column; gap: 6px; font-size: 11px; }
+.theme-style { padding: 5px 6px 6px; border: 1px solid var(--line); border-radius: var(--radius-sm); min-width: 0; }
+.theme-style.set { border-color: var(--accent); }
+.theme-style-name { font-size: 12px; font-weight: 600; color: var(--ink); margin: 0 0 4px; }
+.theme-style-fields { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 1fr); gap: 4px 6px; }
+.theme-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 1px; border-radius: 4px; }
+.theme-field.set { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.theme-field-label { color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.theme-field input, .theme-field select { width: 100%; min-width: 0; height: 24px; padding: 0 4px; border: 1px solid var(--line-2); border-radius: 5px; font: inherit; font-size: 11px; background: var(--bg-2); }
+.theme-field .theme-colour { min-width: 0; }
+.theme-field .theme-colour input[type=color] { width: 24px; height: 24px; }
+.theme-field .theme-colour input[type=text] { min-width: 0; width: auto; flex: 1; }
+/* Theme cards: saved themes and the designs' looks. */
+.theme-looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; margin: 2px 0 6px; }
+.theme-look { position: relative; min-width: 0; }
+.theme-look-apply { display: flex; flex-direction: column; align-items: stretch; gap: 3px; width: 100%; padding: 5px 6px 6px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg-2); color: var(--ink); text-align: left; cursor: pointer; font: inherit; }
+.theme-look-apply:hover { border-color: var(--ink-3); }
+.theme-look-apply:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.theme-look-strip { display: flex; height: 14px; border-radius: 3px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
+.theme-look-strip i { flex: 1; }
+.theme-look-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.theme-look-font { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.theme-look .insp-clear { display: block; right: -5px; top: -5px; border: 0; padding: 0; font-family: inherit; }
+.theme-looks-fold > summary { cursor: pointer; list-style-position: inside; }
 .theme-css { font: 12px/1.45 var(--ui-mono); }
 #inspector { display: flex; flex-direction: column; }
 .theme-body { flex: 1; overflow-y: auto; }
 body.theme-mode #workspace { grid-template-columns: var(--strip-w) 1fr max(var(--inspector-w), 400px); }
 body.theme-mode.panel-collapsed #workspace { grid-template-columns: var(--strip-w) 1fr 0; }
-.theme-base-wrap { overflow-x: auto; }
 .tb-dropdown > button .hint { float: right; margin-left: 12px; }
 
 /* Align toolbar */
@@ -985,8 +1001,8 @@ body.theme-mode.panel-collapsed #workspace { grid-template-columns: var(--strip-
 #inspStyle { overflow: visible; }
 #inspStyle button:first-child { border-radius: 5px 0 0 5px; }
 #inspStyle button:last-of-type { border-radius: 0 5px 5px 0; }
-.theme-var .theme-font, .theme-base td .theme-font { width: 100%; min-width: 46px; height: 26px; padding: 0 6px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--bg-2); text-align: left; font-size: 12px; color: var(--ink); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.theme-base td .theme-font { height: 24px; }
+.theme-var .theme-font, .theme-field .theme-font { width: 100%; min-width: 46px; height: 26px; padding: 0 6px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--bg-2); text-align: left; font-size: 12px; color: var(--ink); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.theme-field .theme-font { height: 24px; font-size: 11px; }
 .theme-font:hover { border-color: var(--ink-3); }
 .theme-font.is-default { color: var(--ink-3); }
 .theme-fontrow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 8px; padding: 5px 6px; margin: 2px 0; border: 1px solid var(--line); border-radius: var(--radius-sm); position: relative; background: var(--bg-2); }

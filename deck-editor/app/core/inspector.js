@@ -8,7 +8,7 @@
    Changes preview on `input` and become one undo step on `change`;
    they apply to every selected element and reflect the primary one.
    ============================================================ */
-import { describe, nameOf, uniqueId, isShape, css, isEditableText, isMaster, isLocked, isLayoutUnit, MEDIA_TAGS, DRAWN, colourName, setSwatches } from './dom.js';
+import { describe, nameOf, uniqueId, isShape, css, isEditableText, isMaster, isLocked, isLayoutUnit, MEDIA_TAGS, DRAWN, colourNames, uniqueColours, setSwatches } from './dom.js';
 import { getOffset, setOffset, setRotation, afterResize, fitText, refitAll } from './transform.js';
 import { styleCmd } from './history.js';
 import { PRESETS, EASES, animationCss, deckRevealClasses, describeAnimation, applyPreset, setTiming, replay, setFragment, fragmentOf, TEXT_EFFECTS, setTextEffect } from './animate.js';
@@ -1166,7 +1166,8 @@ export class Inspector {
        Deck-derived lists: theme colours and fonts (cached per deck)
        ------------------------------------------------------------ */
     themeSwatches() {
-        if (!this.swatches) this.swatches = this.deck.isOpen ? this.deck.themeColours() : [];
+        // One swatch per colour: two variables with the same value would show the same swatch twice.
+        if (!this.swatches) this.swatches = this.deck.isOpen ? uniqueColours(this.deck.themeColours()) : [];
         return this.swatches;
     }
 
@@ -1199,7 +1200,7 @@ export class Inspector {
         $('inspMasterRow').hidden = !this.deck.masterElements.length;
         $('inspShowMaster').checked = !s.hasAttribute('data-no-master');
         const current = toHex(css(s).backgroundColor);
-        setSwatches($('inspSlideSwatches'), this.themeSwatches().map(c => swatchButton(`var(--${c.name})`, c.value, colourName(c.name), toHex(c.value) === current)).join(''));
+        setSwatches($('inspSlideSwatches'), this.themeSwatches().map(c => swatchButton(`var(--${c.name})`, c.value, colourNames(c.names), toHex(c.value) === current)).join(''));
         $('inspSlideBg').value = current || '#ffffff';
         $('inspSlideBgHex').value = current || '';
         $('inspSlideColour').classList.toggle('set', !!s.style.background || !!s.style.backgroundColor);
@@ -1301,7 +1302,7 @@ export class Inspector {
         const prop = this.colourProp(el);
         const current = toHex(cs[prop === 'borderColor' ? 'borderTopColor' : prop]);
         const swatches = this.themeSwatches();
-        setSwatches($('inspSwatches'), swatches.map(s => swatchButton(`var(--${s.name})`, s.value, colourName(s.name), toHex(s.value) === current)).join('')
+        setSwatches($('inspSwatches'), swatches.map(s => swatchButton(`var(--${s.name})`, s.value, colourNames(s.names), toHex(s.value) === current)).join('')
             || '<span class="insp-hint insp-state">This deck defines no theme colours.</span>');
         const recent = this._recent();
         setSwatches($('inspRecent'), recent.length ? '<span class="insp-hint insp-state">Recent</span>' + recent.map(c => swatchButton(c, c, '', c === current)).join('') : '');

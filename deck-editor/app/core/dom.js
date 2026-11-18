@@ -35,13 +35,57 @@ export function setSwatches(box, html) {
     if (again) again.focus({ preventScroll: true });
 }
 
-/* A theme colour's name for people: "ink-2" reads "Ink 2", "accentSoft" "Accent soft"
-   (a colour named by its value, "#3d3c3a", stays as it is). */
+/* What the editor's own variable names do, in words: a deck's --ink is its text colour, not
+   "Ink". A numbered variant reads like its base ("ink-2" is "Text 2"). */
+const PLAIN_NAMES = {
+    ink: 'Text', rule: 'Lines', paper: 'Background', 'slide-bg': 'Slide background', 'stage-bg': 'Around the slides',
+    accent: 'Accent', bg: 'Background', fg: 'Text', text: 'Text', line: 'Lines', border: 'Lines',
+    font: 'Body text', 'font-body': 'Body text', 'font-display': 'Headings', 'font-heading': 'Headings', 'font-mono': 'Code', 'font-hand': 'Handwriting',
+    'pad-x': 'Side margin', 'pad-top': 'Top margin', 'pad-y': 'Top and bottom margin',
+};
+/* A theme variable's name for people: the plain name of the editor's own ones ("ink-2" reads
+   "Text 2", "pad-x" "Side margin"), any other humanised ("accentSoft" reads "Accent soft",
+   "brand_blue" "Brand blue"). A colour named by its value, "#3d3c3a", stays as it is. */
 export function colourName(name) {
     const s = String(name);
     if (s.startsWith('#') || s.includes('(')) return s;
+    const key = s.toLowerCase();
+    if (PLAIN_NAMES[key]) return PLAIN_NAMES[key];
+    const n = /^(.+?)-(\d+)$/.exec(key);
+    if (n && PLAIN_NAMES[n[1]]) return PLAIN_NAMES[n[1]] + ' ' + n[2];
     const words = s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').trim().toLowerCase();
     return words.charAt(0).toUpperCase() + words.slice(1);
+}
+export const plainName = colourName;
+
+/* One swatch per colour: theme colours [{ name, value }] grouped by the colour they show
+   (Paper and Slide background are often the same white), in first-seen order. Each group
+   keeps the first variable as the one a click applies, with every name for its tooltip. */
+export function uniqueColours(list, key = colourKey) {
+    const out = [], at = new Map();
+    for (const c of list) {
+        const k = key(c.value) || c.value;
+        const seen = at.get(k);
+        if (seen) { seen.names.push(c.name); continue; }
+        const g = { ...c, names: [c.name] };
+        at.set(k, g);
+        out.push(g);
+    }
+    return out;
+}
+/* What two theme colours must share to be one swatch: the colour itself, written either way
+   ("#FFF", "#ffffff" and "rgb(255, 255, 255)" are one), translucency included. */
+export function colourKey(v) {
+    const t = String(v).trim().toLowerCase().replace(/\s+/g, '');
+    if (/^#[0-9a-f]{3}$/.test(t)) return '#' + [...t.slice(1)].map(x => x + x).join('');
+    const m = /^rgba?\((\d+),(\d+),(\d+)(?:,(1|1\.0+))?\)$/.exec(t);
+    if (m) return '#' + [m[1], m[2], m[3]].map(n => (+n).toString(16).padStart(2, '0')).join('');
+    return t;
+}
+/* "Background and Slide background" for a swatch that stands for several variables. */
+export function colourNames(names) {
+    const words = names.map(colourName);
+    return words.length < 3 ? words.join(' and ') : words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1];
 }
 export function css(el) { return win(el).getComputedStyle(el); }
 export function isElement(n) { return !!n && n.nodeType === 1; }
