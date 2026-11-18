@@ -657,32 +657,38 @@ export class Selection extends EventTarget {
     /* Lock or unlock the selection (data-locked): a locked element is passed by when clicking
        and marquee-selecting and cannot be moved or resized; Ctrl+click reaches it, and Delete,
        the panel and the Code section still work on it. */
-    lock(on = true) {
-        const items = this.items.slice();
+    lock(on = true, els = null) {
+        const items = (els || this.items).slice();
         this.history.begin(on ? 'Lock' : 'Unlock');
         for (const el of items) this.history.attr(el, 'data-locked', on ? '' : null, on ? 'Lock' : 'Unlock');
         this.history.end();
         this.refresh();
     }
-    hide() {
-        const items = this.items.slice();
+    /* The selection by default (the panel, the menu). `els` is for the layers list, which hides
+       elements that are not selected: the selection then stays, minus what was hidden. */
+    hide(els = null) {
+        const items = (els || this.items).slice();
         this.history.begin('Hide');
         for (const el of items) {
             this.history.style(el, () => { el.style.display = 'none'; }, { label: 'Hide' });
             this.history.attr(el, 'data-hidden', '1', 'Hide');
         }
         this.history.end();
-        this.clear();
+        if (!els) this.clear();
+        else this.set(this.items.filter(e => !items.some(h => h === e || h.contains(e))));
     }
-    unhideAll() {
-        const slide = this.deck.currentSlide; if (!slide) return 0;
-        const hidden = Array.from(slide.querySelectorAll('[data-hidden]'));
-        this.history.begin('Unhide all');
-        for (const el of hidden) {
+    unhide(els, label = 'Unhide') {
+        this.history.begin(label);
+        for (const el of els) {
             this.history.style(el, () => { el.style.display = ''; }, { label: 'Unhide' });
             this.history.attr(el, 'data-hidden', null, 'Unhide');
         }
         this.history.end();
+    }
+    unhideAll() {
+        const slide = this.deck.currentSlide; if (!slide) return 0;
+        const hidden = Array.from(slide.querySelectorAll('[data-hidden]'));
+        this.unhide(hidden, 'Unhide all');
         return hidden.length;
     }
     /* Remove every inline style the editor (or the author) put on the element. */

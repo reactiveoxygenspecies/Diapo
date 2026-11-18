@@ -52,6 +52,12 @@ any browser, without Diapo, and presents on its own.
   folded until you open them, Box, Animation, Align, Position and Link. With
   nothing selected it shows the slide: its name, transition, background and
   speaker notes.
+- **Layers** (Ctrl+Shift+L, or the Layers bar at the top of the panel) lists the
+  slide's elements front to back, so you can reach one that is covered. Click
+  to select (Ctrl+click or Shift+click for several), drag a row to bring it
+  forward or send it back, use the eye to hide and the padlock to lock, and
+  double-click a name to rename it. Things shown on every slide are in the
+  folded "On every slide" section at the bottom.
 - **Ctrl+Z** undoes anything, **Ctrl+Y** redoes. **Ctrl+K** finds any action,
   slide, layout, icon or font by typing its name. **Ctrl+F** finds text anywhere in the deck (Ctrl+H replaces it, all in one undo step); **Look > Check spelling while typing** marks misspelt words while you edit.
 - **Ctrl+M** adds a slide with a layout; right-click a slide in the strip for
