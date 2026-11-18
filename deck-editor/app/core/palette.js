@@ -31,7 +31,7 @@ export class Palette {
         el.className = 'palette';
         el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Command palette');
         el.innerHTML = `<div class="palette-card">
-            <input type="text" class="palette-input" placeholder="Type what to do, a slide's name, an icon, a font…" spellcheck="false" autocomplete="off">
+            <input type="text" class="palette-input" aria-label="Search commands, slides, icons and fonts" placeholder="Type what to do, a slide's name, an icon, a font…" spellcheck="false" autocomplete="off">
             <div class="palette-list" role="listbox"></div>
             <div class="palette-foot"><kbd>↑</kbd><kbd>↓</kbd> choose · <kbd>Enter</kbd> run · <kbd>Esc</kbd> close</div>
         </div>`;

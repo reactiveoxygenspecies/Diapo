@@ -21,6 +21,8 @@ import { PlotSection, plotOf } from './plot.js';
 import { LineSection, isLine } from './lines.js';
 import { canCrop, cropBoxOf, pictureOf } from './crop.js';
 
+// Marks the editor's own style block in the Code section's rule list (what you set in the Theme panel).
+const EDITOR_BLOCK = '(the settings made in the Theme panel)';
 const ALL_WEIGHTS = [100, 200, 300, 400, 500, 600, 700, 800, 900];
 const SHADOWS = {
     '': 'none',
@@ -84,8 +86,8 @@ export class Inspector {
             <h4>Slide <span id="inspSlideNo" class="insp-role"></span></h4>
             <div class="insp-row"><label>Name</label><div class="insp-field" data-prop="_name"><input type="text" id="inspSlideName" placeholder="(none)" spellcheck="false" title="The slide's name in the strip and in Morph from lists. Saved as data-name."></div></div>
             <div class="insp-row"><label>Section</label><div class="insp-field" data-prop="_section"><input type="text" id="inspSection" placeholder="(none)" spellcheck="false" title="A section starts at this slide: a heading in the slide strip, and in the overview (O) when presenting. Saved as data-section."></div></div>
-            <div class="insp-row"><label>Transition</label><div class="insp-field" data-prop="_transition"><select id="inspTransition"><option value="">Deck default</option><option value="none">None</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="up">Up</option><option value="zoom">Zoom</option></select></div></div>
-            <div class="insp-row"><label>All slides</label><div class="insp-field" data-prop="_transitionDeck" title="The transition of every slide that does not choose its own"><select id="inspTransitionDeck"><option value="">None</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="up">Up</option><option value="zoom">Zoom</option></select></div></div>
+            <div class="insp-row"><label>Transition</label><div class="insp-field" data-prop="_transition"><select id="inspTransition" aria-label="Transition of this slide"><option value="">Deck default</option><option value="none">None</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="up">Up</option><option value="zoom">Zoom</option></select></div></div>
+            <div class="insp-row"><label>All slides</label><div class="insp-field" data-prop="_transitionDeck" title="The transition of every slide that does not choose its own"><select id="inspTransitionDeck" aria-label="Transition of all slides"><option value="">None</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="up">Up</option><option value="zoom">Zoom</option></select></div></div>
             <div class="insp-hint insp-state" id="inspTransitionHint"></div>
             <label class="align-toslide" style="margin-top:10px" title="Elements on both slides (linked with Morph from, else the same text or picture) travel, resize and reshape into their new place; everything else fades in. Duplicate this slide and rearrange the copy, or link an element on the next slide with Morph from."><input type="checkbox" id="inspAutoAnimate"> <span>Auto-animate to the next slide</span></label>
             <div class="insp-hint">Elements on both slides move into place; the rest fades in.</div>
@@ -95,22 +97,22 @@ export class Inspector {
           </section>
           <section class="insp-section" data-fold="timing">
             <h4>Runs by itself</h4>
-            <div class="insp-row"><label>Advance after</label><div class="insp-field" data-prop="_advance" title="When the deck presents on its own (A in the saved deck, or a deck that starts by itself): this slide waits these seconds, a fragment at a time, then moves on. Empty: the wait of all slides."><input type="number" id="inspAdvance" min="0.5" max="600" step="0.5" placeholder="same as all"><span class="unit">s</span><i class="insp-clear" role="button" tabindex="0" aria-label="Back to the deck's value" title="Back to the deck's value">&times;</i></div></div>
-            <div class="insp-row"><label>All slides</label><div class="insp-field" data-prop="_advanceDeck" title="The wait of every slide that does not set its own. A deck that has one starts running by itself when it is opened on its own (a kiosk)."><input type="number" id="inspAdvanceDeck" min="0.5" max="600" step="0.5" placeholder="off"><span class="unit">s</span><i class="insp-clear" role="button" tabindex="0" aria-label="Back to the deck's value" title="Back to the deck's value">&times;</i></div></div>
+            <div class="insp-row"><label>Advance after</label><div class="insp-field" data-prop="_advance" title="When the deck presents on its own (A in the saved deck, or a deck that starts by itself): this slide waits these seconds, a fragment at a time, then moves on. Empty: the wait of all slides."><input type="number" id="inspAdvance" aria-label="Seconds before this slide advances" min="0.5" max="600" step="0.5" placeholder="same as all"><span class="unit">s</span><i class="insp-clear" role="button" tabindex="0" aria-label="Back to the deck's value" title="Back to the deck's value">&times;</i></div></div>
+            <div class="insp-row"><label>All slides</label><div class="insp-field" data-prop="_advanceDeck" title="The wait of every slide that does not set its own. A deck that has one starts running by itself when it is opened on its own (a kiosk)."><input type="number" id="inspAdvanceDeck" aria-label="Seconds before any slide advances" min="0.5" max="600" step="0.5" placeholder="off"><span class="unit">s</span><i class="insp-clear" role="button" tabindex="0" aria-label="Back to the deck's value" title="Back to the deck's value">&times;</i></div></div>
             <label class="align-toslide" id="inspLoopRow" title="At the end of a deck that runs by itself, start again from the first slide."><input type="checkbox" id="inspLoop"> <span>Start again at the end</span></label>
           </section>
           <section class="insp-section">
             <h4>Background</h4>
             <div class="insp-swatches" id="inspSlideSwatches"></div>
             <div class="insp-colour" id="inspSlideColour">
-              <input type="color" id="inspSlideBg" title="Pick a colour">
-              <input type="text" id="inspSlideBgHex" placeholder="#rrggbb" spellcheck="false">
+              <input type="color" id="inspSlideBg" aria-label="Slide background colour" title="Pick a colour">
+              <input type="text" id="inspSlideBgHex" aria-label="Slide background colour, as a hex code" placeholder="#rrggbb" spellcheck="false">
               <button class="mini-btn" data-act="slidebg-none" title="Back to the deck's default">default</button>
             </div>
           </section>
           <section class="insp-section">
             <h4>Speaker notes</h4>
-            <textarea id="inspNotes" class="insp-notes" rows="6" placeholder="Notes for the presenter view" spellcheck="true"></textarea>
+            <textarea id="inspNotes" aria-label="Speaker notes for this slide" class="insp-notes" rows="6" placeholder="Notes for the presenter view" spellcheck="true"></textarea>
           </section>
         </div>
         <div data-when="some">
@@ -143,7 +145,7 @@ export class Inspector {
             <h4>List</h4>
             <div class="insp-row"><label>Kind</label><div class="insp-field insp-seg" id="inspListKind"><button data-v="ul" title="Bulleted list">&#8226; Bulleted</button><button data-v="ol" title="Numbered list">1. Numbered</button></div></div>
             <div class="insp-row"><label>Marker</label><div class="insp-field" data-prop="listStyleType"><select id="inspListMarker"></select><i class="insp-clear" role="button" tabindex="0" title="Use the deck's value">&times;</i></div></div>
-            <div class="insp-row" id="inspListStartRow"><label>Starts at</label><div class="insp-field" data-prop="_start"><input type="number" id="inspListStart" min="1" step="1" title="The first number, for a list that carries on from another slide. Saved as the start attribute."><i class="insp-clear" role="button" tabindex="0" title="Start at 1">&times;</i></div></div>
+            <div class="insp-row" id="inspListStartRow"><label>Starts at</label><div class="insp-field" data-prop="_start"><input type="number" id="inspListStart" min="1" step="1" title="The first number, for a list that carries on from another slide."><i class="insp-clear" role="button" tabindex="0" title="Start at 1">&times;</i></div></div>
             <div class="insp-hint">Editing the text: Enter makes the next item, Tab makes it a sub-item, Shift+Tab brings it back out.</div>
           </section>
 
@@ -571,7 +573,7 @@ export class Inspector {
             this.history.attr(s, 'data-auto-animate', on ? '' : null, 'Auto-animate');
             if (on) this._assignIds(s);
             this.history.end();
-            this.app.toast(on ? 'Elements got data-id tags. Duplicate this slide (Ctrl+D) and rearrange the copy.' : 'Auto-animate removed from this slide', { ms: 4000 });
+            this.app.toast(on ? 'Elements on this slide now carry names that tie them to their twins on other slides. Duplicate this slide (Ctrl+D) and rearrange the copy.' : 'Auto-animate removed from this slide', { ms: 4000 });
         });
 
         this.$('inspPick').addEventListener('input', () => this.applyColour(this.$('inspPick').value, false));
@@ -894,7 +896,7 @@ export class Inspector {
             const node = sheet.ownerNode;
             if (node && node.id === 'deck-editor-host') continue;
             let list; try { list = sheet.cssRules; } catch (e) { continue; }
-            walk(list, node && node.id === 'deck-editor-overrides' ? '(the editor\'s override block)' : node && node.tagName === 'LINK' ? '(' + (node.getAttribute('href') || 'linked sheet') + ')' : '');
+            walk(list, node && node.id === 'deck-editor-overrides' ? EDITOR_BLOCK : node && node.tagName === 'LINK' ? '(' + (node.getAttribute('href') || 'linked sheet') + ')' : '');
         }
         // The element and what is inside it (an effect often sits on a child: the marquee's
         // scrolling is on the span in the band): each rule is tested against all of them, as
@@ -934,8 +936,8 @@ export class Inspector {
         const rules = [], want = new Set(), decl = new Map(), nested = new Map(), changing = new Set();
         all.forEach(({ r, where, off }, i) => {
             // The editor's own block is not the deck's, but for the rule of the element's preset (its animation).
-            const preset = where.startsWith('(the editor') && /\[data-anim=/.test(r.selectorText);
-            if (where.startsWith('(the editor') && !preset) return;
+            const preset = where.startsWith(EDITOR_BLOCK) && /\[data-anim=/.test(r.selectorText);
+            if (where.startsWith(EDITOR_BLOCK) && !preset) return;
             targets.forEach((t, j) => {
                 if (!now[i][j] && !shown[i][j]) return;
                 if (preset && j > 0) return;
@@ -972,7 +974,7 @@ export class Inspector {
             want.add('de-' + a.preset);
         }
         const frames = Array.from(want).filter(n => keyframes[n]).map(n => keyframes[n]);
-        $('inspCodeRules').textContent = rules.concat(frames).length ? rules.concat(frames).join('\n\n') : '(no rule of the deck\'s own matches this element; its look comes from inherited styles and inline style)';
+        $('inspCodeRules').textContent = rules.concat(frames).length ? rules.concat(frames).join('\n\n') : '(no rule of the deck\'s own matches this element; its look comes from styles inherited from around it and settings made on the element itself)';
         // The box: the element's own CSS, else the deck's declarations for it as a start (dimmed
         // until edited), the effects on what is inside as nested rules, and the keyframes they
         // use, so an effect can be changed where it is read.
