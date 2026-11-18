@@ -10,7 +10,7 @@
    geometry is computed in stage pixels (1920x1080) and converted
    through the stage's scale, never via offsetX.
    ============================================================ */
-import { isElement, isMeaningful, isShape, svgHostOf, textBlocks, mediaBlocks, isLayoutUnit, slideOf, css, isMaster, ensureUniqueIds, isLocked, DRAWN } from './dom.js';
+import { isElement, isMeaningful, isShape, svgHostOf, textBlocks, mediaBlocks, isLayoutUnit, slideOf, css, isMaster, ensureUniqueIds, isLocked, DRAWN, INLINE_MATH } from './dom.js';
 import { getOffset, setOffset, setRotation, resizeMode, applySize, afterResize, snapLines, snapBox, usesVars } from './transform.js';
 import { LineTool, isLine } from './lines.js';
 
@@ -156,6 +156,9 @@ export class Selection extends EventTarget {
         if (slide && !slide.classList.contains('active')) return null;
         if (!slide) { if (!isMaster(target)) return null; slide = this.deck.stage; }
         if (target === slide) return null;
+        // An equation inside text is a word of it: the text is what is picked (Ctrl+click too).
+        const inline = target.closest(INLINE_MATH);
+        if (inline && inline.parentElement) target = inline.parentElement;
         const fig = target.closest(DRAWN);
         if (fig) return fig;
         const crop = target.closest('[data-crop]');                 // a cropped picture: the box, Ctrl+click the picture

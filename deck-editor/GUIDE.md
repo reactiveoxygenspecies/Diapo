@@ -38,6 +38,10 @@ any browser, without Diapo, and presents on its own.
   `fig.to_json()` gives, or choose the file `fig.write_html()` saved): on the
   slide it is a picture you move and size like any other, and when you present
   (F5, or the saved deck) it is live: hover, zoom, click the legend.
+- **Maths in a sentence**: while typing, **Alt+=** (or the ∑ button over the
+  text) opens a small box for LaTeX with a preview; Enter puts the equation in
+  the text, in its size and colour. Type `\(k_{obs}\)` and press Alt+= to turn
+  it into one at once; click an equation in the text to change it.
 - The **panel on the right** changes what is selected: colour, text, and below,
   folded until you open them, Box, Animation, Align, Position and Link. With
   nothing selected it shows the slide: its name, transition, background and

@@ -318,7 +318,7 @@ the file self-contained and the DOM predictable for the round trip.
 | Ctrl+G / Ctrl+Shift+G | Group the selection in one positioned box / ungroup a group; children keep their place on the slide |
 | Ctrl+] / Ctrl+[ | Bring forward / send backward one step; with Shift, to the front / to the back. Free elements are reordered in the file; z-index is written only when a sibling already carries one |
 | Right-click an element | Element menu: edit text, cut, copy, paste, duplicate, delete, hide, layer order, group, ungroup, select parent (on empty canvas: paste, unhide all, new slide) |
-| Enter, double-click | Edit text in place; Esc when done. The bar over the text (and the keys) has bold, italic, underline (Ctrl+B / I / U), strikethrough (Ctrl+Shift+X), superscript (Ctrl+Shift+=), subscript (Ctrl+=), code, clear formatting, link, bullet list, numbered list and alignment; formatting is saved as plain `<sup>`, `<sub>`, `<strike>`, `<code>` tags. With part of the text selected, the panel changes that part only, as a `<span>` around it: the Colour section (a swatch, the picker, the hex field; none takes it off again) and the Text section's Font, Size, Weight, Style and Spacing, whose heading then reads "the selected words". The edit stays open, the x next to a field takes that property off the part, and a press in those sections keeps the selection even when the field takes the focus. A label inside an inline SVG (a scheme, an exported chart) opens a small box over it in the label's font: Enter adds a line, Esc finishes, the SVG follows as you type |
+| Enter, double-click | Edit text in place; Esc when done. The bar over the text (and the keys) has bold, italic, underline (Ctrl+B / I / U), strikethrough (Ctrl+Shift+X), superscript (Ctrl+Shift+=), subscript (Ctrl+=), code, clear formatting, link, bullet list, numbered list, alignment and an equation in the text (Alt+=, see Equations and chemical structures); formatting is saved as plain `<sup>`, `<sub>`, `<strike>`, `<code>` tags. With part of the text selected, the panel changes that part only, as a `<span>` around it: the Colour section (a swatch, the picker, the hex field; none takes it off again) and the Text section's Font, Size, Weight, Style and Spacing, whose heading then reads "the selected words". The edit stays open, the x next to a field takes that property off the part, and a press in those sections keeps the selection even when the field takes the focus. A label inside an inline SVG (a scheme, an exported chart) opens a small box over it in the label's font: Enter adds a line, Esc finishes, the SVG follows as you type |
 | Right-click a thumbnail | Slide menu: new slide after it, duplicate, delete, move, skip in presentation |
 | Tab / Shift+Tab in a table cell | Next / previous cell; past the last cell a new row |
 | Enter in a list item | The next item, carrying whatever followed the caret and the item's own classes and style; Backspace at the start of an item joins it to the one before. An empty item at the end is how a list is finished: it goes when the edit does |
@@ -390,6 +390,9 @@ Optional hooks, used when present and tolerated when absent:
   and its table in `<script type="application/json" data-chart-data>`. It is
   selected as a whole; the editor redraws the SVG from the table, and saves both.
   A figure with the table alone (a deck generator's) is drawn when the deck opens.
+- `span[data-math]` inside text is an equation in a sentence (see Equations and
+  chemical structures): part of its text, never selected, moved or exported as
+  a picture of its own.
 - `figure[data-math]` (LaTeX) and `figure[data-chem]` (SMILES) are an equation and a
   chemical structure the editor drew (see Equations and chemical structures): the
   source in the attribute and one drawn `<svg>` inside. Selected as a whole; a
@@ -781,6 +784,37 @@ bonds and carbon take the text colour, atom labels the text font (the deck's, or
 Font field's). The structure scales into its box. Rotated,
 its bonds turn and its atom labels stay level (each label is turned back about its
 own centre, kept in the file as `data-upright` on the drawing).
+
+**Maths inside a sentence** ("the rate constant k_obs rises with...") is an
+equation in the text itself. While editing text, **Alt+=** (Word's key), the ∑
+button of the text bar, or Ctrl+K > Equation in the text opens a small popover
+by the caret: a LaTeX field and a live preview. Enter puts the equation in at
+the caret, Esc leaves the text as it was; a TeX that does not draw shows
+MathJax's message and is not put in. With TeX selected in the text, the
+popover opens with it (its `\( \)`, `\[ \]` or `$` delimiters taken off) and
+Enter replaces it. TeX typed as `\(...\)` or `$...$` right before the caret is
+converted at once by Alt+= (the popover opens with the message when it does not
+draw). A click on an equation in the text opens the popover again (a
+double-click on one in a text not being edited too); emptied, Enter removes it.
+In the text the equation is one atom: the caret steps over it, Backspace or
+Delete next to it takes it whole. Inserting, changing and removing one are each
+an undo step of their own. It is drawn in MathJax's inline style, sized in em
+(so it follows the text's size: a new font size needs no redraw), dropped below
+the baseline by MathJax's own depth, and filled with currentColor (so it takes
+the text's colour, a coloured selection's too). It is saved as
+`<span data-math="LaTeX"><svg ...></svg></span>`, its size and
+`vertical-align` in the svg's own style so a deck's CSS for `svg` does not
+change it; `contenteditable=false` is only there while the text is edited.
+Copy and cut write the clipboard themselves: the HTML keeps each equation's
+LaTeX (pasted into a text box here it is drawn again; the clipboard's drawing is
+never taken), the plain text has it as `$`. Find and replace never looks
+inside one, and no match runs across one. A span written with the LaTeX alone is
+drawn when the deck opens; one that does not parse is listed under Problems and
+shows its LaTeX as text. The PowerPoint export writes it as text (Greek letters
+and operators as their characters, `\frac{a}{b}` as a/b, `\ce{H2O}` as H₂O),
+powers raised and indices lowered as runs, and says so in the export's notes:
+PowerPoint has no picture inside a line of text. The PDF, print, thumbnails and
+the single-file export show the drawing.
 
 Both are saved as a `<figure>` holding one plain inline `<svg>` (every glyph a
 path: no font, no script, no library in the deck) with the source in

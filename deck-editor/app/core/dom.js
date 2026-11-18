@@ -8,9 +8,13 @@
    ============================================================ */
 
 export const TEXT_TAGS = 'h1, h2, h3, h4, h5, h6, p, li, blockquote, pre, td, th, dt, dd, figcaption, label, [data-edit]';
-export const MEDIA_TAGS = 'img, video, audio, canvas, iframe, svg, [data-fig], [data-chart], [data-math], [data-chem], [data-plot], [data-svg], picture, object';
+export const MEDIA_TAGS = 'img, video, audio, canvas, iframe, svg, [data-fig], [data-chart], [data-math]:not(span), [data-chem], [data-plot], [data-svg], picture, object';
 /* Figures the editor (or a deck's script) draws: picked, moved and sized as one, never edited inside. */
-export const DRAWN = '[data-fig], [data-chart], [data-math], [data-chem], [data-plot]';
+export const DRAWN = '[data-fig], [data-chart], [data-math]:not(span), [data-chem], [data-plot]';
+/* An equation inside text (math.js): a word of its text, not a picture of its own. Its <svg> is
+   no shape, no media and nothing to select apart from the text that holds it. */
+export const INLINE_MATH = 'span[data-math]';
+export const inInlineMath = (el) => !!(el && el.closest && el.closest(INLINE_MATH));
 export const SHAPE_TAGS = 'path, circle, rect, ellipse, polygon, polyline, line, text, tspan, g, use';
 
 const BLOCK_SELECTOR = TEXT_TAGS + ', ' + MEDIA_TAGS;
@@ -64,7 +68,7 @@ export function masterRootOf(el) {
 
 /* An element inside inline SVG (but not the <svg> root and not inside a chart). */
 export function isShape(el) {
-    return el instanceof win(el).SVGElement && el.tagName.toLowerCase() !== 'svg' && !el.closest(DRAWN);
+    return el instanceof win(el).SVGElement && el.tagName.toLowerCase() !== 'svg' && !el.closest(DRAWN) && !inInlineMath(el);
 }
 
 /* The <svg> root that owns a shape, or the [data-svg] host wrapping it. */
@@ -84,6 +88,7 @@ export function hasOwnText(el) {
 /* Elements worth selecting on their own: text blocks, media, and elements carrying text. */
 export function isMeaningful(el) {
     if (!isElement(el) || el.matches('.slide, .deck-stage')) return false;
+    if (inInlineMath(el)) return false;
     if (el.matches(BLOCK_SELECTOR)) return true;
     if (el.hasAttribute('data-group')) return true;
     if (hasOwnText(el) && css(el).display !== 'inline') return true;
@@ -103,13 +108,19 @@ export function textBlocks(root) {
     const blocks = topBlocks(root, TEXT_TAGS);
     // An element with its own text (a <span> label, a <div> caption) is a text block too.
     for (const el of root.querySelectorAll('span, div, b, strong, em, i, small, a, code')) {
+        if (inInlineMath(el)) continue;                     // its LaTeX shown while it does not draw is not a text of its own
         if (el.closest(TEXT_TAGS) && el.closest(TEXT_TAGS) !== root) continue;
         if (blocks.some(b => b.contains(el))) continue;
         if (hasOwnText(el)) blocks.push(el);
     }
     return blocks;
 }
-export function mediaBlocks(root) { return topBlocks(root, MEDIA_TAGS); }
+export function mediaBlocks(root) { return topBlocks(root, MEDIA_TAGS).filter(el => !inInlineMath(el)); }
+/* Media inside `el`, the drawings of equations in its text apart. */
+export function hasMedia(el) {
+    for (const n of el.querySelectorAll(MEDIA_TAGS)) if (!inInlineMath(n)) return true;
+    return false;
+}
 
 /* Something that lays out as its own box, so it makes sense to move it as a unit. */
 export function isLayoutUnit(el) {
@@ -127,7 +138,7 @@ export function isLayoutUnit(el) {
    authored size is a box. */
 export function isTextLike(el) {
     if (isShape(el)) return false;
-    if (el.matches(MEDIA_TAGS) || el.querySelector(MEDIA_TAGS)) return false;
+    if (el.matches(MEDIA_TAGS) || hasMedia(el)) return false;
     if (el.style.width || el.style.height) return false;
     if (el.matches(TEXT_TAGS)) return true;
     return textBlocks(el).length > 0 || hasOwnText(el);
@@ -135,6 +146,7 @@ export function isTextLike(el) {
 
 /* Elements the user can put text into (SVG labels are edited through a box over them). */
 export function isEditableText(el) {
+    if (inInlineMath(el)) return false;                     // the text around it is
     if (isShape(el)) return el.matches('text, tspan');
     return el.matches(TEXT_TAGS) || hasOwnText(el);
 }

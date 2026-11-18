@@ -4,8 +4,9 @@
    The browser's own find does not see into the deck iframe in a useful way (and not at all
    into speaker notes), so the editor searches the deck itself: every slide, skipped ones
    too, plus the master layer (the footer). Text elements, lists, tables, shapes with text
-   (SVG labels) and, optionally, speaker notes are searched; charts, equations, structures
-   and code blocks are not (their text is data or markup, not prose).
+   (SVG labels) and, optionally, speaker notes are searched; charts, equations (those inside
+   a sentence too: a match never runs across one), structures and code blocks are not
+   (their text is data or markup, not prose).
 
    Matching works on a text block at a time (a paragraph, a list item, a table cell), with
    the text of its formatting runs joined, so "Hello world" is found when "world" is bold.
@@ -424,15 +425,19 @@ function textGroups(doc, root, notes) {
                 if (SKIP_TAGS.test(n.localName)) return 2;
                 if (!notes && n.matches(CHROME)) return 2;
                 if (n.matches(DRAWN) || n.matches('code[data-code], pre')) return 2;
+                // An equation inside text is shown (as a stop, like a <br>), what is inside it never is.
+                if (n.parentElement && n.parentElement.matches('span[data-math]')) return 2;
+                if (n.matches('span[data-math]')) return 1;
                 return n.localName === 'br' ? 1 : 3;                         // only <br> is shown; the others are passed through
             }
-            return 1;
+            return n.parentElement && n.parentElement.matches('span[data-math]') ? 2 : 1;   // the LaTeX an undrawn equation shows
         },
     });
     // NodeFilter results: ACCEPT 1, REJECT 2 (the subtree too), SKIP 3 (the children still count).
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-        if (n.nodeType === 1) {                                              // a <br> (the filter let nothing else through)
-            if (cur) { cur.text += '\n'; cur.segs.push({ node: null, len: 1 }); }
+        if (n.nodeType === 1) {                                              // a <br> or an equation (the filter let nothing else through)
+            // A stop no match runs across: an equation is not words, and "rate k rises" is not "rate  rises".
+            if (cur) { cur.text += n.localName === 'br' ? '\n' : '￼'; cur.segs.push({ node: null, len: 1 }); }
             continue;
         }
         const v = n.nodeValue;

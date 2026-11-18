@@ -25,12 +25,16 @@
    export returns.
    ============================================================ */
 import { readChart, chartKind, seriesColour, isChart, scatterX } from './chart.js';
+import { texToRuns } from './math.js';
 
 import { bleed as lineBleed } from './lines.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SKIP = 'script, style, template, noscript, aside.notes, .notes, .deck-controls, .deck-overview, .deck-laser, .deck-draw, .deck-draw-bar, .deck-keys, .deck-keyhint, [data-placeholder]';
 const INLINE = new Set(['inline', 'contents']);
-const LEAF_MEDIA = 'img, svg, video, canvas, iframe, object, embed, picture, table, [data-chart], [data-math], [data-chem], [data-plot], [data-fig]';
+const LEAF_MEDIA = 'img, svg, video, canvas, iframe, object, embed, picture, table, [data-chart], [data-math]:not(span), [data-chem], [data-plot], [data-fig]';
+/* An equation inside text: PowerPoint has no picture inside a line of text, so it goes in as
+   its LaTeX read out (texToRuns), powers and indices raised and lowered. */
+const INLINE_MATH = 'span[data-math]';
 const GENERIC_FONTS = { 'sans-serif': 'Arial', serif: 'Georgia', monospace: 'Consolas', 'system-ui': 'Segoe UI', cursive: 'Comic Sans MS', fantasy: 'Impact' };
 const BULLETS = { disc: '•', circle: '◦', square: '▪', '-': '–' };
 const NUMBERING = { decimal: 'arabicPeriod', 'decimal-leading-zero': 'arabicPeriod', 'lower-alpha': 'alphaLcPeriod', 'lower-latin': 'alphaLcPeriod', 'upper-alpha': 'alphaUcPeriod', 'upper-latin': 'alphaUcPeriod', 'lower-roman': 'romanLcPeriod', 'upper-roman': 'romanUcPeriod' };
@@ -414,6 +418,7 @@ export class PptxCollector {
         if (!this.stacked(el)) return false;
         for (const d of el.querySelectorAll('*')) {
             if (d.matches(SKIP) || d.tagName === 'BR') continue;
+            if (d.closest(INLINE_MATH)) continue;                  // read as text (mathRuns)
             if (d.matches(LEAF_MEDIA)) return false;
             const dcs = this.css(d);
             if (dcs.display === 'none') continue;
@@ -449,6 +454,7 @@ export class PptxCollector {
             if (n.nodeType === 3) { runs.push(...this.textRuns(n, cs)); continue; }
             if (n.nodeType !== 1 || n.matches(SKIP) || (skipTags && skipTags.includes(n.tagName))) continue;
             if (n.tagName === 'BR') { runs.push({ br: true, size: parseFloat(cs.fontSize) || 32 }); continue; }
+            if (n.matches(INLINE_MATH)) { runs.push(...this.mathRuns(n)); continue; }
             const ncs = this.css(n);
             if (ncs.display === 'none') continue;
             if (this.inlineish(ncs.display)) { runs.push(...this.spaced(n, ncs, this.inlineRuns(n))); continue; }
@@ -487,10 +493,24 @@ export class PptxCollector {
             if (n.nodeType === 3) out.push(...this.textRuns(n));
             else if (n.nodeType === 1 && !n.matches(SKIP)) {
                 if (n.tagName === 'BR') out.push({ br: true, size: parseFloat(this.css(n).fontSize) || 32 });
+                else if (n.matches(INLINE_MATH)) out.push(...this.mathRuns(n));
                 else { const ncs = this.css(n); if (ncs.display !== 'none') out.push(...this.spaced(n, ncs, this.inlineRuns(n))); }
             }
         }
         return out;
+    }
+    /* An equation inside text as runs of its text, in the look of the words round it, powers
+       raised and indices lowered. */
+    mathRuns(el) {
+        const pieces = texToRuns(el.getAttribute('data-math') || '');
+        if (!pieces.length) return [];
+        this.note('equations inside text became their text (PowerPoint holds no picture inside a line of text)');
+        const cs = this.css(el);
+        return pieces.map(p => {
+            const r = this.runOf(cs, p.t, el);
+            if (p.script === 'sup') r.base = 30000; else if (p.script === 'sub') r.base = -25000;
+            return r;
+        });
     }
     /* The spaces HTML collapses: at the ends of a paragraph and doubled across runs. */
     collapse(runs, pre = false) {
