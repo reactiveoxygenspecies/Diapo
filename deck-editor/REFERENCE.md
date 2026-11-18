@@ -1067,7 +1067,31 @@ unsaved edits included; the deck file itself is not touched.
   embedded (a missing file, an external URL, `srcset`), and the editor shows
   it in the toast. Count on roughly the size of the assets plus a third.
 
-Both ask where to save with a normal dialog; the default is next to the deck
+- **Publish...**: a folder ready for a free web host, for when someone wants "a link". Diapo
+  hosts nothing and makes no network call of its own for this. The dialog asks for the folder
+  (default `<deck folder name>-site` beside the deck's folder; "Choose folder..." opens the
+  native dialog, and without one the path is typed) and writes the deck as `index.html` with
+  every local file it uses at the same relative paths: pictures, video, fonts, the deck's own
+  scripts and styles (and what those styles load), and, for an interactive chart, the Plotly
+  files (Diapo's current edition when the deck folder has none or an older one). Left behind:
+  anything in a dot-folder (`.deck-editor`, `.git`), `.bak` and `.~draft` files, and files that
+  leave the deck folder (by `..` or a link); the dialog's notes name them. The deck's scripts are
+  kept as written, because a host serves them without Diapo's script pausing: the dialog warns
+  when the deck has scripts the user has not trusted. Google Fonts links stay as they are,
+  unless "Download the Google Fonts into the folder" is ticked (the "Download into fonts/" code
+  of the font picker, so the only network use, and only on that tick). A folder that already has
+  files in it, or a `.zip` of that name, is not written until the user confirms; confirming
+  replaces files of the same names and deletes nothing. "Also make a .zip" writes
+  `<folder>.zip` beside the folder (not inside it) for hosts that take a zip. The result
+  dialog gives the steps for Netlify Drop, GitHub Pages and any web host, with buttons to show
+  the folder (Explorer / Finder; only a folder published in this session) and copy its path.
+  The two host links go through `POST /api/open-link?page=netlify-drop|github-new`, which opens
+  fixed addresses in the user's browser, only on a click. The routes are `GET /api/publish/plan`,
+  `POST /api/publish` (`file`, `to`, `overwrite`, `fonts`, `zip`; body = the live deck),
+  `POST /api/publish/pick` and `POST /api/publish/reveal`; the writer is `write_publish_folder`
+  in `serve.py` (tests: `tests/test_publish.py`, `tests/publish.spec.js`). Also in the Ctrl+K palette.
+
+PDF and Single HTML file ask where to save with a normal dialog; the default is next to the deck
 (`<deck name>.pdf`, `<deck name>-standalone.html`). For scripts and tests,
 `POST /api/pdf?file=&to=` and `POST /api/export?file=&to=` take a bare file
 name and skip the dialog.

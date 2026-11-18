@@ -45,7 +45,9 @@ Underneath, though, the deck is still a web page, so it can do everything a web 
 by the deck's own scripts, Plotly graphs for example, run once you trust the deck, and you move and resize them like
 anything else. AI models are quite good at adding effects and transitions to your slides, if you are into that sort of thing.
 
-Each deck can be exported into a single .html file, which can be opened in any modern browser.
+Each deck can be exported into a single .html file, which can be opened in any modern browser. For a link to share
+after a talk, Export > Publish... prepares a folder to drop on a free host you own (Netlify Drop, GitHub Pages);
+Diapo hosts nothing itself.
 
 I'm not 100% happy with it yet but it's in a decent functional state and some colleagues and friends were eager to try and play around with it, so I'm throwing it out there.
 
@@ -68,7 +70,8 @@ Press **D** to draw on the slide, to circle the number that matters or underline
 ## Bringing your stuff along
 
 You can import PowerPoint (.pptx) and Markdown files, and export a deck as a PDF, as a handout with your speaker
-notes, as a single self-contained HTML file, or back to an editable PowerPoint file.
+notes, as a single self-contained HTML file, as a folder ready to publish on a free web host, or back to an editable
+PowerPoint file.
 
 AI-drafted decks open like any other, as long as they follow the [Diapo Format](diapo-format/README.md). The
 [`diapo-deck`](skills/diapo-deck) skill teaches Claude Code to write them, so an assistant can draft the deck and you

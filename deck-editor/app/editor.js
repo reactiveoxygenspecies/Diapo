@@ -27,6 +27,7 @@ import { ThemePanel } from './core/theme.js';
 import { FontPicker } from './core/fonts.js';
 import { IconPicker } from './core/icons.js';
 import { Exporter } from './core/export.js';
+import { showPublish } from './core/publish.js';
 import { EditOps } from './core/editops.js';
 import { Problems } from './core/problems.js';
 import { readableText } from './core/dom.js';
@@ -1401,6 +1402,7 @@ $('exportMenu').addEventListener('click', async (e) => {
     if (b.dataset.x === 'pdf') await app.exporter.pdf();
     if (b.dataset.x === 'handout') await app.exporter.pdf({ handout: true });
     if (b.dataset.x === 'html') await app.exporter.standalone();
+    if (b.dataset.x === 'publish') await showPublish(app);
     if (b.dataset.x === 'pptx') await app.exporter.pptx();
 });
 
@@ -1573,6 +1575,7 @@ function paletteEntries() {
         out.push({ group: 'Deck', label: 'Export PDF with notes (handout)...', run: () => app.exporter.pdf({ handout: true }) });
         out.push({ group: 'Deck', label: 'Export PowerPoint (.pptx)...', keywords: 'powerpoint pptx office microsoft', run: () => app.exporter.pptx() });
         out.push({ group: 'Deck', label: 'Export a single HTML file...', run: () => app.exporter.standalone() });
+        out.push({ group: 'Deck', label: 'Publish...', keywords: 'website link host netlify github pages share online', run: () => showPublish(app) });
         out.push({ group: 'Deck', label: 'Presenter view', hint: 'P', run: () => app.presenter.open() });
         out.push({ group: 'Deck', label: 'Rehearse (time the slides, then keep the times)', keywords: 'timing auto advance kiosk', run: () => startRehearsal() });
         out.push({ group: 'Deck', label: 'Preview (present in the canvas)', run: click('#btnPreview') });
