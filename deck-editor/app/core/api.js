@@ -83,6 +83,12 @@ export const api = {
     pdf: (file, html, { to = null, dialog = true, w = 0, h = 0 } = {}) =>
         call('POST', '/api/pdf?' + q({ file, ...(to ? { to } : {}), dialog: dialog ? 1 : 0, ...(w && h ? { w, h } : {}) }), html, { 'Content-Type': 'text/html; charset=utf-8' }),
 
+    /* The version a deck's file is at now (X-Diapo-Version, as the iframe gets it), '' when it is gone. */
+    deckVersion: async (file) => {
+        const r = await fetch(api.deckUrl(file), { cache: 'no-store' });
+        if (r.body) r.body.cancel().catch(() => {});
+        return r.ok ? r.headers.get('X-Diapo-Version') || '' : '';
+    },
     /* URL the iframe uses for a workspace file. */
     deckUrl: (file, { draft = false } = {}) => '/deck/' + file.split('/').map(encodeURIComponent).join('/') + (draft ? '?draft=1' : ''),
 };

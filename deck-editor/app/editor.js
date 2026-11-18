@@ -121,6 +121,16 @@ const tabs = new DeckTabs({
         getView: () => ({ zoomMode: app.zoomMode, scroll: [$('canvas').scrollLeft, $('canvas').scrollTop] }),
         setView: (t) => { setZoom(t.zoomMode); if (t.zoomMode !== 'fit' && t.scroll) { $('canvas').scrollLeft = t.scroll[0]; $('canvas').scrollTop = t.scroll[1]; } },
         unload: () => unloadDeck(),
+        // A deck going to a background tab keeps its document and history (tabs.js, Deck.park).
+        park: () => {
+            if (app.selection) app.selection.clear();
+            const parked = { deck: app.deck.park(), history: app.history.park(), draftWritten };
+            clearTimeout(draftTimer); draftTimer = null; draftWritten = false;
+            return parked;
+        },
+        resume: (file, parked) => resumeDeck(file, parked),
+        discard: (parked) => Deck.discardParked(parked.deck),
+        versionOf: (parked) => parked.deck.state.diskVersion || '',
     },
 });
 app.tabs = tabs;
@@ -565,20 +575,41 @@ async function loadDeck(file, { draft = false, discard = false, sameSession = fa
     if (draft) { app.history.forceDirty(); if (!viaTab) toast('Draft restored. Save to write it into the file.', { ms: 3500 }); }
     // After no-deck goes: the strip changes the canvas's height, and the resize it causes must not measure a hidden stage.
     document.body.classList.remove('no-deck');
+    deckShown(file, { offer: !draft && !noOffer });
+    return true;
+}
+
+/* A deck parked in a background tab comes back (tabs.js): the same document, so its history
+   comes back too, with its own saved point: undoing to it makes the deck clean again and
+   removes the draft written when the tab was left, as for a deck that was never left. */
+function resumeDeck(file, parked) {
+    document.querySelectorAll('.bar').forEach(b => b.remove());
+    clearTimeout(draftTimer); draftTimer = null;
+    app.deck.resume(parked.deck);
+    app.deck.file = app.file = file;            // the file may have been renamed meanwhile
+    draftWritten = parked.draftWritten;
+    app.history.resume(parked.history);
+    document.body.classList.remove('no-deck');
+    // The panels read the deck again; listeners bound to the document are still there.
+    app.deck.dispatchEvent(new CustomEvent('ready', { detail: { resumed: true } }));
+    deckShown(file);
+}
+
+/* What every deck shown in the canvas gets, loaded or back from a background tab. */
+function deckShown(file, { offer = false } = {}) {
     tabs.loaded(file);
     document.querySelectorAll('[data-needs-deck]').forEach(b => { b.disabled = false; });
     showDeckName();
     refreshDirty();
     api.recent(file).catch(() => {});
     offerTrust(file);
-    if (!draft && !noOffer) offerDraft(file);
+    if (offer) offerDraft(file);
     const url = new URL(location.href);
     url.searchParams.set('file', file);
     history.replaceState(null, '', url);
     applyZoom();
     status('');
     window.dispatchEvent(new CustomEvent('editor:open', { detail: file }));
-    return true;
 }
 
 /* The title bar names the deck (its title, else its folder); the whole path is on hover. */
@@ -1323,10 +1354,10 @@ function onKey(e) {
 function stop(e) { e.preventDefault(); e.stopImmediatePropagation(); }
 window.addEventListener('keydown', onKey, true);
 window.addEventListener('keyup', (e) => app.selection.handleKeyUp(e), true);
-app.deck.addEventListener('ready', () => {
-    app.deck.win.addEventListener('keydown', onKey, true);
-    app.deck.win.addEventListener('keyup', (e) => app.selection.handleKeyUp(e), true);
-    app.deck.doc.addEventListener('contextmenu', noBrowserMenu);
+app.deck.onNewDocument((doc, win) => {
+    win.addEventListener('keydown', onKey, true);
+    win.addEventListener('keyup', (e) => app.selection.handleKeyUp(e), true);
+    doc.addEventListener('contextmenu', noBrowserMenu);
 });
 /* The browser's own context menu (Back, Reload, View page source, Inspect) is not part of the
    editor: where the editor has no menu of its own, a right-click does nothing. Fields keep it,

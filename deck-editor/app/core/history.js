@@ -6,12 +6,15 @@
    short window are merged (slider drags, nudges), and begin()/end()
    wraps many commands into one step (a drag, a multi-select move).
 
-   The stack also remembers the first-seen state of every element
+   At most MAX_STEPS steps are kept. The stack also remembers the first-seen state of every element
    it touched (`originals`), so the serialiser can ask "was this
    element ever changed from what the deck loaded?".
    ============================================================ */
 
 const MERGE_WINDOW_MS = 900;
+/* Steps kept per deck. Each holds what it changed (a text's HTML, a slide removed), and a deck
+   in a background tab keeps its history too (tabs.js), so the oldest steps go past this. */
+const MAX_STEPS = 200;
 
 export class History extends EventTarget {
     constructor() {
@@ -33,6 +36,21 @@ export class History extends EventTarget {
     forceDirty() { this.savedAt = {}; this._emit('change'); }
     clear() { this.undoStack = []; this.redoStack = []; this.savedAt = null; this.tx = null; this.originals = new WeakMap(); this._emit('change'); }
 
+    /* A deck tab going to the background takes its history with it, and gets it back on
+       return (tabs.js; its document is kept alive, so the commands still point at live
+       elements). park() leaves this stack empty without a 'change': the editor is about to
+       load another deck and says so itself. */
+    park() {
+        if (this.tx) this.end();
+        const state = { undoStack: this.undoStack, redoStack: this.redoStack, savedAt: this.savedAt, originals: this.originals };
+        this.undoStack = []; this.redoStack = []; this.savedAt = null; this.tx = null; this.originals = new WeakMap();
+        return state;
+    }
+    resume(state) {
+        Object.assign(this, state, { tx: null });
+        this._emit('change');
+    }
+
     /* ------------------------------------------------------------
        Recording
        ------------------------------------------------------------ */
@@ -47,9 +65,19 @@ export class History extends EventTarget {
         } else {
             cmd.time = Date.now();
             this.undoStack.push(cmd);
+            if (this.undoStack.length > MAX_STEPS) this._trim();
         }
         this.redoStack = [];
         this._emit('change');
+    }
+
+    /* The oldest step goes. The saved point stays exact: if it was that step, the bottom of
+       what is left is the saved state; if it was below it (the stack was empty at the save),
+       no undo can reach it any more. */
+    _trim() {
+        const gone = this.undoStack.shift();
+        if (this.savedAt === gone) this.savedAt = null;
+        else if (this.savedAt === null) this.savedAt = {};
     }
 
     /* Apply and push. */

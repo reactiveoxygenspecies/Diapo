@@ -57,7 +57,7 @@ export class FileDrop {
         this._hideTimer = null;
         this._listen(document, false);
         // The deck's document is a new one with every deck opened.
-        this.deck.addEventListener('ready', () => this._listen(this.deck.doc, true));
+        this.deck.onNewDocument((doc) => this._listen(doc, true));
     }
 
     _listen(doc, inDeck) {

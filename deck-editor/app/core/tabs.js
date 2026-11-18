@@ -1,18 +1,28 @@
 /* ============================================================
    tabs.js - several decks open at once, one tab each.
 
-   Only the active tab's deck is live in the editor's single iframe; the others are
-   remembered as a record (file, workspace, slide, zoom, whether they have unsaved
-   edits). Leaving a dirty tab writes its draft (the same file the autosave keeps) and
-   returning to it opens that draft again, with the disk version it was first opened at,
-   so a tab switch never makes a false "changed on disk" conflict and never hides a real
-   one. The undo history belongs to the live document and does not survive a switch.
+   Only the active tab's deck is shown; the others are remembered as a record (file,
+   workspace, slide, zoom, whether they have unsaved edits). Leaving a dirty tab writes its
+   draft (the same file the autosave keeps), so its edits are safe whatever happens next.
+
+   The deck that goes to the background is parked (Deck.park, History.park): its iframe
+   stays alive, hidden, with its undo history, because every step of that history points
+   at the document's own elements (history.js) and could not be applied to a document
+   loaded again. Coming back shows that frame again: undo and redo go on as if the tab had
+   never been left. Up to MAX_PARKED decks are kept so; past that the one left longest ago
+   lets its frame go, and its tab comes back the way every tab did before: its draft opened
+   again, with the disk version it was first opened at (no false "changed on disk"
+   conflict, no real one hidden), and an empty history. A clean parked deck whose file
+   changed on disk meanwhile is read again too. Closing a tab drops its history; a reload
+   of the editor starts every deck with an empty one.
 
    The editor (editor.js) owns loading, saving and the draft; it hands this class the few
    things it needs as `host` functions.
    ============================================================ */
 
 const KEY = 'diapo-tabs';
+/* Background decks kept alive with their history: each is a whole document in memory. */
+const MAX_PARKED = 4;
 const TOUR = '@diapo/';
 
 export class DeckTabs {
@@ -21,6 +31,7 @@ export class DeckTabs {
         this.tabs = [];
         this.busy = false;
         this._sig = '';
+        this._clock = 0;
         el.addEventListener('click', (e) => this._click(e));
         el.addEventListener('auxclick', (e) => {
             const t = e.target.closest('.deck-tab');
@@ -30,7 +41,7 @@ export class DeckTabs {
         this._dragging();
         const key = (e) => this._key(e);
         window.addEventListener('keydown', key, true);
-        app.deck.addEventListener('ready', () => { if (app.deck.doc) app.deck.doc.addEventListener('keydown', key, true); });
+        app.deck.onNewDocument((doc) => doc.addEventListener('keydown', key, true));
     }
 
     get active() { return this.tabs.find(t => t.active) || null; }
@@ -57,7 +68,7 @@ export class DeckTabs {
     }
 
     _record(file, ws) {
-        return { file, ws, dirty: false, slide: 0, zoomMode: null, scroll: null, version: '', name: this.host.nameOf(file, ''), loaded: false, active: false, snap: null };
+        return { file, ws, dirty: false, slide: 0, zoomMode: null, scroll: null, version: '', name: this.host.nameOf(file, ''), loaded: false, active: false, snap: null, parked: null, parkedAt: 0 };
     }
 
     /* The host calls this after every successful load, whoever asked for it. */
@@ -110,11 +121,23 @@ export class DeckTabs {
 
     async _enter(tab, cur) {
         const app = this.app;
-        let draft = false;
-        if (tab.dirty) { try { draft = (await this.api.draftStatus(tab.file)).exists; } catch (e) { /* open it clean */ } }
         if (tab.ws && tab.ws !== app.workspace) {
             if (!(await this.host.setWorkspace(tab.ws))) { if (cur) cur.snap = null; return false; }
         }
+        // The deck in front goes to the background whole, history and all.
+        if (cur && cur !== tab && !cur.parked && app.deck.isOpen && app.file === cur.file) this._park(cur);
+        if (tab.parked) {
+            const parked = tab.parked;
+            tab.parked = null;
+            if (await this._stillFits(tab, parked)) {
+                this.host.resume(tab.file, parked);          // loaded() makes the tab the active one
+                if (tab.zoomMode) this.host.setView(tab);
+                return true;
+            }
+            this.host.discard(parked);
+        }
+        let draft = false;
+        if (tab.dirty) { try { draft = (await this.api.draftStatus(tab.file)).exists; } catch (e) { /* open it clean */ } }
         const ok = await this.host.load(tab.file, { draft, sameSession: true, viaTab: true, version: draft ? tab.version : '', noOffer: tab.loaded });
         if (!ok) {
             // The file is gone or cannot be opened: its tab goes, and the neighbour opens in its place.
@@ -130,6 +153,23 @@ export class DeckTabs {
         if (tab.zoomMode) this.host.setView(tab);
         if (tab.slide) app.deck.goTo(tab.slide);
         return true;
+    }
+
+    _park(tab) {
+        tab.parked = this.host.park();
+        tab.parkedAt = ++this._clock;
+        const parked = this.tabs.filter(t => t.parked).sort((a, b) => a.parkedAt - b.parkedAt);
+        while (parked.length > MAX_PARKED) this._unpark(parked.shift());
+    }
+    _unpark(tab) {
+        if (tab && tab.parked) { this.host.discard(tab.parked); tab.parked = null; }
+    }
+    /* A parked deck comes back as it was, unless it had no unsaved edits and its file changed
+       on disk meanwhile: then the file is read again, as it was before decks were parked. With
+       unsaved edits it comes back, and the save asks before writing over the change. */
+    async _stillFits(tab, parked) {
+        if (tab.dirty) return true;
+        try { return (await this.api.deckVersion(tab.file)) === this.host.versionOf(parked); } catch (e) { return false; }
     }
 
     /* ------------------------------------------------------------
@@ -155,6 +195,7 @@ export class DeckTabs {
         const i = this.tabs.indexOf(tab);
         const wasActive = tab.active;
         this.tabs.splice(i, 1);
+        this._unpark(tab);                  // its history goes with it
         if (!wasActive) { this.refresh(true); return true; }
         const next = this.tabs[i] || this.tabs[i - 1] || null;
         if (!next) { this.host.unload(); this.refresh(true); return true; }
@@ -165,6 +206,7 @@ export class DeckTabs {
     }
 
     _drop(tab) {
+        this._unpark(tab);
         const i = this.tabs.indexOf(tab);
         if (i >= 0) this.tabs.splice(i, 1);
         this.refresh(true);

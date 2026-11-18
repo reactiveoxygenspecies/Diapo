@@ -312,10 +312,8 @@ export class Selection extends EventTarget {
 
         this.deck.addEventListener('mutate', () => this.scheduleRefresh());
         this.deck.addEventListener('slide', () => { this.showHover(null); this.prune(); });
-        this.deck.addEventListener('ready', () => {
-            this.items = []; this.refresh();
-            this.deck.doc.addEventListener('transitionend', () => this.scheduleRefresh());
-        });
+        this.deck.addEventListener('ready', () => { this.items = []; this.refresh(); });
+        this.deck.onNewDocument((doc) => doc.addEventListener('transitionend', () => this.scheduleRefresh()));
         this.history.addEventListener('step', () => this.prune());
         window.addEventListener('editor:zoom', () => this.scheduleRefresh());
         window.addEventListener('resize', () => this.scheduleRefresh());
