@@ -1359,11 +1359,107 @@ So a deck's own scripts are paused until the user trusts the deck:
   from a file on disk; the browser's print dialog (the fallback without Chrome
   or Edge) prints a trusted deck without its own scripts.
 
+## Diapo for AI agents (MCP)
+
+`mcp_server.py` lets any assistant that speaks the Model Context Protocol work
+on the decks of a folder: Claude Desktop, Cursor, Claude Code, a local model.
+The assistant starts it and talks to it over stdin / stdout (MCP's stdio
+transport: JSON-RPC 2.0, one message per line; protocol revisions 2025-11-25
+back to 2024-11-05). It is a separate program, standard library only, and
+works on the files: the editor need not be running.
+
+```
+py -3 mcp_server.py [--folder <decks folder>] [--settings <file>] [--online]
+```
+
+Without `--folder` it uses the last folder Diapo opened (`workspace` in
+`~/.deck-editor.json`, or in the file `--settings` names). It only reads the
+settings: the trusted decks (so a render runs a trusted deck's scripts) and
+the number of backups to keep.
+
+Tools:
+
+| Tool | What it does |
+|---|---|
+| `list_decks` | the decks in the folder (or a sub-folder): path, title, slide count, size, modified time |
+| `read_deck` | an outline: each slide's number, name (`data-name`), id, section, layout classes, text (headings, paragraphs, list items, tables as rows, inline equations as `\( TeX \)`), speaker notes, pictures (src, alt, missing), charts, equations, structures and Plotly figures by kind, element ids; the deck's stage size, its own scripts and whether they are trusted, and its **version**. `slide_html` adds one slide's exact HTML, `include_css` the deck's styles |
+| `write_slide` | replace a slide (`slide`: number, id or name) or insert one (`after`: 0 = first) with one whole `<section class="slide">` element |
+| `set_notes` | a slide's speaker notes (plain text; empty removes them), written as the editor does: `<aside class="notes" hidden>` with `<br>` line breaks |
+| `delete_slide`, `move_slide` | remove a slide (not the only one), put one at another position; the comment right before a slide goes with it |
+| `create_deck` | a new deck from a template of `app/templates` (`talk` becomes `talk/index.html`, titled "Talk") |
+| `check_deck` | the problems of a deck as ERROR / WARN / INFO: the diapo-deck skill's `check-deck.py` (missing files, scripts Diapo pauses, the file contract), plus TeX of equations that will not draw (braces, `\begin` / `\end`, `\left` / `\right`; MathJax in the editor has the last word) |
+| `render_slide` | a PNG of one slide (`scale` 0.1 to 1 of the stage, default 0.5) with every step revealed, returned as MCP image content |
+| `import_file` | a `.pptx` or `.md` inside the folder becomes `<name>/index.html`, as File > Import does |
+| `export_pdf` | the printable copy (skipped slides out, every step revealed, interactive charts as their picture, links kept) printed to `<deck folder>/<name>.pdf`, as File > Export > PDF does |
+
+Writes follow the editor's rules, through serve.py's own functions: every
+write names the version `read_deck` (or the previous write) returned and is
+refused when the file has changed since, as the editor's save is (409); the
+previous file becomes `.deck-editor/<name>.bak` and the older ones rotate;
+the file is written whole through a temporary file; only the slide or notes
+block being changed is touched, so the head, the styles, the runtime and the
+deck's scripts stay byte for byte; only the first slide keeps `active`. A
+deck open in the editor notices the change on disk and offers to reload it,
+as it does for any other program that saves the file.
+
+Safety:
+
+- Only files inside the folder are read or written: `..`, absolute paths
+  elsewhere, drive-relative paths and `@diapo/` are refused, and so is a path
+  that a symlink or junction takes outside (`list_decks` leaves those out).
+- A script an agent writes into a deck is one of the deck's own: Diapo
+  pauses it until the user trusts the deck, and a deck trusted before is
+  paused again, since trust is kept per fingerprint of its scripts (see
+  "Scripts in decks").
+- The program sends nothing over the network. `render_slide` serves the deck
+  to headless Chrome / Edge from a server on 127.0.0.1, on a free port, that
+  answers GET `/deck/...` inside the folder only, with the same script policy
+  as serve.py, and stops after the call; `export_pdf` prints from a file next
+  to the deck that carries the editor's policy. The browser finds every other
+  host unreachable and has its own background traffic turned off, so web
+  fonts and pictures a deck links from the internet are missing from renders
+  and PDFs; `--online` lets it fetch them.
+- What leaves the computer depends on the agent: a cloud assistant receives
+  what it reads (outlines, slide HTML, pictures of slides); a local model
+  keeps everything on the machine.
+
+Setting it up (replace the paths; on macOS and Linux the command is
+`python3` with the script as its first argument):
+
+Claude Desktop, in `claude_desktop_config.json` (Settings > Developer > Edit
+Config):
+
+```json
+{
+  "mcpServers": {
+    "diapo": {
+      "command": "py",
+      "args": ["-3", "C:\\path\\to\\Diapo\\deck-editor\\mcp_server.py", "--folder", "C:\\Users\\me\\Decks"]
+    }
+  }
+}
+```
+
+Cursor, in `~/.cursor/mcp.json` (or `.cursor/mcp.json` in a project): the
+same `mcpServers` block.
+
+Claude Code:
+
+```
+claude mcp add diapo -- py -3 C:\path\to\Diapo\deck-editor\mcp_server.py --folder C:\Users\me\Decks
+```
+
+Live edits in the open editor (an agent changing the deck the user is
+looking at, each change an undo step) are not part of it yet; the protocol,
+the tool table and the deck model in `mcp_server.py` are kept apart from the
+file writes so that can be added on top.
+
 ## Files
 
 ```
 deck-editor/
   serve.py            static server + JSON API
+  mcp_server.py       the MCP server for AI agents (stdio; see "Diapo for AI agents (MCP)")
   Start Diapo.bat     Windows launcher
   app/
     index.html        the editor shell (look.js sets the Look before the first paint)
@@ -1439,7 +1535,9 @@ npm run test:py        (the Python tests: pptx_chart.py, pptx_import.py, emf_svg
                         (version comparison and stubbed GitHub answers), which
                         script files beside a deck count as Diapo's own, and the
                         file types a drop on the canvas sends matching the
-                        server's upload types)
+                        server's upload types, and mcp_server.py driven over stdio:
+                        reading, writing, stale writes and outside paths refused,
+                        paused scripts, the checker, a render and a PDF)
 ```
 
 The tests start `serve.py` on a throw-away workspace made from
