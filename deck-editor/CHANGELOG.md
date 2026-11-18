@@ -58,6 +58,10 @@
 - **Editing options.** Look > Play entrances when changing slides (off by
   default: a slide shows at once as it ends up) and Look > Check spelling while
   typing (on; never saved in the file).
+- **Easier to read and to hit.** Panel text is larger (12/13 px), every control
+  is at least 24 px to click, quiet text and field edges are darker in all four
+  looks, and every field and icon button has an accessible name. Insert's shapes
+  and lines have small pictures, and leftover technical wording is gone.
 - Slide numbers in the strip are darker, readable in every look.
 - CI: a Windows workflow runs the browser and Python tests on every push and pull
   request to main, and fails if the generated deck copies are stale.
