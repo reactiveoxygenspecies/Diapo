@@ -8,7 +8,7 @@
     "test": "playwright test --project=chrome",
     "test:headed": "playwright test --project=chrome --headed",
     "test:firefox": "playwright test --project=firefox",
-    "test:py": "py -3 -m unittest tests.test_pptx_chart tests.test_pptx_import tests.test_emf_svg tests.test_md_import tests.test_settings tests.test_server_files tests.test_pptx_export tests.test_update_check tests.test_deck_files tests.test_upload_ext tests.test_pptx_scatter",
+    "test:py": "py -3 -m unittest tests.test_pptx_chart tests.test_pptx_import tests.test_emf_svg tests.test_md_import tests.test_settings tests.test_server_files tests.test_pptx_export tests.test_update_check tests.test_deck_files tests.test_upload_ext tests.test_pptx_scatter tests.test_looks",
     "build:icons": "node tools/build-fa.js",
     "build:icon": "node tools/build-icon.js"
   },

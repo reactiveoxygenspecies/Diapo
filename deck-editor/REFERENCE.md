@@ -272,7 +272,7 @@ the file self-contained and the DOM predictable for the round trip.
 | Keys | Action |
 |---|---|
 | Ctrl+O | Decks drawer. Tab reaches each deck (Enter opens it) and its Rename and Duplicate |
-| Tab in the panels | Every control is reachable: the colour swatches (named by colour, "Ink 2 #3d3c3a"), the marks that put a field back to the deck's value, the section headings. A control reached with Tab keeps its keys: Enter and Space press it, arrows and Delete are not the canvas's. After a mouse click in a panel the canvas keys work as before |
+| Tab in the panels | Every control is reachable: the colour swatches (named by colour, "Text 2 #3d3c3a"; one swatch per colour, so two variables with the same value share one named for both, "Background and Slide background #ffffff"), the marks that put a field back to the deck's value, the section headings. A control reached with Tab keeps its keys: Enter and Space press it, arrows and Delete are not the canvas's. After a mouse click in a panel the canvas keys work as before |
 | Ctrl+\ | Hide or show both side panels. The status bar has a button for each; drag a panel's inner edge to resize it, double-click the edge to reset. A narrow window starts with the panels hidden |
 | Ctrl+T | Theme panel: the deck's variables, base text styles, custom CSS, saved themes |
 | Ctrl+S | Save (keeps a backup, see below) |
@@ -900,15 +900,26 @@ styling, applied live to whatever slide is shown:
 
 - **Variables**: every custom property the deck defines on `:root`, grouped into
   colours, fonts, sizes and other (a `var(--x)` counts as whatever it points
-  at, so `--slide-bg: var(--paper)` is a colour). The deck's own value is the default; an
+  at, so `--slide-bg: var(--paper)` is a colour). Each is shown by what it does,
+  not by its CSS name, which is in the tooltip: `--ink` / `--ink-2` are Text /
+  Text 2, `--rule` Lines, `--paper` Background, `--slide-bg` Slide background,
+  `--stage-bg` Around the slides, `--accent-2` Accent 2, `--font` Body text,
+  `--font-display` Headings, `--font-mono` Code, `--pad-x` Side margin,
+  `--pad-top` Top margin; any other name is humanised (`--brand_blue` reads
+  Brand blue). The same names label the colour swatches everywhere
+  (`colourName` in `core/dom.js`). A colour that points at another reads
+  "Same as Background"; typing another colour's name, with or without "Same
+  as", points it there. The deck's own value is the default; an
   override is highlighted and its "x" reverts it. **Add** under the colours
   creates a new variable (`--name`, from the name you type, or `--colour-N`)
   in the override block; it shows in the list marked as added, in every colour
   swatch row of the properties panel, and in saved themes. Its "x" removes it.
 - **Base text styles**: font, size, weight, colour, line height and spacing for
-  h1, h2, h3, p, li and the slide's default text, for decks whose CSS sets these
-  directly. Written as `.deck-stage .slide h1 { ... }`, which outranks the usual
-  deck rules without `!important`.
+  the Title (h1), Heading (h2), Subheading (h3), Paragraph (p), List item (li)
+  and the slide's default text, for decks whose CSS sets these directly; one
+  block per kind of text with its six fields on two lines, so nothing scrolls
+  sideways at the panel's 400px. Written as `.deck-stage .slide h1 { ... }`,
+  which outranks the usual deck rules without `!important`.
 - **Motion**: the slide transition (the deck default, its duration, and Play to
   see it on the canvas) and the element reveal: duration, easing (named
   curves or a custom `cubic-bezier`), stagger (the step between `--i`
@@ -918,9 +929,33 @@ styling, applied live to whatever slide is shown:
   small rule in the override block that makes its reveal read them (the panel
   says so); it goes away when both are cleared.
 - **Custom CSS**: free text, applied live after a short pause.
-- **Themes**: save the current overrides under a name, apply a saved theme to any
-  deck that uses the same variable names (decks made from the same template),
-  delete. Themes live in `~/.deck-editor.json`.
+- **Themes**: cards with a strip of each theme's colours and its heading font's
+  name (set in that font only when the editor has it loaded already: opening
+  the panel never fetches a font).
+  - **Your themes** (shown when there are any): save the current overrides under
+    a name, apply a saved theme to any deck that uses the same variable names
+    (decks made from the same template), delete with its "x". Themes live in
+    `~/.deck-editor.json`.
+  - **Looks from the designs** (folds; remembered): the colours, fonts and
+    margins of the 31 designs, read from `app/templates/looks.json`, which
+    `tools/build-templates.py` extracts from each design's `:root` variables
+    (motion left out, `var()` pointers resolved) with the Google families it
+    loads; `tests/test_looks.py` checks the file is current. Applying one
+    (`core/looks.js`) is one undo step that sets override variables and adds
+    the Google families its fonts need. A deck variable with the look's name
+    takes its value; any other colour is matched by role: its name (`bg`,
+    `surface`, `fg`, `muted`, `border`, `primary`, `brand`...), else vivid
+    enough to be an accent, else what the deck's CSS uses it for (`color`,
+    `background`, `border`), else how light it is next to the slide's own
+    background and text. Text colours go to Text, Text 2, Text 3 by contrast;
+    backgrounds to Background, Background 2 by closeness to the slide's; extra
+    accents take the look's accents in turn; a background on the text's side of
+    the lightness scale (an inverted panel) takes the look's text colour and
+    the text on it the look's background. Font variables go by name (display /
+    heading / title, mono / code, hand, else body text). State colours (danger,
+    success, warning...), sizes other than the look's own names, and variables
+    that point at another are left alone; the result line says how many
+    settings changed and how many had no match.
 
 All of it is one override block, every change is an undo step, and a deck with no
 overrides has no block. Deleting the block from a file by hand is safe: the deck
@@ -1008,7 +1043,9 @@ They are written in `tools/templates-src/<slug>.html` with two markers, and
 `py -3 tools/build-templates.py` splices in `blank.html`'s base CSS, controller
 and runtime verbatim to produce `app/templates/<slug>.html`; run it after
 changing the blank template's base block or scripts so the templates stay in
-step. Everything else in them follows the deck file contract: theme variables
+step. It also rewrites `app/templates/looks.json` from every design listed in
+`templates.json` (the Theme panel's looks), so run it after changing a
+design's colours or fonts or adding a design. Everything else in them follows the deck file contract: theme variables
 with the editor's names, type on the tags, `.reveal` entrances with `--i`,
 fragments, notes, image placeholders, a master layer with the page counter,
 `data-name` and `data-section` on the slides.
@@ -1277,7 +1314,7 @@ deck-editor/
       font-catalog.js popular Google families with their weights
       icons.js        the Font Awesome icon picker
     icons/fontawesome.json  the icon catalog (built by tools/build-fa.js)
-    templates/      blank.html, the templates, templates.json, previews/
+    templates/      blank.html, the templates, templates.json, looks.json (the designs' looks for the Theme panel), previews/
   tests/              Playwright acceptance tests (see below)
   tools/              templates-src/ + build-templates.py (the editor's own templates),
                       build-format.py (diapo-format/ and the skill's runtime),

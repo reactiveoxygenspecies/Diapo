@@ -44,7 +44,7 @@
    Charts a deck renders with its own script ([data-fig], Plotly)
    stay the deck's: this is for charts made in the editor.
    ============================================================ */
-import { css, colourName, setSwatches } from './dom.js';
+import { css, colourNames, uniqueColours, setSwatches } from './dom.js';
 
 export const CHART_KINDS = [
     ['column', 'Column', 'M4 20V11h4v9M10 20V5h4v15M16 20v-6h4v6M2 20.5h20'],
@@ -1380,11 +1380,13 @@ export class ChartSection {
         const cur = spec.series[this.active];
         if (!pie && cur) {
             this.$('chartColourLabel').textContent = 'Colour of ' + (cur.name || 'series ' + (this.active + 1));
-            const theme = this.deck.themeColours().map(c => [`var(--${c.name})`, c.value, c.name]);
-            const seen = new Set(theme.map(t => t[0]));
-            const extra = spec.palette.filter(c => !seen.has(c)).map(c => [c, c, c]);
+            // One swatch per colour (two variables with one value share it), named by every variable it stands for.
+            const groups = uniqueColours(this.deck.themeColours());
+            const theme = groups.map(c => [`var(--${c.name})`, c.value, colourNames(c.names), c.names.map(n => `var(--${n})`)]);
+            const seen = new Set(theme.flatMap(t => t[3]));
+            const extra = spec.palette.filter(c => !seen.has(c)).map(c => [c, c, c, [c]]);
             setSwatches(this.$('chartSwatches'), `<button type="button" class="insp-swatch chart-auto${cur.colour ? '' : ' on'}" data-c="" title="Automatic: the chart's colours in turn" aria-label="Automatic: the chart's colours in turn"></button>`
-                + theme.concat(extra).map(([v, show, name]) => `<button type="button" class="insp-swatch${cur.colour === v ? ' on' : ''}" data-c="${esc(v)}" title="${esc(name === show ? show : colourName(name) + ' ' + show)}" aria-label="${esc(name === show ? show : colourName(name) + ' ' + show)}" style="background:${esc(show)}"></button>`).join(''));
+                + theme.concat(extra).map(([v, show, name, all]) => `<button type="button" class="insp-swatch${all.includes(cur.colour) ? ' on' : ''}" data-c="${esc(v)}" title="${esc(name === show ? show : name + ' ' + show)}" aria-label="${esc(name === show ? show : name + ' ' + show)}" style="background:${esc(show)}"></button>`).join(''));
             // Points and line of the series, for lines, areas and scatters; a scatter's trend line.
             this.$('chartSeriesLook').hidden = !(kind === 'line' || kind === 'area' || scatter);
             this.root.querySelector('[data-series="marker"]').value = cur.marker || '';

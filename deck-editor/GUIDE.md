@@ -49,7 +49,9 @@ any browser, without Diapo, and presents on its own.
   slides in the strip to pick several, then drag one of them (or Ctrl+Up /
   Ctrl+Down, or Move to... on the menu) to move them all at once.
 - **Theme** (Ctrl+T) changes the whole deck at once: its colours, fonts and
-  text styles, and how things move.
+  text styles, and how things move. **Looks from the designs** gives any deck
+  the colours, fonts and margins of one of Diapo's designs in one click (one
+  undo puts it back); save your own styling there as a theme too.
 
 ## Present
 

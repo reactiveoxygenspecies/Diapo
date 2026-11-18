@@ -7,18 +7,23 @@
    the deck's own value as the default and are highlighted when an
    override is set; the "x" clears one override. Every change is one
    undo step. Named themes (the whole override set) are saved on the
-   server and can be applied to any deck that uses the same names.
+   server and can be applied to any deck that uses the same names;
+   the bundled designs' looks (looks.js) restyle any deck by role.
+
+   The panel speaks in plain words: variables show what they do
+   ("Text 2", "Side margin"), with the CSS name in the tooltip only.
    ============================================================ */
-import { css } from './dom.js';
+import { css, plainName } from './dom.js';
 import { toHex } from './inspector.js';
 import { replay } from './animate.js';
 import { loader } from './loader.js';
 import { STAGE_W, STAGE_H, STAGE_SIZES } from './document.js';
-import { firstFamily, availableWeights, ensureGoogle, commitFonts, cloneFonts, faceFamilies, parseGoogleUrl, googleUrl, withoutFamilyFaces, deckFontLinks, usedWeights } from './fonts.js';
+import { firstFamily, availableWeights, ensureGoogle, commitFonts, cloneFonts, faceFamilies, parseGoogleUrl, googleUrl, withoutFamilyFaces, deckFontLinks, usedWeights, knownGoogle, rememberGoogle } from './fonts.js';
+import { loadLooks, lookVars, lookStrip, lookFont } from './looks.js';
 
 const BASE_TARGETS = [
-    ['h1', 'Title (h1)'], ['h2', 'Heading (h2)'], ['h3', 'Subheading (h3)'],
-    ['p', 'Paragraph'], ['li', 'List item'], ['', 'Slide text (default)'],
+    ['h1', 'Title'], ['h2', 'Heading'], ['h3', 'Subheading'],
+    ['p', 'Paragraph'], ['li', 'List item'], ['', 'Slide text'],
 ];
 const BASE_PROPS = [
     ['font-family', 'Font', 'font'], ['font-size', 'Size', 'px'], ['font-weight', 'Weight', 'weight'],
@@ -62,19 +67,25 @@ export class ThemePanel {
         this.root.innerHTML = `
         <section class="insp-section">
           <h4>Themes</h4>
+          <div class="insp-hint" style="margin:0 0 6px">Restyle the whole deck in one go. Undo puts it back.</div>
+          <div id="thSaved" hidden>
+            <div class="theme-sub">Your themes</div>
+            <div class="theme-looks" id="thSavedList"></div>
+          </div>
+          <details class="theme-looks-fold" id="thLooksFold" open>
+            <summary class="theme-sub">Looks from the designs</summary>
+            <div class="insp-hint" style="margin:0 0 6px">The colours, fonts and margins of each design that comes with Diapo.</div>
+            <div class="theme-looks" id="thLooks"></div>
+          </details>
+          <div class="insp-hint insp-state" id="thLookHint"></div>
           <div class="theme-row">
-            <select id="thPreset"><option value="">Saved themes...</option></select>
-            <button class="mini-btn" data-act="apply" title="Apply the selected theme to this deck">Apply</button>
-            <button class="mini-btn" data-act="delete" title="Delete the selected theme">Delete</button>
+            <input id="thName" type="text" placeholder="Name for the current styling" spellcheck="false" aria-label="Name for a new theme">
+            <button class="mini-btn" data-act="save" title="Save the colours, fonts, sizes and text styles set in this panel as a theme of your own">Save</button>
           </div>
           <div class="theme-row">
-            <input id="thName" type="text" placeholder="Name for the current styling" spellcheck="false">
-            <button class="mini-btn" data-act="save" title="Save the current overrides as a theme">Save</button>
+            <button class="mini-btn" data-act="reset" title="Clear everything set in this panel; the deck uses its own styles again">Reset to deck defaults</button>
           </div>
-          <div class="theme-row">
-            <button class="mini-btn" data-act="reset" title="Remove every override; the deck uses its own styles again">Reset to deck defaults</button>
-          </div>
-          <div class="insp-hint">A theme is the variables and base styles below.</div>
+          <div class="insp-hint">A theme of your own keeps the colours, fonts, sizes and text styles set below.</div>
         </section>
         <section class="insp-section">
           <h4>Fonts in this deck</h4>
@@ -113,7 +124,7 @@ export class ThemePanel {
         <section class="insp-section">
           <h4>Slide size</h4>
           <div class="theme-row">
-            <select id="thSize" title="The size every slide is laid out at, in px; the presentation scales it to the screen">
+            <select id="thSize" title="The size every slide is laid out at; when you present, the slides fit themselves to the screen">
               ${STAGE_SIZES.map(z => `<option value="${z.w}x${z.h}">${z.name} · ${z.w} × ${z.h}</option>`).join('')}
               <option value="custom">Custom...</option>
             </select>
@@ -127,17 +138,17 @@ export class ThemePanel {
         </section>
         <section class="insp-section">
           <h4>Base text styles</h4>
-          <div class="insp-hint" style="margin:0 0 8px">Written as <code>.deck-stage .slide h1 { ... }</code>.</div>
+          <div class="insp-hint" style="margin:0 0 8px">How each kind of text looks on every slide. Leave a field empty to keep the deck's own style; text you styled one by one keeps its own.</div>
           <div id="thBase"></div>
         </section>
         <section class="insp-section">
           <h4>Custom CSS</h4>
-          <textarea id="thCss" class="insp-notes theme-css" rows="8" spellcheck="false" placeholder=".slide h2 { text-transform: uppercase; }"></textarea>
-          <div class="insp-hint">Applied after a pause; saved in the same block.</div>
+          <textarea id="thCss" class="insp-notes theme-css" rows="8" spellcheck="false" aria-label="Custom CSS" placeholder=".slide h2 { text-transform: uppercase; }"></textarea>
+          <div class="insp-hint">For CSS of your own. Applied after a short pause and saved with the deck.</div>
         </section>
         <details class="insp-section insp-code" id="thCode">
           <summary><h4>Deck CSS</h4></summary>
-          <div class="insp-hint">The deck's own stylesheet, as written in its file: colours, sizes and fonts that the fields above do not show. The variables and styles set above are written after it and win over it.</div>
+          <div class="insp-hint">The deck's own stylesheet, as written in its file: colours, sizes and fonts that the fields above do not show. What you set above is applied on top of it.</div>
           <div id="thCodeBody"></div>
           <div class="theme-row">
             <button class="mini-btn" data-act="codeApply" title="Apply the changes (also on leaving the box, or Ctrl+Enter)">Apply</button>
@@ -265,7 +276,7 @@ export class ThemePanel {
         const notes = [];
         if (!(rt && rt.playTransition)) notes.push('Transitions need the presentation features script (Presenter menu).');
         if (!hasReveal) notes.push('No element in this deck uses the reveal classes, so the reveal settings change nothing here.');
-        else if (!this._deckReadsMotionVars() && (o.vars.stagger != null || o.vars['reveal-y'] != null)) notes.push('This deck predates the stagger and distance variables; a small rule in the override block makes its reveal read them.');
+        else if (!this._deckReadsMotionVars() && (o.vars.stagger != null || o.vars['reveal-y'] != null)) notes.push('This deck is older than the stagger and distance settings, so the editor adds a small rule that makes its reveal follow them.');
         $('thMotionHint').textContent = notes.join(' ');
     }
     /* Motion variables go into :root like any other; the compatibility rules come and go with them. */
@@ -307,7 +318,7 @@ export class ThemePanel {
         if (!preset || document.activeElement !== this.$('thSizeW') && document.activeElement !== this.$('thSizeH')) { this.$('thSizeW').value = w; this.$('thSizeH').value = h; }
         const notes = [];
         if (w !== STAGE_W || h !== STAGE_H) notes.push(`Elements keep their positions in px, so anything past the new edge is clipped: move it back in. Thumbnails, guides, new layouts and the PDF follow the size.`);
-        else notes.push(`The size is written into the deck's override block; the presentation scales it to the screen.`);
+        else notes.push(`Every slide is laid out at this size and saved with the deck; when you present, the slides fit themselves to the screen.`);
         if ((w !== STAGE_W || h !== STAGE_H) && this.deck.scaleScriptAssumesDefault()) notes.push(`This deck's own script assumes 1920 × 1080 when presenting outside the editor.`);
         this.$('thSizeHint').textContent = notes.join(' ');
     }
@@ -343,7 +354,7 @@ export class ThemePanel {
             <b style="font-family:${esc(stackOf(fam))}">${esc(fam)}</b>
             <span>${[...r.weights].sort((a, b) => a - b).join(' ')}${r.italics.size ? ' + italic' : ''} <i>${label[r.source]}</i></span>
             ${r.removable ? `<button class="insp-clear" data-remove="${esc(fam)}" title="Remove this font from the deck">&times;</button>` : ''}
-          </div>`).join('') : '<div class="insp-hint insp-state">This deck uses only system fonts. Pick a Google font in the properties panel or in a variable below to add one.</div>';
+          </div>`).join('') : '<div class="insp-hint insp-state">This deck uses only system fonts. Pick a Google font in the properties panel or under Fonts below to add one.</div>';
         const online = [...rows.values()].filter(r => r.source === 'google').length;
         const ownFiles = /url\(fonts\//.test(fonts.own);
         const acts = this.$('thFontActs');
@@ -392,7 +403,7 @@ export class ThemePanel {
         const groups = { colour: [], font: [], length: [], other: [] };
         const lookup = (n) => { const p = props.find(x => x.name === n); return p ? p.value : null; };
         for (const p of props) groups[kindOf(p.name, p.value, lookup)].push(p);
-        const titles = { colour: 'Colours', font: 'Fonts', length: 'Sizes and spacing', other: 'Other variables' };
+        const titles = { colour: 'Colours', font: 'Fonts', length: 'Sizes and spacing', other: 'Other settings' };
         let html = '';
         for (const [kind, list] of Object.entries(groups)) {
             if (!list.length && kind !== 'colour') continue;
@@ -401,7 +412,7 @@ export class ThemePanel {
                 const set = o.vars[p.name] != null;
                 const value = set ? o.vars[p.name] : p.value;
                 html += `<div class="theme-var${set ? ' set' : ''}${p.added ? ' added' : ''}" data-var="${esc(p.name)}" data-kind="${kind}">
-                    <label title="--${esc(p.name)}${p.added ? ' (added in the editor)' : ': ' + esc(p.default)}">${esc(p.name)}</label>
+                    <label title="--${esc(p.name)}${p.added ? ' (added in the editor)' : ': ' + esc(p.default)}">${esc(plainName(p.name))}</label>
                     ${this._fieldFor(kind, value, p.added ? '' : p.default)}
                     <i class="insp-clear" role="button" tabindex="0" title="${p.added ? 'Remove this colour' : 'Back to the deck\'s value'}">&times;</i>
                 </div>`;
@@ -409,9 +420,9 @@ export class ThemePanel {
             if (kind === 'colour') {
                 // New colours: a --name variable in the override block, in every swatch row from then on.
                 html += `<div class="theme-row theme-add">
-                    <input type="text" id="thNewName" placeholder="Name, e.g. brand-2" spellcheck="false" autocomplete="off" aria-label="Name of the new colour">
+                    <input type="text" id="thNewName" placeholder="Name, e.g. Brand blue" spellcheck="false" autocomplete="off" aria-label="Name of the new colour">
                     <input type="color" id="thNewColour" value="#2f6fed" aria-label="The new colour">
-                    <button class="mini-btn" data-act="addcolour" title="Add a colour variable to this deck; it appears in the colour swatches everywhere">Add</button>
+                    <button class="mini-btn" data-act="addcolour" title="Add a colour of your own to this deck; it appears in the colour swatches everywhere">Add</button>
                 </div>`;
             }
         }
@@ -425,16 +436,17 @@ export class ThemePanel {
         let name = nameField.value.trim().toLowerCase().replace(/^--/, '').replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '');
         const taken = new Set(this.deck.rootProperties().map(p => p.name));
         if (!name) { let n = 1; while (taken.has('colour-' + n)) n++; name = 'colour-' + n; }
-        if (taken.has(name)) { this.app.toast(`There is already a variable called --${name}; pick another name or change its value in the list.`, { error: true }); nameField.focus(); nameField.select(); return; }
+        if (taken.has(name)) { this.app.toast(`There is already a colour called "${plainName(name)}"; pick another name or change its value in the list.`, { error: true }); nameField.focus(); nameField.select(); return; }
         this._change('Add colour ' + name, (o) => { o.vars[name] = colour; });
         nameField.value = '';
-        this.app.toast(`--${name} added; it is in the colour swatches now.`);
+        this.app.toast(`"${plainName(name)}" added; it is in the colour swatches now.`);
     }
 
     _fieldFor(kind, value, def) {
         if (kind === 'colour') {
             const hex = toHex(resolveColour(this.deck, value)) || '#000000';
-            return `<span class="theme-colour"><input type="color" value="${hex}"><input type="text" class="theme-text" value="${esc(value)}" spellcheck="false" placeholder="${esc(def)}"></span>`;
+            // A colour that points at another one reads "Same as Background", not var(--paper); valueFromRow reads it back.
+            return `<span class="theme-colour"><input type="color" value="${hex}"><input type="text" class="theme-text" value="${esc(colourText(value))}" spellcheck="false" placeholder="${esc(colourText(def))}" title="A colour (#2f6fed) or &quot;Same as&quot; and another colour's name"></span>`;
         }
         if (kind === 'font') return `<button type="button" class="theme-font" data-value="${esc(value)}" style="font-family:${esc(value)}">${esc(firstFamily(value))}</button>`;
         if (kind === 'length') {
@@ -444,15 +456,18 @@ export class ThemePanel {
         return `<input type="text" class="theme-text" value="${esc(value)}" spellcheck="false" placeholder="${esc(def)}">`;
     }
 
+    /* One block per kind of text, its six fields on two lines, so the section fits the panel at
+       its narrowest instead of scrolling sideways like a table would. */
     _renderBase() {
         const o = this.deck.overrides;
-        let html = '<table class="theme-base"><tr><th></th>' + BASE_PROPS.map(([, label]) => `<th>${label}</th>`).join('') + '</tr>';
+        let html = '<div class="theme-base">';
         for (const [sel, label] of BASE_TARGETS) {
             const sample = this.deck.doc.querySelector('.deck-stage .slide ' + (sel || ''));
             const cs = sample ? css(sample) : null;
             const decl = o.rules[sel] || {};
-            html += `<tr data-sel="${esc(sel)}"><th>${label}</th>`;
-            for (const [prop, , kind] of BASE_PROPS) {
+            const any = BASE_PROPS.some(([prop]) => decl[prop] != null);
+            html += `<div class="theme-style${any ? ' set' : ''}" data-sel="${esc(sel)}"><div class="theme-style-name">${label}</div><div class="theme-style-fields">`;
+            for (const [prop, plabel, kind] of BASE_PROPS) {
                 const set = decl[prop] != null;
                 const computed = cs ? cs.getPropertyValue(prop) : '';
                 const value = set ? decl[prop] : '';
@@ -466,20 +481,74 @@ export class ThemePanel {
                 else if (kind === 'colour') field = `<span class="theme-colour"><input type="color" value="${toHex(computed) || '#000000'}"><input type="text" class="theme-text" value="${esc(value)}" placeholder="${esc(toHex(computed) || 'deck')}" spellcheck="false"></span>`;
                 else if (kind === 'num') field = `<input type="number" step="0.05" value="${value ? parseFloat(value) : ''}" placeholder="${cs && cs.lineHeight !== 'normal' ? (parseFloat(cs.lineHeight) / parseFloat(cs.fontSize)).toFixed(2) : ''}">`;
                 else field = `<input type="number" step="1" value="${value ? parseFloat(value) : ''}" placeholder="${computed ? Math.round(parseFloat(computed)) || 0 : ''}" data-unit="px">`;
-                html += `<td class="${set ? 'set' : ''}" data-prop="${prop}" data-kind="${kind}">${field}</td>`;
+                html += `<div class="theme-field${set ? ' set' : ''}" data-prop="${prop}" data-kind="${kind}"><span class="theme-field-label">${plabel}</span>${field}</div>`;
             }
-            html += '</tr>';
+            html += '</div></div>';
         }
-        this.$('thBase').innerHTML = '<div class="theme-base-wrap">' + html + '</table></div>';
+        this.$('thBase').innerHTML = html + '</div>';
+        // Each field is named for screen readers by its kind of text and what it sets ("Title: Size").
+        for (const f of this.$('thBase').querySelectorAll('.theme-field')) {
+            const name = f.closest('.theme-style').querySelector('.theme-style-name').textContent + ': ' + f.querySelector('.theme-field-label').textContent;
+            f.querySelectorAll('input, select, button').forEach(c => c.setAttribute('aria-label', name + (c.type === 'color' ? ' (picker)' : '')));
+        }
     }
 
     _syncCss() { if (document.activeElement !== this.$('thCss')) this.$('thCss').value = this.deck.overrides.css || ''; }
 
+    /* The user's own themes (cards with a delete button), then the designs' looks. Nothing here
+       loads a font: a card shows its heading font in that font only when the editor has it already. */
     async _renderPresets() {
         try { this.themes = (await this.app.api.themes()).themes || {}; } catch (e) { this.themes = {}; }
-        const sel = this.$('thPreset');
-        const cur = sel.value;
-        sel.innerHTML = '<option value="">Saved themes...</option>' + Object.keys(this.themes).sort().map(n => `<option${n === cur ? ' selected' : ''}>${esc(n)}</option>`).join('');
+        const names = Object.keys(this.themes).sort((a, b) => a.localeCompare(b));
+        this.$('thSaved').hidden = !names.length;
+        this.$('thSavedList').innerHTML = names.map(n => lookCard({ key: n, name: n, vars: this.themes[n].vars || {}, saved: true })).join('');
+        const looks = await loadLooks();
+        const box = this.$('thLooks');
+        const html = looks.length ? looks.map(l => lookCard({ key: l.slug, name: l.name, vars: l.vars })).join('') : '<div class="insp-hint insp-state">The designs\' looks could not be read.</div>';
+        if (box.innerHTML !== html) box.innerHTML = html;
+    }
+
+    /* A design's look onto this deck: its colours, fonts and margins, matched to the deck's own
+       variables by role (looks.js), the Google families it needs, all as one undo step. */
+    async _applyLook(slug) {
+        const look = (await loadLooks()).find(l => l.slug === slug);
+        if (!look || !this.deck.isOpen) return;
+        const res = lookVars(this.deck, look);
+        const changed = Object.keys(res.vars).length, left = res.considered - res.matched;
+        const leftText = left ? (left === 1 ? '; 1 setting of this deck had no match and was left as it was' : `; ${left} settings of this deck had no match and were left as they were`) : '';
+        if (!changed) {
+            const msg = res.considered ? `This deck already looks like ${look.name}${leftText}.` : `This deck has no colours, fonts or margins of its own that the ${look.name} look could change.`;
+            this.$('thLookHint').textContent = msg;
+            this.app.toast(msg, { ms: 4000 });
+            return;
+        }
+        const label = `${look.name} look`;
+        this.history.begin(label);
+        const used = usedWeights(this.deck);
+        for (const fam of res.families) {
+            const g = (look.google || {})[fam];
+            if (!g) continue;                       // a system font, or one the deck has already
+            if (!knownGoogle(fam)) rememberGoogle(fam, g);
+            ensureGoogle(this.deck, this.history, fam, [...new Set([400, 700, ...used.weights, ...g.weights])], [...new Set([...used.italics, ...g.italics])]);
+        }
+        this._change(label, (o) => { Object.assign(o.vars, res.vars); });
+        this.history.end();
+        const msg = `${look.name} look applied: ${changed} ${changed === 1 ? 'setting' : 'colours, fonts and margins'} changed${leftText}.`;
+        this.$('thLookHint').textContent = msg;
+        this.app.toast(msg, { ms: 4000 });
+    }
+
+    _applySaved(name) {
+        const t = this.themes[name];
+        if (!t) return;
+        this.history.begin('Apply theme ' + name);
+        // A theme can name Google families this deck does not load yet.
+        const used = usedWeights(this.deck);
+        const fams = [...Object.entries(t.vars || {}).filter(([k, v]) => kindOf(k, String(v)) === 'font').map(([, v]) => v), ...Object.values(t.rules || {}).map(r => r['font-family']).filter(Boolean)];
+        for (const v of fams) ensureGoogle(this.deck, this.history, firstFamily(v), [...new Set([400, 700, ...used.weights])], used.italics);
+        this._change('Apply theme ' + name, (o) => { o.vars = { ...t.vars }; o.rules = JSON.parse(JSON.stringify(t.rules || {})); o.css = t.css || ''; });
+        this.history.end();
+        this.$('thLookHint').textContent = `Theme "${name}" applied.`;
     }
 
     /* ------------------------------------------------------------
@@ -519,7 +588,7 @@ export class ThemePanel {
             }
             const row = e.target.closest('.theme-var');
             if (row) { this._preview((o) => { o.vars[row.dataset.var] = valueFromRow(row, e.target); }); return; }
-            const cell = e.target.closest('.theme-base td');
+            const cell = e.target.closest('.theme-base .theme-field');
             if (cell && e.target.type !== 'text') this._previewBase(cell, e.target);
         });
         r.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'thNewName') { e.preventDefault(); this._addColour(); } });
@@ -545,11 +614,11 @@ export class ThemePanel {
             }
             const row = e.target.closest('.theme-var');
             if (row) { this._preview((o) => { o.vars[row.dataset.var] = valueFromRow(row, e.target); }); this._commit('Theme: ' + row.dataset.var); return; }
-            const cell = e.target.closest('.theme-base td');
+            const cell = e.target.closest('.theme-base .theme-field');
             if (cell) {
                 this.history.begin('Base style');
                 if (cell.dataset.kind === 'weight' && e.target.value) {
-                    const sel = cell.closest('tr').dataset.sel, decl = this.deck.overrides.rules[sel] || {};
+                    const sel = cell.closest('.theme-style').dataset.sel, decl = this.deck.overrides.rules[sel] || {};
                     const sample = this.deck.doc.querySelector('.deck-stage .slide ' + sel);
                     ensureGoogle(this.deck, this.history, firstFamily(decl['font-family'] || (sample ? css(sample).fontFamily : '')), [+e.target.value], []);
                 }
@@ -562,6 +631,11 @@ export class ThemePanel {
         let cssTimer = 0;
         this.$('thCss').addEventListener('input', () => { clearTimeout(cssTimer); cssTimer = setTimeout(() => this._preview((o) => { o.css = this.$('thCss').value; }), 400); });
         this.$('thCss').addEventListener('keydown', (e) => e.stopPropagation());
+
+        // The designs' looks: open until folded, and remembered either way.
+        const looksFold = this.$('thLooksFold');
+        try { if (localStorage.getItem(LOOKS_OPEN_KEY) === '0') looksFold.open = false; } catch (err) { /* private window */ }
+        looksFold.addEventListener('toggle', () => { try { localStorage.setItem(LOOKS_OPEN_KEY, looksFold.open ? '1' : '0'); } catch (err) { /* private window */ } });
 
         // Deck CSS: folded until asked for (remembered), applied on leaving a box, Ctrl+Enter or the button.
         const code = this.$('thCode');
@@ -601,8 +675,17 @@ export class ThemePanel {
                 commitFonts(this.deck, this.history, next, 'Remove font ' + fam);
                 return;
             }
+            const card = e.target.closest('.theme-look');
+            if (card) {
+                const key = card.dataset.key;
+                if (e.target.closest('[data-del]')) {
+                    if (confirm('Delete the theme "' + key + '"?')) { try { await this.app.api.deleteTheme(key); await this._renderPresets(); } catch (err) { this.app.toast(err.message, { error: true }); } }
+                } else if (e.target.closest('.theme-look-apply')) {
+                    if (card.dataset.saved) this._applySaved(key); else this._applyLook(key);
+                }
+                return;
+            }
             const b = e.target.closest('[data-act]'); if (!b) return;
-            const name = this.$('thPreset').value;
             switch (b.dataset.act) {
                 case 'host': this._hostFonts(false); break;
                 case 'addfiles': this.app.fontPicker.open(b, { current: '', onPick: null }); this.app.fontPicker.fileInput.click(); break;
@@ -613,31 +696,20 @@ export class ThemePanel {
                 case 'sizeApply': this._setSize(this.$('thSizeW').value, this.$('thSizeH').value); break;
                 case 'playTrans': this._playTransition(); break;
                 case 'replayReveal': this._replayReveal(); break;
-                case 'apply': if (name && this.themes[name]) {
-                    const t = this.themes[name];
-                    this.history.begin('Apply theme ' + name);
-                    // A theme can name Google families this deck does not load yet.
-                    const used = usedWeights(this.deck);
-                    const fams = [...Object.entries(t.vars || {}).filter(([k, v]) => kindOf(k, String(v)) === 'font').map(([, v]) => v), ...Object.values(t.rules || {}).map(r => r['font-family']).filter(Boolean)];
-                    for (const v of fams) ensureGoogle(this.deck, this.history, firstFamily(v), [...new Set([400, 700, ...used.weights])], used.italics);
-                    this._change('Apply theme ' + name, (o) => { o.vars = { ...t.vars }; o.rules = JSON.parse(JSON.stringify(t.rules || {})); o.css = t.css || ''; });
-                    this.history.end();
-                } break;
                 case 'save': {
-                    const n = this.$('thName').value.trim() || name;
+                    const n = this.$('thName').value.trim();
                     if (!n) { this.app.toast('Give the theme a name'); this.$('thName').focus(); return; }
-                    try { await this.app.api.saveTheme(n, this._snapshot()); this.$('thName').value = ''; await this._renderPresets(); this.$('thPreset').value = n; this.app.toast('Theme "' + n + '" saved'); }
+                    try { await this.app.api.saveTheme(n, this._snapshot()); this.$('thName').value = ''; await this._renderPresets(); this.app.toast('Theme "' + n + '" saved'); }
                     catch (err) { this.app.toast(err.message, { error: true }); }
                     break;
                 }
-                case 'delete': if (name && confirm('Delete the theme "' + name + '"?')) { try { await this.app.api.deleteTheme(name); await this._renderPresets(); } catch (err) { this.app.toast(err.message, { error: true }); } } break;
             }
         });
     }
 
     /* The font picker for a variable row or a base-style cell. */
     _pickFont(btn) {
-        const row = btn.closest('.theme-var'), cell = btn.closest('.theme-base td');
+        const row = btn.closest('.theme-var'), cell = btn.closest('.theme-base .theme-field');
         const current = btn.dataset.value || btn.style.fontFamily;
         this.app.fontPicker.open(btn, {
             current,
@@ -650,7 +722,7 @@ export class ThemePanel {
                     this._change('Theme: ' + v, (o) => { o.vars[v] = stack; });
                     this.history.end();
                 } else if (cell) {
-                    const sel = cell.closest('tr').dataset.sel;
+                    const sel = cell.closest('.theme-style').dataset.sel;
                     const sample = this.deck.doc.querySelector('.deck-stage .slide ' + sel);
                     const decl = this.deck.overrides.rules[sel] || {};
                     const used = usedWeights(this.deck, sel ? '.slide ' + sel : '.slide');
@@ -665,7 +737,7 @@ export class ThemePanel {
     }
 
     _previewBase(cell, input) {
-        const sel = cell.closest('tr').dataset.sel, prop = cell.dataset.prop, kind = cell.dataset.kind;
+        const sel = cell.closest('.theme-style').dataset.sel, prop = cell.dataset.prop, kind = cell.dataset.kind;
         let v = input.value;
         if (input.type === 'color') { v = input.value; cell.querySelector('.theme-text').value = v; }
         else if (kind === 'px' && v !== '') v = v + 'px';
@@ -678,6 +750,27 @@ export class ThemePanel {
 
 /* --- helpers ------------------------------------------------------ */
 const CODE_OPEN_KEY = 'diapo-theme-code-open';
+const LOOKS_OPEN_KEY = 'diapo-theme-looks-open';
+
+/* A theme card: a strip of its colours, its name, and its heading font's name, set in that
+   font only when the editor has the font loaded already (asking for it would fetch it from
+   Google just for opening the panel). Saved themes get a delete button. */
+function lookCard({ key, name, vars, saved }) {
+    const strip = lookStrip(vars), stack = lookFont(vars), fam = firstFamily(stack);
+    const font = fam ? `<span class="theme-look-font"${editorHasFont(fam) ? ` style="font-family:${esc(stack)}"` : ''}>${esc(fam)}</span>` : '';
+    const what = saved ? `Apply your theme "${name}" to this deck` : `Give this deck the colours, fonts and margins of the ${name} design`;
+    return `<div class="theme-look" data-key="${esc(key)}"${saved ? ' data-saved="1"' : ''}>
+        <button type="button" class="theme-look-apply" title="${esc(what)}${fam ? esc(' (headings in ' + fam + ')') : ''}" aria-label="${esc(what)}">
+          <span class="theme-look-strip">${strip.map(c => `<i style="background:${esc(c)}"></i>`).join('')}</span>
+          <span class="theme-look-name">${esc(name)}</span>${font}
+        </button>${saved ? `<button type="button" class="insp-clear" data-del title="Delete this theme" aria-label="Delete the theme ${esc(name)}">&times;</button>` : ''}
+      </div>`;
+}
+function editorHasFont(family) {
+    const want = family.toLowerCase();
+    for (const f of document.fonts) if (f.status === 'loaded' && f.family.replace(/^["']|["']$/g, '').toLowerCase() === want) return true;
+    return false;
+}
 
 /* Tab indents by four spaces (every selected line when the selection spans lines), Shift+Tab takes
    one level off. Done with execCommand so the box's own undo keeps working. */
@@ -739,10 +832,19 @@ function valueFromRow(row, input) {
         const text = row.querySelector('.theme-text'), pick = row.querySelector('input[type=color]');
         if (input === pick) { text.value = pick.value; return pick.value; }
         const hex = toHex(text.value.trim()); if (hex) pick.value = hex;
+        // "Same as Background" (or just "Background"): the variable that row stands for.
+        const said = text.value.trim().replace(/^same as\s+/i, '').toLowerCase();
+        const other = Array.from(row.parentElement.querySelectorAll('.theme-var[data-kind="colour"]')).find(r => r !== row && r.querySelector('label').textContent.trim().toLowerCase() === said);
+        if (other) return `var(--${other.dataset.var})`;
         return text.value.trim();
     }
     if (kind === 'length') { const n = row.querySelector('input[type=number]'); return n.value === '' ? '' : n.value + (n.dataset.unit || 'px'); }
     return input.value;
+}
+/* How a colour value reads in its field: var(--paper) is "Same as Background". */
+function colourText(value) {
+    const m = /^var\(--([\w-]+)\)$/.exec(String(value == null ? '' : value).trim());
+    return m ? 'Same as ' + plainName(m[1]) : String(value == null ? '' : value);
 }
 /* A theme value such as var(--x) or an rgb() string, resolved by the deck itself. */
 function resolveColour(deck, value) {
