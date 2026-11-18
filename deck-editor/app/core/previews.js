@@ -1,6 +1,7 @@
 /* ============================================================
    previews.js - what a deck is called, and a picture of its
-   first slide, for the Decks drawer and the title bar.
+   first slide, for the Decks drawer, the welcome screen and the
+   title bar; and of a template's slides, for the New deck gallery.
 
    A deck is named by its <title>, unless that is a placeholder
    ("New deck", "Untitled"); then by its folder (decks are
@@ -25,24 +26,36 @@ export function deckName(file, title = '') {
     return base.toLowerCase() === 'index' && parts.length ? parts.pop() : base;
 }
 
-const cache = new Map();          // `${path}@${mtime}` -> { html, ext } (ext: stylesheets from other origins, added after the first paint)
+const cache = new Map();          // `${url}@${mtime}#${slide}` -> { html, ext } (ext: stylesheets from other origins, added after the first paint)
 const MAX_CACHED = 80;
+/* A template's text, kept while its slides are looked at in the New deck gallery (several
+   previews of one file would otherwise fetch it once each). Decks are not kept: they change. */
+const texts = new Map();
+async function fetchText(url, keep) {
+    if (keep && texts.has(url)) return texts.get(url);
+    const p = fetch(url, { cache: keep ? 'default' : 'no-store' }).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); });
+    if (keep) {
+        if (texts.size >= 6) texts.delete(texts.keys().next().value);
+        texts.set(url, p);
+        p.catch(() => texts.delete(url));
+    }
+    return p;
+}
 
-/* The srcdoc of a deck's first slide ({ html: '' } when the file is not a deck or could not be read;
-   a failed read is not cached, so the next look tries again). */
-async function previewHtml(path, mtime) {
-    const key = path + '@' + mtime;
+/* The srcdoc of one slide of a deck, the first unless `index` says ({ html: '' } when the file is
+   not a deck, has no such slide or could not be read; a failed read is not cached, so the next look
+   tries again). `url` is a deck under /deck/ or a template under /templates/. */
+async function previewHtml(url, mtime, index = 0) {
+    const key = url + '@' + mtime + '#' + index;
     if (cache.has(key)) return cache.get(key);
-    const url = '/deck/' + path.split('/').map(encodeURIComponent).join('/');
     let failed = false;
-    const text = await fetch(url, { cache: 'no-store' }).then(r => { if (!r.ok) failed = true; return r.ok ? r.text() : ''; }).catch(() => { failed = true; return ''; });
+    const text = await fetchText(url, url.startsWith('/templates/')).catch(() => { failed = true; return ''; });
     const doc = new DOMParser().parseFromString(text, 'text/html');
     const slides = Array.from(doc.querySelectorAll('.deck-stage .slide'));
     let html = '', ext = [];
-    if (slides.length) {
+    if (slides[index]) {
         doc.querySelectorAll('script, title, aside.notes, .notes, .deck-controls, .deck-keys, .deck-keyhint').forEach(n => n.remove());
-        slides.slice(1).forEach(s => s.remove());
-        slides[0].classList.add('active', 'visible');
+        slides.forEach((s, i) => { if (i !== index) s.remove(); else s.classList.add('active', 'visible'); });
         const dir = url.slice(0, url.lastIndexOf('/') + 1);
         const base = doc.createElement('base'); base.href = new URL(dir, location.href).href;   // absolute: see slides.js
         doc.head.prepend(base);
@@ -59,7 +72,10 @@ async function previewHtml(path, mtime) {
     return entry;
 }
 
-/* Fill every `.deck-thumb[data-path]` inside `root` once it scrolls into view. */
+const deckUrl = (path) => '/deck/' + path.split('/').map(encodeURIComponent).join('/');
+
+/* Fill every `.deck-thumb[data-path]` (a deck in the folder) or `.deck-thumb[data-url]` (a
+   template, `data-slide` its slide, from 0) inside `root` once it scrolls into view. */
 export class DeckPreviews {
     constructor(scrollRoot) {
         this.observer = new IntersectionObserver((entries) => {
@@ -69,12 +85,21 @@ export class DeckPreviews {
                 this.fill(e.target);
             }
         }, { root: scrollRoot, rootMargin: '120px' });
+        // A box that changes width (the welcome screen's cards follow the window) keeps its picture fitted.
+        this.resizer = new ResizeObserver((entries) => {
+            for (const e of entries) {
+                if (!e.target.isConnected) { this.resizer.unobserve(e.target); continue; }      // its list was redrawn
+                const frame = e.target.querySelector('iframe');
+                if (frame && e.target.clientWidth) frame.style.transform = `scale(${e.target.clientWidth / 1920})`;
+            }
+        });
     }
     watch(root) {
-        root.querySelectorAll('.deck-thumb[data-path]').forEach(t => this.observer.observe(t));
+        root.querySelectorAll('.deck-thumb[data-path], .deck-thumb[data-url]').forEach(t => this.observer.observe(t));
     }
     async fill(box) {
-        const { html, ext, failed } = await previewHtml(box.dataset.path, box.dataset.mtime || '');
+        const url = box.dataset.url || deckUrl(box.dataset.path);
+        const { html, ext, failed } = await previewHtml(url, box.dataset.mtime || '', +box.dataset.slide || 0);
         if (!box.isConnected) return;
         if (!html) { if (failed) setTimeout(() => { if (box.isConnected && !box.classList.contains('filled')) this.observer.observe(box); }, 3000); return; }     // unreadable just now: look again
         const frame = document.createElement('iframe');
@@ -86,5 +111,6 @@ export class DeckPreviews {
         frame.srcdoc = html;
         box.appendChild(frame);
         box.classList.add('filled');
+        this.resizer.observe(box);
     }
 }

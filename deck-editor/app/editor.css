@@ -326,12 +326,15 @@ html[data-rulers="on"] #canvasInner { padding: 48px 28px 28px 48px; }
 .guide-ghost::after { content: attr(data-at) ' px'; position: absolute; left: 4px; top: 2px; font: 10px var(--ui-mono); color: #fff; background: #16a6c8; padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
 body.no-deck #stageWrap { display: none; }
 
+/* The welcome screen scrolls as a whole; .home's auto margins centre it while it is shorter
+   than the canvas and let it start at the top once it is taller (a narrow or low window). */
 .canvas-empty {
     position: absolute; inset: 0;
-    display: none; align-items: center; justify-content: center;
+    display: none; overflow-y: auto;
     color: var(--ink-2); text-align: center;
 }
 body.no-deck .canvas-empty { display: flex; }
+.canvas-empty .home { margin: auto; width: min(960px, 100%); padding: 32px 16px 40px; box-sizing: border-box; }
 /* The logo on the empty canvas: a 35mm slide mount (50x50 card, 36x24 window) with DIAPO reversed out of the window.
    Anton is the face; Impact stands in where it is not installed. The stamp is the processing date, set to this month, in the same ink as the print. */
 .canvas-empty .mount {
@@ -850,14 +853,14 @@ select option { background: var(--bg-2); color: var(--ink); }
 
 
 /* Drawer: open / browse / recent / folder */
-.drawer-open { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 14px 6px; }
+.drawer-open { display: grid; grid-template-columns: repeat(3, auto); gap: 8px; padding: 12px 14px 6px; }
 .drawer-open .tb-btn { border-color: var(--line-2); justify-content: center; white-space: nowrap; height: 32px; }
 .drawer-recent { padding: 4px 8px 0; }
 .drawer-file.recent .name { font-weight: 600; }
 .drawer-ws { display: flex; align-items: center; gap: 6px; padding: 10px 14px 0; }
-.drawer-ws label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--section-ink); }
-.drawer-ws input { flex: 1; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); font: 12px var(--ui-mono); outline: none; }
-.drawer-ws input:focus { border-color: var(--accent); }
+.drawer-ws-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--section-ink); }
+/* The folder by its name; the whole path is its tooltip. */
+.folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 /* A subfolder's heading folds its decks away. */
 .drawer-subfolder {
     display: flex; align-items: baseline; gap: 6px; width: 100%; margin-top: 6px;
@@ -871,20 +874,6 @@ select option { background: var(--bg-2); color: var(--ink); }
 .drawer-other { display: block; margin: 10px 6px 0; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--ink-3); text-decoration: underline; cursor: pointer; }
 .drawer-other:hover { color: var(--ink); }
 
-.drawer-new { margin: 8px 14px 0; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--bg); }
-.drawer-new label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--section-ink); }
-.drawer-new-row { display: flex; gap: 6px; margin-top: 6px; }
-.tpl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 8px; max-height: 300px; overflow-y: auto; padding: 2px; }
-.drawer-new .tpl-card { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 4px; border: 2px solid var(--line-2); border-radius: 8px; background: var(--bg-2); cursor: pointer; text-transform: none; letter-spacing: 0; color: var(--ink); }
-.tpl-card:hover { border-color: var(--ink-3); }
-.tpl-card:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
-.tpl-card input { position: absolute; opacity: 0; pointer-events: none; }
-.tpl-card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; background: var(--sketch-bg); }
-.tpl-name { font-size: 12px; font-weight: 600; padding: 2px 2px 0; }
-.tpl-meta { font-size: 10.5px; color: var(--ink-3); padding: 0 2px 2px; }
-.drawer-new-row input { flex: 1; min-width: 0; height: 26px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); font: inherit; outline: none; }
-.drawer-new-row input:focus { border-color: var(--accent); }
-.drawer-new .insp-hint { word-break: break-all; }
 
 /* ------------------------------------------------------------
    Theme panel
@@ -1235,3 +1224,89 @@ body.resizing-panels #deckFrame { pointer-events: none; }
 .find-boxes { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
 .find-box { position: absolute; background: rgba(255, 214, 0, 0.45); border-radius: 2px; }
 .find-box.current { background: rgba(255, 140, 0, 0.7); }
+/* ------------------------------------------------------------
+   Welcome screen: the folder, the recent decks and the folder's
+   newest decks as cards with the picture of their first slide
+   ------------------------------------------------------------ */
+.link-btn { padding: 0; border: 0; background: none; font: inherit; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.link-btn:hover { color: var(--ink); }
+.home-folder { margin: 4px 0 8px; font-size: 13px; }
+.home-folder b { color: var(--ink); font-weight: 600; }
+.home-section { text-align: left; margin-top: 26px; }
+.home-section h2 { margin: 0 0 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--section-ink); }
+.home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.home-deck {
+    display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 6px; border: 1px solid transparent; border-radius: var(--radius);
+    background: none; font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+}
+.home-deck:hover, .home-deck:focus-visible { background: var(--bg-2); border-color: var(--line-2); }
+.home-deck .deck-thumb { width: 100%; height: auto; aspect-ratio: 16 / 9; margin-bottom: 4px; }
+.home-deck .name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-deck .meta { font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1em; }
+.home-section > .link-btn { margin-top: 10px; font-size: 13px; }
+.home-empty { color: var(--ink-3); font-size: 13px; }
+
+/* The File menu: the folder's name at its foot (the whole path on hover). */
+.file-menu { min-width: 240px; }
+.tb-dropdown > button:disabled { opacity: 0.4; cursor: default; background: transparent; }
+.file-folder { padding: 2px 10px 6px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ------------------------------------------------------------
+   New deck gallery (core/gallery.js): filters on top, the cards
+   in a grid that follows the width, the chosen design larger on
+   the right (under the grid in a narrow window), the name and
+   Create at the foot.
+   ------------------------------------------------------------ */
+.gallery { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; }
+.gallery-backdrop { position: absolute; inset: 0; background: rgba(20,20,24,0.45); }
+.gallery-card {
+    position: relative; display: flex; flex-direction: column;
+    width: min(1280px, calc(100vw - 32px)); height: min(860px, calc(100vh - 32px));
+    background: var(--bg-2); color: var(--ink); border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden;
+}
+.gallery-head { position: relative; display: flex; align-items: center; gap: 10px 16px; padding: 14px 56px 14px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.gallery-head h2 { margin: 0; font-size: 16px; }
+.gallery-head #btnGalleryClose { position: absolute; right: 18px; top: 16px; }
+.gallery-filters { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line-2); border-radius: var(--radius-sm); overflow: hidden; }
+.seg button { height: 28px; padding: 0 10px; border: 0; border-left: 1px solid var(--line-2); background: var(--bg-2); color: var(--ink-2); font: inherit; font-size: 12.5px; cursor: pointer; }
+.seg button:first-child { border-left: 0; }
+.seg button:hover { color: var(--ink); background: var(--bg); }
+.seg button[aria-pressed="true"] { background: var(--seg-on); color: #fff; }
+.gallery-count { font-size: 12px; color: var(--ink-3); }
+.gallery-main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+.gallery-grid { overflow-y: auto; padding: 16px 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; align-content: start; }
+.gallery-item {
+    display: flex; flex-direction: column; gap: 3px; padding: 6px; min-width: 0;
+    border: 2px solid transparent; border-radius: 10px; background: none; font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+}
+.gallery-item:hover { border-color: var(--line-2); }
+.gallery-item[aria-selected="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.gallery-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gallery-item img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: var(--sketch-bg); box-shadow: 0 0 0 1px var(--line); margin-bottom: 4px; }
+.gallery-item .name { font-weight: 600; font-size: 13px; }
+.gallery-item .meta { font-size: 12px; color: var(--ink-3); }
+.gallery-none { grid-column: 1 / -1; margin: 0; color: var(--ink-3); font-size: 13px; }
+.gallery-detail { overflow-y: auto; padding: 16px 18px; border-left: 1px solid var(--line); background: var(--bg); }
+.gallery-cover { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; box-shadow: 0 0 0 1px var(--line), 0 8px 20px rgba(0,0,0,0.12); background: var(--sketch-bg); }
+.gallery-detail h3 { margin: 14px 0 2px; font-size: 18px; }
+.gallery-meta { margin: 0 0 8px; font-size: 12px; color: var(--ink-3); }
+.gallery-tagline { margin: 0 0 12px; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+.gallery-more { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gallery-more .deck-thumb { width: 100%; height: auto; aspect-ratio: 16 / 9; }
+.gallery-foot { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.gallery-foot label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--section-ink); }
+.gallery-foot input { width: 240px; max-width: 100%; height: 32px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); font: inherit; background: var(--bg-2); color: var(--ink); outline: none; }
+.gallery-foot input:focus { border-color: var(--accent); }
+.gallery-foot input.wants { border-color: var(--warn); box-shadow: 0 0 0 3px rgba(200, 83, 45, 0.18); }
+.gallery-where { flex: 1; min-width: 0; font-size: 12px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gallery-foot .tb-btn { border-color: var(--line-2); height: 32px; }
+.gallery-foot .tb-btn.primary { border-color: transparent; }
+@media (max-width: 900px) {
+    .gallery-main { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+    .gallery-detail { border-left: 0; border-top: 1px solid var(--line); max-height: 34vh; display: grid; grid-template-columns: 160px 1fr; gap: 0 14px; align-items: start; }
+    .gallery-detail h3 { margin-top: 0; }
+    .gallery-detail .gallery-cover { grid-row: span 3; }
+    .gallery-more { display: none; }
+    .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}

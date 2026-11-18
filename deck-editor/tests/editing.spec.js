@@ -1628,7 +1628,7 @@ test('60 crop: a double-click crops a picture by hand (handles crop, a drag move
 /* ------------------------------------------------------------
    61. Palette: layouts and templates
    ------------------------------------------------------------ */
-test('61 palette layouts and templates: a layout is added by name, a template opens New with it chosen', async ({ page }) => {
+test('61 palette layouts and templates: a layout is added by name, a template opens the New deck gallery with it chosen', async ({ page }) => {
     await openDeck(page);
     const n0 = await page.evaluate(() => window.deckEditor.deck.slides.length);
     await page.keyboard.press('Control+k');
@@ -1642,9 +1642,9 @@ test('61 palette layouts and templates: a layout is added by name, a template op
     await page.fill('.palette-input', 'swiss template');
     await expect(page.locator('.palette-item.on')).toContainText('New deck from the Swiss template');
     await page.keyboard.press('Enter');
-    await expect(page.locator('#drawerNew')).toBeVisible();
-    await expect(page.locator('#newDeckTemplates input[value="swiss"]')).toBeChecked();
-    expect(await page.evaluate(() => document.activeElement.id)).toBe('newDeckName');
+    await expect(page.locator('#gallery')).toBeVisible();
+    await expect(page.locator('#gallery .gallery-item[data-slug="swiss"]')).toHaveAttribute('aria-selected', 'true');
+    await expect.poll(() => page.evaluate(() => document.activeElement.id)).toBe('galleryName');
 });
 
 /* ------------------------------------------------------------

@@ -251,9 +251,9 @@ test('27 platform: when no file dialog exists, Browse and Open ask for a typed p
     await openDeck(page);
     // Browse folder: the prompt takes a path.
     await page.evaluate((ws) => { window.__answers = [ws]; window.prompt = () => window.__answers.shift(); }, WS);
-    await page.click('#btnFiles');
+    await page.keyboard.press('Control+o');
     await page.click('#btnPickFolder');
-    await expect(page.locator('#drawerWs')).toHaveValue(WS);
+    await expect(page.locator('#drawerFolder')).toHaveAttribute('title', WS);
     // Open deck: a typed file path opens it.
     await page.evaluate((deck) => { window.__answers = [deck]; }, DECK);
     await page.click('#btnPickFile');
@@ -265,12 +265,12 @@ test('27 platform: when no file dialog exists, Browse and Open ask for a typed p
     expect(r.name).toBe('sample-standalone.html');
     expect(fs.existsSync(path.join(DECK_DIR, 'sample-standalone.html'))).toBe(true);
     // Opening a deck by path made its folder the current one (as the native route does).
-    await page.click('#btnFiles');
-    await expect(page.locator('#drawerWs')).toHaveValue(DECK_DIR);
+    await page.keyboard.press('Control+o');
+    await expect(page.locator('#drawerFolder')).toHaveAttribute('title', DECK_DIR);
     // Cancelling the prompt does nothing.
     await page.evaluate(() => { window.__answers = [null]; });
     await page.click('#btnPickFolder');
-    await expect(page.locator('#drawerWs')).toHaveValue(DECK_DIR);
+    await expect(page.locator('#drawerFolder')).toHaveAttribute('title', DECK_DIR);
     // Back to the test workspace for the tests that follow.
     await request.post('/api/workspace?path=' + encodeURIComponent(WS), { headers: own });
     // Windows scans a freshly written file when another process opens it (the drawer reads its
@@ -289,8 +289,7 @@ test('28 onboarding: the empty state builds the tour deck; problems list missing
     fs.rmSync(SAMPLES, { recursive: true, force: true });
     await page.goto('/');
     await page.waitForFunction(() => window.deckEditor);
-    await page.keyboard.press('Escape');                                   // the drawer opens by itself with no deck
-    await expect(page.locator('#btnEmptySample')).toBeVisible();
+    await expect(page.locator('#btnEmptySample')).toBeVisible();          // the welcome screen, with no drawer over it
     await page.click('#btnEmptySample');
     await page.waitForFunction(() => window.deckEditor.deck.isOpen && window.deckEditor.file === '@diapo/welcome/index.html');
     expect(await page.evaluate(() => window.deckEditor.deck.slides.length)).toBe(23);
@@ -408,18 +407,17 @@ test('39 templates: New offers the imported designs; each one opens, presents an
     test.setTimeout(240000);
     await page.goto('/');
     await page.waitForFunction(() => window.deckEditor);
-    if (await page.locator('#drawer').isHidden()) await page.click('#btnFiles');   // the drawer opens by itself with no deck open
-    await page.click('#btnNewDeck');
-    await expect(page.locator('.tpl-card')).toHaveCount(32);
-    await expect(page.locator('.tpl-card input[value="blank"]')).toBeChecked();
-    for (const img of await page.locator('.tpl-card img').all()) {      // lazy: Firefox loads them only near the view
+    await page.click('#btnEmptyNew');                                      // the New deck gallery
+    await expect(page.locator('.gallery-item')).toHaveCount(32);
+    await expect(page.locator('.gallery-item[data-slug="blank"]')).toHaveAttribute('aria-selected', 'true');
+    for (const img of await page.locator('.gallery-item img').all()) {     // lazy: Firefox loads them only near the view
         await img.scrollIntoViewIfNeeded();
         await expect.poll(() => img.evaluate(i => i.complete && i.naturalWidth > 0)).toBe(true);
     }
     // Create one from a template through the form.
-    await page.click('.tpl-card:has(input[value="sakura-chroma"])');
-    await page.fill('#newDeckName', 'sakura-test');
-    await page.click('#btnNewCreate');
+    await page.click('.gallery-item[data-slug="sakura-chroma"]');
+    await page.fill('#galleryName', 'sakura-test');
+    await page.click('#btnGalleryCreate');
     await page.waitForFunction(() => window.deckEditor.deck.isOpen && window.deckEditor.deck.file === 'sakura-test/index.html');
     expect(await page.evaluate(() => window.deckEditor.deck.slides.map(s => s.dataset.name))).toEqual(['cover', 'manifesto', 'catalogue', 'stripe', 'data', 'quote', 'cal', 'colophon']);
     // The new deck is the template with the name it was given as its title (what the Decks list shows).
@@ -461,8 +459,8 @@ test('46 versions: the saves keep previous versions; the list shows them with ti
     await page.waitForTimeout(300);
     await save(page);
     // The list: newest previous first (the one before the last save: "Version one", 4 slides), then the original.
-    await page.click('#btnExport');
-    await page.click('[data-x="versions"]');
+    await page.click('#btnFile');
+    await page.click('[data-f="versions"]');
     await expect(page.locator('.help.versions')).toBeVisible();
     const rows = await page.evaluate(() => Array.from(document.querySelectorAll('.versions-card tr')).map(tr => tr.textContent.replace(/\s+/g, ' ').trim()));
     expect(rows.length).toBeGreaterThanOrEqual(2);
@@ -479,14 +477,14 @@ test('46 versions: the saves keep previous versions; the list shows them with ti
     expect(readDeck()).toContain('Version two');
     // Restore the original from the deck: the deck is the original again, "Version two" the newest previous version.
     await openDeck(page);
-    await page.click('#btnExport');
-    await page.click('[data-x="versions"]');
+    await page.click('#btnFile');
+    await page.click('[data-f="versions"]');
     await page.click('.versions-card tr:nth-child(2) [data-a="restore"]');
     await page.waitForTimeout(800);
     expect(await page.evaluate(() => window.deckEditor.deck.doc.querySelector('h1').textContent)).toBe('Sample deck title');
     expect(readDeck()).toContain('Sample deck title');
-    await page.click('#btnExport');
-    await page.click('[data-x="versions"]');
+    await page.click('#btnFile');
+    await page.click('[data-f="versions"]');
     await expect(page.locator('.versions-card tr').first()).toBeVisible();
     const after = await page.evaluate(() => Array.from(document.querySelectorAll('.versions-card tr')).map(tr => tr.textContent.replace(/\s+/g, ' ').trim()));
     expect(after[0]).toMatch(/· 4 slides/);
@@ -667,10 +665,11 @@ test('66 framing: the editor, its pages and the decks may be shown in a frame on
 test('68 small things: the tour\'s folder in the status bar, rename keeps versions, draft and trust, previews fetch no stray pictures', async ({ page }) => {
     // The status bar names the tour's own folder while the tour is open.
     await openDeck(page);
-    await expect(page.locator('#statusWorkspace')).toHaveText(WS);
+    await expect(page.locator('#statusFolder')).toHaveText(path.basename(WS));      // the folder by its name, the path on hover
+    await expect(page.locator('#statusFolder')).toHaveAttribute('title', 'Your decks are in ' + WS);
     await page.evaluate(() => window.deckEditor.openSampleDeck());
     await page.waitForFunction(() => window.deckEditor.file === '@diapo/welcome/index.html');
-    await expect(page.locator('#statusWorkspace')).toHaveText('Diapo tour, in a folder of its own');
+    await expect(page.locator('#statusFolder')).toHaveText('Diapo tour, in a folder of its own');
 
     // Rename: the previous versions, the draft, trust and the Recent entry follow the deck.
     const file = 'sample/index.html', q = encodeURIComponent;

@@ -518,7 +518,7 @@ def set_workspace(path):
     WORKSPACE = full
     with settings_change() as s:
         s["workspace"] = full
-    print(f"Workspace: {full}")
+    print(f"Folder: {full}")
     return full
 
 
@@ -615,7 +615,7 @@ def safe_path(rel):
         root, rel = SAMPLES_DIR, rel[len(SAMPLES_PREFIX):].lstrip("/")
     full = os.path.realpath(os.path.join(root, rel))
     if full != root and not full.startswith(root + os.sep):
-        raise PermissionError("path is outside the workspace")
+        raise PermissionError("path is outside the folder of decks")
     return full
 
 
@@ -1376,7 +1376,7 @@ class Inliner:
         clean = urllib.parse.unquote(clean.replace("&amp;", "&"))
         full = os.path.realpath(os.path.join(base_dir or self.deck_dir, clean.replace("/", os.sep)))
         if not (full == self.root or full.startswith(self.root + os.sep)):
-            self.note("outside the workspace, kept as a link: " + ref)
+            self.note("outside the folder of decks, kept as a link: " + ref)
             return None
         if not os.path.isfile(full):
             self.note("missing file, kept as is: " + ref)
@@ -2724,7 +2724,7 @@ def main():
     for note in SETTINGS_NOTES:
         print(note)
     if not os.path.isdir(WORKSPACE):
-        fail(f"Workspace folder not found: {WORKSPACE}")
+        fail(f"Folder not found: {WORKSPACE}")
     server, port = bind_server()
     url = f"http://127.0.0.1:{port}/"
     if server is None:                                  # Diapo is already running there: show it, do not start a second one
@@ -2733,7 +2733,7 @@ def main():
             open_window(url, port, console=False)        # this process ends at once; the running one has its console
         return
     hint = "   (Ctrl+C to stop)" if sys.__stdout__ is not None else ""     # no console in the windowed build
-    print(f"Diapo\nWorkspace: {WORKSPACE}\nEditor:    {url}{hint}\nChange the workspace from the Decks drawer in the editor.")
+    print(f"Diapo\nFolder:    {WORKSPACE}\nEditor:    {url}{hint}\nChange the folder from the File menu in the editor.")
     window = None
     if OPEN_BROWSER:
         window = open_window(url, port)
