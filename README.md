@@ -92,8 +92,9 @@ On any system, Diapo also runs from this repository. All it needs is Python 3.8 
 2. In the `deck-editor` folder, double-click `Start Diapo.bat` on Windows or `Start Diapo.command` on macOS (the
    first time, right-click > Open), or run `./start-diapo.sh` on Linux. From a terminal,
    `python3 deck-editor/serve.py [folder]` does the same (`py -3` on Windows).
-3. Choose **Try the sample deck** for a tour (the one in the screenshots above), or **New** to start from a blank deck
-   or from one of 31 designs.
+3. Diapo opens on its welcome screen. Choose **Try the sample deck** for a tour (the one in the screenshots above), or
+   **New deck** to pick one of 31 designs (or a blank deck) in the gallery. Everything about files (open, import, save
+   as, previous versions, the folder your decks live in) is in the **File** menu.
 
 Diapo looks for Chrome or Edge first, because either one gives it a window of its own and prints PDFs directly.
 Without them, it opens in a tab of your default browser, Firefox included, and PDFs are saved through the browser's

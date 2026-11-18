@@ -53,7 +53,7 @@ folder) is shown in a message box. `Start Diapo.bat` behaves the same way
 when the python.org launcher is installed (`pyw` runs the server without a
 console); otherwise it keeps a console open.
 
-**File dialogs**: Open deck, Browse folder, Import and the export locations use
+**File dialogs**: Open a file, Change folder, Import and the export locations use
 the system's dialog: tkinter where Python has it (the python.org installers
 do), otherwise the native dialog on macOS (`osascript`) or `zenity` / `kdialog`
 on Linux. Where none exists (a minimal Linux Python, a server), the editor asks
@@ -72,14 +72,27 @@ default name. Setting `DECK_EDITOR_NO_DIALOG=1` forces that behaviour.
 
 ## Opening decks
 
-The Decks drawer (Ctrl+O, or the Decks button) is the one place for this:
+**The welcome screen** is the home while no deck is open (at the first start,
+and after the last tab closes); the Decks drawer stays closed over it. It has
+**New deck...**, **Open...** (a file anywhere), **Import...** and **Try the
+sample deck**, the folder your decks are in by its name (the whole path on
+hover) with **Change folder...**, the recent decks, and the folder's newest
+decks that Recent does not show, each a card with the picture of its first
+slide; **All N decks in this folder...** opens the drawer.
 
-- **Open deck...** shows a normal file dialog; pick any `.html` deck on this
+**The File menu** (top left) holds the rest: **New deck...**, **Open...**
+(Ctrl+O: the Decks drawer), **Open a file...**, **Import...**, **Save**,
+**Save as...**, **Previous versions...**, **Rename...** and **Duplicate...**
+(the open deck), and **Change folder...**, with the folder's name at its foot.
+
+The Decks drawer (Ctrl+O, File > Open...) is the deck list while you work:
+
+- **Open a file...** shows a normal file dialog; pick any `.html` deck on this
   computer. Its folder becomes the current folder.
-- **Browse folder...** shows a folder dialog; every `*.html` in that folder and its
+- **Change folder...** shows a folder dialog; every `*.html` in that folder and its
   subfolders is listed (`node_modules`, `.git`, dot-folders and this tool's own
-  folder are skipped). You can also paste a path into the Folder field and press
-  Enter.
+  folder are skipped). The folder shows by its name; the whole path is its
+  tooltip. Where no dialog exists the path is typed instead.
 - **Recent** lists the decks you opened last, wherever they are; one click reopens
   them. Every deck in the drawer goes by its name (its `<title>`, else its
   folder), with a picture of its first slide (the deck's own CSS, no scripts;
@@ -88,13 +101,20 @@ The Decks drawer (Ctrl+O, or the Decks button) is the one place for this:
   first. The title bar names the open deck the same way, with the whole path
   on hover. The last folder and the recent decks are remembered in
   `~/.deck-editor.json`, so the next start lands where you left off.
-- **New** creates `<name>/index.html` inside the current folder from a template,
-  with the name as the deck's title (`my-talk` is "My talk"):
-  the blank one, or one of the designs listed under Templates below (a card with
-  the title slide for each).
+- **New deck...** opens the gallery of designs, a large dialog: Blank first,
+  then the designs listed under Templates below as big cards with their title
+  slide, filtered by background (**All**, **Light**, **Dark**) and by style
+  (**Formal**, **Elegant**, **Technical**, **Playful**, **Minimal**, **Bold**:
+  the `tone` and `style` of each entry in `app/templates/templates.json`).
+  Blank is never filtered away. The chosen design is shown larger beside the
+  grid with its slide count, its description and four more of its slides
+  (drawn from the template itself, like the drawer's pictures). Arrows move
+  through the cards (Up and Down by a row), Enter goes to the name, Enter
+  there creates; Esc closes. It creates `<name>/index.html` inside the current
+  folder, with the name as the deck's title (`my-talk` is "My talk"). Ctrl+K
+  "New deck from the ... template" opens it with that design chosen.
 - **Import...** makes a deck from a Markdown or PowerPoint file (see Importing).
-- With no deck open, the canvas offers **Open a deck**, **New deck** and **Try
-  the sample deck**: a tour of the editor in Diapo's own design, in three
+- **Try the sample deck** (welcome screen, Ctrl+K) opens a tour of the editor in Diapo's own design, in three
   parts (Start here: the basics, in the order a first deck needs them;
   Present & share; For power users), with a live chart and a picture to
   crop (`app/templates/welcome.html`, built from `tools/templates-src/` like
@@ -116,7 +136,7 @@ is inside this editor, and the file is not changed.
 
 ## Importing
 
-**Import...** in the Decks drawer picks a `.md` or `.pptx` file on this
+**Import...** (File menu, welcome screen, Decks drawer) picks a `.md` or `.pptx` file on this
 computer and writes `<file name>/index.html` (a free folder name) into the
 current folder, built on the blank template, so the result looks like a deck
 made with New and everything in it is editable. Pictures are copied into the
@@ -271,13 +291,13 @@ the file self-contained and the DOM predictable for the round trip.
 
 | Keys | Action |
 |---|---|
-| Ctrl+O | Decks drawer. Tab reaches each deck (Enter opens it) and its Rename and Duplicate |
+| Ctrl+O | Decks drawer (File > Open...). Tab reaches each deck (Enter opens it) and its Rename and Duplicate |
 | Tab in the panels | Every control is reachable: the colour swatches (named by colour, "Ink 2 #3d3c3a"), the marks that put a field back to the deck's value, the section headings. A control reached with Tab keeps its keys: Enter and Space press it, arrows and Delete are not the canvas's. After a mouse click in a panel the canvas keys work as before |
 | Ctrl+\ | Hide or show both side panels. The status bar has a button for each; drag a panel's inner edge to resize it, double-click the edge to reset. A narrow window starts with the panels hidden |
 | Ctrl+T | Theme panel: the deck's variables, base text styles, custom CSS, saved themes |
 | Ctrl+S | Save (keeps a backup, see below) |
-| Ctrl+Shift+S | Save as: the deck with its unsaved edits under a new name or in another folder (Export menu too). The pictures, scripts, styles and fonts it uses are copied along, so the copy stands on its own; the editor then works on the copy and the original stays as last saved. A folder outside the current one becomes the current folder |
-| Ctrl+P | Export as PDF (Export menu: also a single self-contained HTML file) |
+| Ctrl+Shift+S | Save as: the deck with its unsaved edits under a new name or in another folder (File menu too). The pictures, scripts, styles and fonts it uses are copied along, so the copy stands on its own; the editor then works on the copy and the original stays as last saved. A folder outside the current one becomes the current folder |
+| Ctrl+P | Export as PDF (Export menu: also PDF with notes, a single self-contained HTML file, PowerPoint) |
 | F5 / Esc | Preview the deck as-is / back to the editor |
 | P, Shift+F5 | Presenter view in a second window (current and next slide, notes, timer); the same key in a saved deck on its own |
 | ? | Keyboard help; its second tab, About Diapo, shows the version and checks for updates (see Checking for updates) |
@@ -963,11 +983,11 @@ server asks Google which weights the family has, and it is added if it exists.
   machine that does not have the font.
 
 `app/templates/blank.html` is a complete reference deck that follows this contract;
-"New" in the Decks drawer creates a deck from it, or from one of the templates below.
+New deck (File menu, welcome screen) creates a deck from it, or from one of the templates below.
 
 ## Templates
 
-New > Template offers, besides Blank, twenty-six of the editor's own designs and five
+The New deck gallery offers, besides Blank, twenty-six of the editor's own designs and five
 adapted from [beautiful-html-templates](https://github.com/zarazhangrui/beautiful-html-templates)
 (MIT; the licence is in `app/templates/LICENSE-beautiful-html-templates.txt`).
 
@@ -1038,7 +1058,8 @@ wrappers and rewrites JS-driven decoration (8-Bit Orbit's stars, particles and
 charts) as markup and CSS. `node tools/import-bht.js --fetch` downloads the
 sources into `tools/bht-src/`; without `--fetch` it converts what is there.
 Adding another template is one entry in its `TEMPLATES` table plus a line in
-`app/templates/templates.json` and a preview in `app/templates/previews/`.
+`app/templates/templates.json` (with its `tone`, light or dark, and its
+`style` for the gallery's filters) and a preview in `app/templates/previews/`.
 
 ## Exporting
 
@@ -1088,7 +1109,7 @@ name and skip the dialog.
   away until the deck is opened again. Saving a deck updates an older script
   by itself, so decks keep up with the editor without being asked; the
   Presenter menu has the same action for a deck that never had the script.
-- **Export > Previous versions...** lists those backups, newest first, each
+- **File > Previous versions...** lists those backups, newest first, each
   with its time, title and slide count. **Open a copy** puts the version
   beside the deck as `<name> (<date> <time>).html` and opens it; **Restore**
   makes it the deck again (the current file becomes the newest previous
@@ -1105,7 +1126,7 @@ name and skip the dialog.
   Windows, not in the deck's) or a control character is refused, and so are
   the names Windows keeps for devices (`CON`, `NUL`, `COM1`...). Save as takes
   a name or a full path, never a drive without one.
-- The server refuses to write a file outside the workspace, or a body that does not
+- The server refuses to write a file outside the folder of decks, or a body that does not
   contain `deck-stage`. Writes go through a temporary file, so a crash cannot leave
   a truncated deck.
 - Unsaved edits are autosaved after a short pause to
@@ -1113,10 +1134,10 @@ name and skip the dialog.
   to restore or discard the draft; saving removes it, and so does undoing back
   to the saved state. (The draft is a complete deck file, so structural edits
   such as added slides survive too.)
-- **Rename** (Decks drawer) takes the deck's history along: its previous
+- **Rename** (File menu for the open deck, or a deck's row in the Decks drawer) takes the deck's history along: its previous
   versions and draft in `.deck-editor/`, its trust (scripts in decks) and its
   place in Recent. A change of case only works too.
-- **Duplicate** (Decks drawer) copies the HTML file only; the copy shares
+- **Duplicate** (File menu, or the Decks drawer) copies the HTML file only; the copy shares
   `assets/` and `fonts/` with the original, so a picture replaced in one shows
   in both. **Save as** (Ctrl+Shift+S) is the way to make an independent copy:
   it writes the live deck under a new name or folder and copies the local
@@ -1246,7 +1267,7 @@ deck-editor/
     known-scripts.json  hashes of earlier editions of Diapo's scripts (see Scripts in decks)
     brand/            the logo: mark.svg (favicon, no word), logo.svg (the mount with DIAPO, outlined), loader.svg (the loading mark, animated), Anton, its face; icon.ico for the exe and icon-256/512.png for the page and its manifest
     editor.css
-    editor.js         boot, layout, drawer, keyboard map
+    editor.js         boot, layout, File menu, welcome screen, drawer, keyboard map
     core/
       api.js          the only module that talks to serve.py
       document.js     deck loading, slide model, navigation, serialisation
@@ -1266,7 +1287,8 @@ deck-editor/
       fonts.js        the font block, Google Fonts URLs, self-hosting, the picker
       export.js       the printable copy, PDF, single-file export
       layouts.js      slide layouts and their picker sketches
-      previews.js     what a deck is called, and the picture of its first slide in the Decks drawer
+      previews.js     what a deck is called, and the picture of its first slide (drawer, welcome screen) or of a template's slides (gallery)
+      gallery.js      New deck: the gallery of designs, its filters and keys
       editops.js      copy / cut / paste, delete, layer order, group / ungroup
       loader.js       the loading mark: the mount turning until it is upright (brand/loader.svg)
   import_deck.py      Markdown -> deck, the deck builder, the .pptx dispatch (used by serve.py)

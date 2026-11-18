@@ -58,7 +58,7 @@ def main():
         sys.exit("PyInstaller failed")
     exe = os.path.join(HERE, "dist", "diapo" + (".exe" if sys.platform == "win32" else ""))
     print("\nBuilt", exe, f"({os.path.getsize(exe) // (1024 * 1024)} MB)")
-    print("Start it with a folder of decks as the argument, or double-click it and choose the folder in the Decks drawer.")
+    print("Start it with a folder of decks as the argument, or double-click it and choose the folder with File > Change folder.")
 
 
 if __name__ == "__main__":

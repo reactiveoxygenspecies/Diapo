@@ -26,10 +26,29 @@
       <span class="brand-name">Diapo</span>
     </div>
     <span class="tb-sep"></span>
-    <button class="tb-btn" id="btnFiles" title="Decks in this workspace (Ctrl+O)">
-      <svg viewBox="0 0 20 20"><path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4l2 2h7A1.5 1.5 0 0 1 18 7.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 15.5z"/></svg>
-      <span>Decks</span>
-    </button>
+    <!-- File: making, opening and keeping decks, and the folder they live in (Export holds only the exports). -->
+    <div class="tb-menu" id="fileMenu">
+      <button class="tb-btn" id="btnFile" title="New, open, save, and the folder your decks are in" aria-haspopup="true" aria-expanded="false">
+        <svg viewBox="0 0 20 20"><path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4l2 2h7A1.5 1.5 0 0 1 18 7.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 15.5z"/></svg>
+        <span>File</span>
+      </button>
+      <div class="tb-dropdown file-menu" hidden>
+        <button data-f="new" title="Start a deck from one of the designs, or a blank one">New deck...</button>
+        <button data-f="open" title="The decks in this folder and the ones you opened last">Open... <span class="hint">Ctrl+O</span></button>
+        <button data-f="openfile" title="Choose a deck file anywhere on this computer; its folder becomes the current one">Open a file...</button>
+        <button data-f="import" title="Make a deck from a Markdown (.md) or PowerPoint (.pptx) file">Import...</button>
+        <hr>
+        <button data-f="save">Save <span class="hint">Ctrl+S</span></button>
+        <button data-f="saveas" title="The deck with its unsaved edits under a new name or in another folder, its pictures and fonts copied along">Save as... <span class="hint">Ctrl+Shift+S</span></button>
+        <button data-f="versions" title="The copies kept by your last saves: open one, or bring it back">Previous versions...</button>
+        <hr>
+        <button data-f="rename">Rename...</button>
+        <button data-f="duplicate">Duplicate...</button>
+        <hr>
+        <button data-f="folder" title="Choose the folder that holds your decks">Change folder...</button>
+        <div class="insp-hint file-folder" id="fileFolder"></div>
+      </div>
+    </div>
     <div class="tb-file">
       <span id="fileName" class="tb-filename">No deck open</span>
       <span id="dirtyDot" class="dirty-dot" title="Unsaved changes" hidden></span>
@@ -124,9 +143,6 @@
     <div class="tb-menu" id="exportMenu">
       <button class="tb-btn" id="btnExport" data-needs-deck disabled title="Export the deck as PowerPoint, a PDF or a single HTML file">Export</button>
       <div class="tb-dropdown" hidden>
-        <button data-x="saveas">Save as... <span class="hint">Ctrl+Shift+S</span></button>
-        <button data-x="versions">Previous versions...</button>
-        <hr>
         <button data-x="pdf">PDF... <span class="hint">Ctrl+P</span></button>
         <button data-x="handout">PDF with notes (handout)...</button>
         <button data-x="html">Single HTML file...</button>
@@ -162,8 +178,10 @@
         <div id="overlay"></div>
       </div>
     </div>
+    <!-- The welcome screen: the home while no deck is open (the drawer stays closed). editor.js fills
+         the folder's name, the recent decks and the folder's newest decks. -->
     <div id="canvasEmpty" class="canvas-empty">
-      <div>
+      <div class="home">
         <!-- The logo: the word reversed out of the mount's window, the margin print (the version, set by editor.js) and the date stamp (set to this month by editor.js). -->
         <h1 class="mount" aria-label="Diapo">
           <span class="mount-print a">36 × 24</span><span class="mount-print b" id="brandVersion">N° 001</span>
@@ -171,13 +189,16 @@
           <span class="mount-print c">DIAPOSITIVE</span><span class="mount-stamp" id="brandStamp">SEP 26</span>
           <i class="mount-notch"></i>
         </h1>
-        <p>Open a deck, start a new one, or take the tour.</p>
+        <p>Start a new deck, open one, or take the tour.</p>
         <div class="canvas-empty-actions">
-          <button class="tb-btn primary" id="btnEmptyOpen">Open a deck</button>
-          <button class="tb-btn" id="btnEmptyNew">New deck</button>
-          <button class="tb-btn" id="btnEmptySample">Try the sample deck</button>
+          <button class="tb-btn primary" id="btnEmptyNew" title="Start from one of the designs, or a blank deck">New deck...</button>
+          <button class="tb-btn" id="btnEmptyOpen" title="Choose a deck file anywhere on this computer">Open...</button>
+          <button class="tb-btn" id="btnEmptyImport" title="Make a deck from a Markdown (.md) or PowerPoint (.pptx) file">Import...</button>
+          <button class="tb-btn" id="btnEmptySample" title="A tour of Diapo, in a folder of its own: edit it freely">Try the sample deck</button>
         </div>
-        <p class="insp-hint">Or import a Markdown or PowerPoint file from the Decks drawer.</p>
+        <div class="home-folder">Your decks are in <b id="homeFolder"></b> <button type="button" class="link-btn" id="btnHomeFolder">Change folder...</button></div>
+        <section id="homeRecent" class="home-section" aria-label="Recent decks"></section>
+        <section id="homeDecks" class="home-section" aria-label="Decks in this folder"></section>
       </div>
     </div>
     <!-- While a deck opens (body.opening): the loader, filled in by editor.js. -->
@@ -195,7 +216,7 @@
 
 <footer id="statusbar">
   <button class="panel-toggle" id="btnToggleStrip" title="Show or hide the slide strip (Ctrl+\ hides or shows both panels)">&#9664; Slides</button>
-  <span id="statusWorkspace" class="status-path" title="Workspace folder"></span>
+  <span id="statusFolder" class="status-path"></span>
   <span id="statusBusy" class="status-busy" hidden></span>
   <span id="statusMsg"></span>
   <button class="problems-badge" id="problemsBadge" title="Missing files and script errors in this deck" hidden></button>
@@ -221,7 +242,7 @@
 </footer>
 
 <!-- ======================================================
-     File drawer: decks in the workspace
+     Decks drawer: the deck list while a deck is open (Ctrl+O, File > Open)
      ====================================================== -->
 <div id="drawer" class="drawer" role="dialog" aria-modal="true" aria-label="Decks" hidden>
   <div class="drawer-panel">
@@ -233,26 +254,15 @@
     </div>
     <div class="drawer-body">
     <div class="drawer-open">
-      <button class="tb-btn primary" id="btnPickFile" title="Choose a deck file anywhere on this computer">Open deck&hellip;</button>
-      <button class="tb-btn" id="btnPickFolder" title="Choose the folder that holds your decks">Browse folder&hellip;</button>
-      <button class="tb-btn" id="btnNewDeck" title="New deck from the blank template">New</button>
+      <button class="tb-btn primary" id="btnPickFile" title="Choose a deck file anywhere on this computer">Open a file&hellip;</button>
+      <button class="tb-btn" id="btnNewDeck" title="Start from one of the designs, or a blank deck">New deck&hellip;</button>
       <button class="tb-btn" id="btnImport" title="Make a deck from a Markdown (.md) or PowerPoint (.pptx) file">Import&hellip;</button>
-    </div>
-    <div id="drawerNew" class="drawer-new" hidden>
-      <label for="newDeckName">New deck name</label>
-      <div class="drawer-new-row">
-        <input id="newDeckName" type="text" placeholder="my-talk" spellcheck="false" autocomplete="off">
-        <button class="mini-btn" id="btnNewCreate">Create</button>
-        <button class="mini-btn" id="btnNewCancel">Cancel</button>
-      </div>
-      <label style="margin-top:10px;display:block">Template</label>
-      <div class="tpl-grid" id="newDeckTemplates" role="radiogroup"></div>
-      <div class="insp-hint">Created as a folder with index.html inside <span id="newDeckWhere"></span></div>
     </div>
     <div id="drawerRecent" class="drawer-recent"></div>
     <div class="drawer-ws">
-      <label for="drawerWs">Folder</label>
-      <input id="drawerWs" type="text" spellcheck="false" placeholder="Paste a folder path and press Enter">
+      <span class="drawer-ws-label">Folder</span>
+      <b id="drawerFolder" class="folder-name"></b>
+      <button class="mini-btn" id="btnPickFolder" title="Choose the folder that holds your decks">Change folder&hellip;</button>
       <button class="mini-btn" id="btnRefresh" title="Reload the list">&#8635;</button>
     </div>
     <input id="drawerFilter" class="drawer-filter" type="search" placeholder="Filter decks in this folder" autocomplete="off">
@@ -260,6 +270,35 @@
     </div>
   </div>
   <div class="drawer-backdrop"></div>
+</div>
+
+<!-- ======================================================
+     New deck: the gallery of designs (core/gallery.js)
+     ====================================================== -->
+<div id="gallery" class="gallery" role="dialog" aria-modal="true" aria-labelledby="galleryTitle" hidden>
+  <div class="gallery-backdrop"></div>
+  <div class="gallery-card">
+    <div class="gallery-head">
+      <h2 id="galleryTitle">New deck</h2>
+      <div class="gallery-filters" role="toolbar" aria-label="Show the designs">
+        <div class="seg" id="galleryTones" role="group" aria-label="Background"></div>
+        <div class="seg" id="galleryStyles" role="group" aria-label="Style"></div>
+        <span class="gallery-count" id="galleryCount"></span>
+      </div>
+      <button class="mini-btn" id="btnGalleryClose" title="Close (Esc)" aria-label="Close">&times;</button>
+    </div>
+    <div class="gallery-main">
+      <div class="gallery-grid" id="galleryGrid" role="listbox" aria-label="Designs"></div>
+      <aside class="gallery-detail" id="galleryDetail" aria-live="polite"></aside>
+    </div>
+    <div class="gallery-foot">
+      <label for="galleryName">Name</label>
+      <input id="galleryName" type="text" placeholder="my-talk" spellcheck="false" autocomplete="off">
+      <span class="gallery-where" id="galleryWhere"></span>
+      <button class="tb-btn" id="btnGalleryCancel">Cancel</button>
+      <button class="tb-btn primary" id="btnGalleryCreate">Create</button>
+    </div>
+  </div>
 </div>
 
 <!-- Draft restore bar, help overlay and toast are created by editor.js -->

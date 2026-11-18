@@ -10,17 +10,23 @@ on a Mac). With Chrome or Edge on the computer, Diapo opens in a window of its
 own and closing it quits Diapo; without them it opens in a tab of your usual
 browser.
 
-The first time, try **Try the sample deck**: a tour of the editor, made with the
-editor, that you can change freely. Your own decks never mix with it.
+Diapo opens on its welcome screen: **New deck**, **Open**, **Import** and **Try
+the sample deck**, the folder your decks are in (with **Change folder...**), and
+your recent decks with a picture of their first slide. The first time, try **Try
+the sample deck**: a tour of the editor, made with the editor, that you can
+change freely. Your own decks never mix with it.
 
 ## Your first deck
 
-1. **Decks** (top left, or Ctrl+O) lists the decks in your folder by name, with
-   a picture of the first slide. **Browse folder...** picks another folder.
-2. **New** asks for a name and a design: Blank, or one of the templates. The
-   deck is a folder with an `index.html` inside, named as you typed.
-3. **Import...** turns a PowerPoint (.pptx) or Markdown (.md) file into a deck
-   you can edit like any other.
+1. **New deck** (on the welcome screen, or in the **File** menu, top left) shows
+   the designs in a large gallery: filter them by Light or Dark and by style,
+   look at one more closely, type a name and press **Create**. The deck is a
+   folder with an `index.html` inside, named as you typed. Arrows, Enter and
+   Tab do it all from the keyboard.
+2. **File > Open...** (Ctrl+O) lists the decks in your folder by name, with a
+   picture of the first slide. **File > Change folder...** picks another folder.
+3. **File > Import...** turns a PowerPoint (.pptx) or Markdown (.md) file into a
+   deck you can edit like any other.
 
 A deck is one HTML file (plus its `assets/` folder for pictures). It opens in
 any browser, without Diapo, and presents on its own.
@@ -63,16 +69,17 @@ any browser, without Diapo, and presents on its own.
 
 ## Save and share
 
-- **Save** (Ctrl+S) writes the deck. The version before is kept: **Export >
-  Previous versions** lists them and brings one back.
+- **Save** (Ctrl+S) writes the deck. The version before is kept: **File >
+  Previous versions** lists them and brings one back. The **File** menu also
+  renames and duplicates the deck.
 - Unsaved changes are kept aside as you work; if the window closes, Diapo
   offers them back the next time the deck opens.
 - **Export > PDF** (Ctrl+P) prints one page per slide; **PDF with notes** adds
   your speaker notes under each slide.
 - **Export > Single HTML file** puts everything (pictures, fonts) into one file
   to send by email or put online.
-- **Save as** (Ctrl+Shift+S) copies the deck with its pictures to another name
-  or folder.
+- **File > Save as** (Ctrl+Shift+S) copies the deck with its pictures to another
+  name or folder.
 
 ## A deck with scripts of its own
 

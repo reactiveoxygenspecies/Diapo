@@ -1,5 +1,6 @@
 /* ============================================================
-   editor.js - boot, layout, file drawer, keyboard map.
+   editor.js - boot, layout, File menu, welcome screen, file drawer,
+   keyboard map.
 
    The modules under core/ each own one concern and get the shared
    `app` object; this file wires them to the DOM of index.html.
@@ -31,6 +32,7 @@ import { EditOps } from './core/editops.js';
 import { Problems } from './core/problems.js';
 import { readableText } from './core/dom.js';
 import { deckName, DeckPreviews } from './core/previews.js';
+import { TemplateGallery } from './core/gallery.js';
 import { loader } from './core/loader.js';
 import { DeckTabs } from './core/tabs.js';
 import { FileDrop } from './core/filedrop.js';
@@ -509,6 +511,7 @@ function unloadDeck() {
     $('fileName').textContent = 'No deck open'; $('fileName').title = '';
     showStatusFolder();
     refreshDirty();
+    refreshFiles();                    // the welcome screen's recent decks include the one just closed
     const url = new URL(location.href);
     url.searchParams.delete('file');
     history.replaceState(null, '', url);
@@ -569,12 +572,23 @@ function showDeckName() {
     showStatusFolder();
     refreshDirty();
 }
-/* The status bar's folder: the workspace, or, while the tour is open, where the tour is (a
-   folder of its own; Save as puts a copy anywhere). */
+/* The status bar's folder: the folder of decks by its name (the whole path on hover), or, while
+   the tour is open, where the tour is (a folder of its own; Save as puts a copy anywhere). The
+   drawer and the welcome screen name it the same way. */
 function showStatusFolder() {
     const tour = !!app.file && app.file.startsWith('@diapo/');
-    $('statusWorkspace').textContent = tour ? 'Diapo tour, in a folder of its own' : app.workspace;
-    $('statusWorkspace').title = tour ? 'The tour is a copy of its own, outside your folders. Save as puts a copy anywhere.' : app.workspace;
+    $('statusFolder').textContent = tour ? 'Diapo tour, in a folder of its own' : folderName(app.workspace);
+    $('statusFolder').title = tour ? 'The tour is a copy of its own, outside your folders. Save as puts a copy anywhere.' : 'Your decks are in ' + app.workspace;
+    for (const id of ['drawerFolder', 'homeFolder']) {
+        $(id).textContent = folderName(app.workspace);
+        $(id).title = app.workspace;
+    }
+}
+/* "C:\Users\me\Talks" -> "Talks"; a drive or the root keeps its whole name. */
+export function folderName(p) {
+    const parts = String(p || '').split(/[\\/]/).filter(Boolean);
+    if (!parts.length) return p || '';
+    return parts.length === 1 ? String(p) : parts[parts.length - 1];
 }
 function fullPathOf(workspace, file) {
     const sep = (workspace || '').includes('\\') ? '\\' : '/';          // the machine's own separator
@@ -595,7 +609,6 @@ async function refreshFiles() {
         app.workspace = s.workspace;
         recentList = s.recent || [];
         showStatusFolder();
-        if (document.activeElement !== $('drawerWs')) $('drawerWs').value = s.workspace;
         const r = await api.list('');
         fileList = r.files;
     } catch (err) {
@@ -604,6 +617,7 @@ async function refreshFiles() {
     }
     renderRecent();
     renderFiles();
+    renderHome();
 }
 
 function renderRecent() {
@@ -710,7 +724,7 @@ function renderFiles() {
     const list = $('drawerList');
     const otherToggle = others ? `<button type="button" class="drawer-other" data-other>${drawerPrefs.other ? 'Hide' : 'Show'} ${others} other HTML file${others === 1 ? '' : 's'}</button>` : '';
     if (!items.length) {
-        const empty = shown.length ? 'No deck matches the filter.' : fileList.length ? 'No decks in this folder.' : 'No .html files in this workspace yet. Click New to create one.';
+        const empty = shown.length ? 'No deck matches the filter.' : 'No decks in this folder yet. New makes one here; Change folder looks elsewhere.';
         list.innerHTML = `<div class="drawer-empty">${empty}</div>${otherToggle}`;
         return;
     }
@@ -731,18 +745,27 @@ function renderFiles() {
     previews.watch(list);
 }
 
+/* The drawer is the deck list while a deck is open (Ctrl+O, File > Open...). With no deck open
+   the welcome screen is the home and the drawer stays closed until asked for. */
 function showDrawer(on) {
+    if (on) { showFileMenu(false); if (app.gallery) app.gallery.close(); }
     $('drawer').hidden = !on;
     if (on) { refreshFiles(); $('drawerFilter').focus(); }
 }
 
+/* A recent deck: its folder becomes the current one first (the tour opens from any folder). */
+async function openRecent(ws, path) {
+    const sample = path.startsWith('@diapo/');
+    if (!sample && ws !== app.workspace && !(await switchWorkspace(ws))) return;
+    if (await openDeck(path)) showDrawer(false);
+}
 $('drawerRecent').addEventListener('click', async (e) => {
     const row = e.target.closest('.drawer-file'); if (!row) return;
-    const sample = row.dataset.path.startsWith('@diapo/');            // the sample deck opens from any workspace
-    if (!sample && row.dataset.ws !== app.workspace && !(await switchWorkspace(row.dataset.ws))) return;
-    if (await openDeck(row.dataset.path)) showDrawer(false);
+    await openRecent(row.dataset.ws, row.dataset.path);
 });
-$('btnPickFile').addEventListener('click', async () => {
+
+/* Open a deck file anywhere on this computer (the system's dialog); its folder becomes the current one. */
+async function pickDeckFile() {
     try {
         let r = await withDialogFallback(() => api.pickFile(), 'Full path of the deck (.html) to open:');
         if (r.cancelled) return;
@@ -755,8 +778,9 @@ $('btnPickFile').addEventListener('click', async () => {
         await refreshFiles();
         if (await openDeck(r.file)) showDrawer(false);
     } catch (err) { toast(err.message, { error: true, ms: 5000 }); }
-});
-$('btnPickFolder').addEventListener('click', async () => {
+}
+/* Change folder: the system's folder dialog, or a typed path where there is none. */
+async function changeFolder() {
     try {
         const r = await withDialogFallback(() => api.pickWorkspace(), 'Full path of the folder that holds your decks:');
         if (r.cancelled) return;
@@ -764,14 +788,29 @@ $('btnPickFolder').addEventListener('click', async () => {
         app.workspace = r.workspace;
         await refreshFiles();
     } catch (err) { toast(err.message, { error: true, ms: 5000 }); }
-});
-$('drawerWs').addEventListener('keydown', async (e) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    const v = $('drawerWs').value.trim();
-    if (v && v !== app.workspace) await switchWorkspace(v);
-});
-$('drawerWs').addEventListener('blur', () => { $('drawerWs').value = app.workspace; });
+}
+$('btnPickFile').addEventListener('click', pickDeckFile);
+$('btnPickFolder').addEventListener('click', changeFolder);
+
+/* Rename and Duplicate: from a deck's row in the drawer, or from the File menu for the open deck. */
+async function renameDeck(path) {
+    const name = prompt('New file name:', path.split('/').pop());
+    if (!name || name === path.split('/').pop()) return;
+    try {
+        const r = await api.rename(path, name);
+        tabs.renamed(path, r.file);
+        if (app.file === path) { app.file = r.file; app.deck.file = r.file; showDeckName(); const u = new URL(location.href); u.searchParams.set('file', r.file); history.replaceState(null, '', u); }
+        toast('Renamed to ' + r.file);
+        refreshFiles();
+    } catch (err) { toast(err.message, { error: true }); }
+}
+async function duplicateDeck(path) {
+    const base = path.split('/').pop().replace(/\.html$/i, '');
+    const name = prompt('Name for the copy:', base + ' copy.html');
+    if (!name) return;
+    try { const r = await api.duplicate(path, name); toast('Created ' + r.file); refreshFiles(); }
+    catch (err) { toast(err.message, { error: true }); }
+}
 
 $('drawerList').addEventListener('click', async (e) => {
     const fold = e.target.closest('[data-fold]');
@@ -780,87 +819,86 @@ $('drawerList').addEventListener('click', async (e) => {
     const row = e.target.closest('.drawer-file'); if (!row) return;
     const path = row.dataset.path;
     const act = e.target.closest('[data-act]')?.dataset.act;
-    if (act === 'rename') {
-        const name = prompt('New file name:', path.split('/').pop());
-        if (!name || name === path.split('/').pop()) return;
-        try {
-            const r = await api.rename(path, name);
-            tabs.renamed(path, r.file);
-            if (app.file === path) { app.file = r.file; app.deck.file = r.file; showDeckName(); const u = new URL(location.href); u.searchParams.set('file', r.file); history.replaceState(null, '', u); }
-            toast('Renamed to ' + r.file);
-            refreshFiles();
-        } catch (err) { toast(err.message, { error: true }); }
-        return;
-    }
-    if (act === 'dup') {
-        const base = path.split('/').pop().replace(/\.html$/i, '');
-        const name = prompt('Name for the copy:', base + ' copy.html');
-        if (!name) return;
-        try { const r = await api.duplicate(path, name); toast('Created ' + r.file); refreshFiles(); }
-        catch (err) { toast(err.message, { error: true }); }
-        return;
-    }
+    if (act === 'rename') return renameDeck(path);
+    if (act === 'dup') return duplicateDeck(path);
     if (row.classList.contains('other')) { toast(path.split('/').pop() + ' is a web page, not a deck: Diapo opens decks built on its slide stage.', { ms: 5000 }); return; }
     if (await openDeck(path)) showDrawer(false);
 });
 
-/* New deck: an inline name field (no prompt). The deck is created as
-   <folder>/<name>/index.html inside the current folder; to create it
-   somewhere else, change the folder first with Browse. */
-$('btnNewDeck').addEventListener('click', () => {
-    const form = $('drawerNew');
-    form.hidden = !form.hidden;
-    if (!form.hidden) { $('newDeckWhere').textContent = app.workspace; $('newDeckName').value = ''; $('newDeckName').focus(); loadTemplates(); }
+/* ------------------------------------------------------------
+   Welcome screen: the home while no deck is open. The actions,
+   the folder by name, the recent decks and the newest decks of
+   the folder, each with the picture of its first slide.
+   ------------------------------------------------------------ */
+const HOME_DECKS = 8;
+const homePreviews = new DeckPreviews($('canvasEmpty'));
+function homeCard({ ws = '', path, title, when, here, full }) {
+    const date = when ? new Date(when * 1000).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '';
+    const where = path.startsWith('@diapo/') ? 'Diapo tour' : here ? '' : folderName(ws);
+    return `<button type="button" class="home-deck" data-ws="${escapeHtml(ws)}" data-path="${escapeHtml(path)}" title="${escapeHtml(full)}">
+        ${deckThumb(here ? path : '', when)}
+        <span class="name">${escapeHtml(deckName(path, title))}</span>
+        <span class="meta">${escapeHtml([where, date].filter(Boolean).join(' | '))}</span></button>`;
+}
+function renderHome() {
+    const recent = recentList.slice(0, HOME_DECKS).map(r => {
+        const sample = r.file.startsWith('@diapo/');
+        const here = sample || r.workspace === app.workspace;
+        return homeCard({ ws: r.workspace, path: r.file, title: r.title, when: r.when, here, full: sample ? 'The Diapo tour, in a folder of its own' : fullPathOf(r.workspace, r.file) });
+    });
+    $('homeRecent').innerHTML = recent.length ? `<h2>Recent</h2><div class="home-grid">${recent.join('')}</div>` : '';
+    // The folder's own decks, newest first, without the ones Recent already shows.
+    const seen = new Set(recentList.filter(r => r.workspace === app.workspace).map(r => r.file));
+    const decks = fileList.filter(f => f.deck !== false && !seen.has(f.path)).sort((a, b) => b.mtime - a.mtime);
+    const all = fileList.filter(f => f.deck !== false).length;
+    const cards = decks.slice(0, HOME_DECKS).map(f => homeCard({ ws: app.workspace, path: f.path, title: f.title, when: f.mtime, here: f.size <= PREVIEW_MAX_BYTES, full: fullPathOf(app.workspace, f.path) }));
+    const more = all > cards.length + seen.size || all > HOME_DECKS ? `<button type="button" class="link-btn" id="btnHomeAll">All ${all} decks in this folder...</button>` : '';
+    $('homeDecks').innerHTML = `<h2>In ${escapeHtml(folderName(app.workspace))}</h2>`
+        + (cards.length ? `<div class="home-grid">${cards.join('')}</div>${more}`
+            : all ? more || '<p class="home-empty">Every deck in this folder is under Recent.</p>'
+                : '<p class="home-empty">No decks in this folder yet. New deck makes one here; Import turns a PowerPoint or Markdown file into one.</p>');
+    homePreviews.watch($('canvasEmpty'));
+}
+$('canvasEmpty').addEventListener('click', async (e) => {
+    if (e.target.closest('#btnHomeAll')) { showDrawer(true); return; }
+    const card = e.target.closest('.home-deck'); if (!card) return;
+    await openRecent(card.dataset.ws || app.workspace, card.dataset.path);
 });
-/* The template cards: app/templates/templates.json lists them, previews/<slug>.jpg shows the title slide. */
-let templatesLoaded = false, templateList = [];
+
+/* New deck: the gallery of designs (core/gallery.js). The deck is created as
+   <folder>/<name>/index.html inside the current folder; to create it somewhere
+   else, change the folder first. */
+let templateList = [];
 async function fetchTemplates() {
     if (!templateList.length) templateList = (await fetch('/templates/templates.json', { cache: 'no-store' }).then(r => r.json())).templates || [];
     return templateList;
 }
 fetchTemplates().catch(() => {});          // the palette lists them without waiting
-async function loadTemplates() {
-    if (templatesLoaded) return;
-    try {
-        const data = { templates: await fetchTemplates() };
-        const grid = $('newDeckTemplates');
-        grid.innerHTML = data.templates.map((t, i) => `<label class="tpl-card" title="${escapeAttr(t.tagline)}">
-            <input type="radio" name="newDeckTemplate" value="${escapeAttr(t.slug)}"${i === 0 ? ' checked' : ''}>
-            <img src="/templates/previews/${escapeAttr(t.slug)}.jpg" alt="" loading="lazy">
-            <span class="tpl-name">${escapeHtml(t.name)}</span>
-            <span class="tpl-meta">${t.slides} slides</span>
-        </label>`).join('');
-        templatesLoaded = true;
-    } catch (e) { /* the blank template still works without the list */ }
-}
-/* The New form opened with one template chosen (from the palette). */
-async function newDeckFrom(slug) {
-    showDrawer(true);
-    if ($('drawerNew').hidden) $('btnNewDeck').click();
-    await loadTemplates();
-    const r = $('newDeckTemplates').querySelector(`input[value="${CSS.escape(slug)}"]`);
-    if (r) { r.checked = true; r.closest('.tpl-card').scrollIntoView({ block: 'nearest' }); }
-    $('newDeckName').focus();
-}
-function selectedTemplate() { const r = $('newDeckTemplates').querySelector('input:checked'); return r && r.value !== 'blank' ? r.value : ''; }
-$('btnNewCancel').addEventListener('click', () => { $('drawerNew').hidden = true; });
-$('newDeckName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('btnNewCreate').click(); } if (e.key === 'Escape') { e.stopPropagation(); $('drawerNew').hidden = true; } });
-$('btnNewCreate').addEventListener('click', async () => {
-    const name = $('newDeckName').value.trim().replace(/\.html$/i, '');
-    if (!name) { $('newDeckName').focus(); return; }
-    if (/[\\/:*?"<>|]/.test(name)) { toast('Type a name, not a path. Use Browse folder to choose where decks live.', { error: true, ms: 4500 }); return; }
-    try {
-        const r = await api.newDeck(name + '/index.html', selectedTemplate());
-        $('drawerNew').hidden = true;
-        toast('Created ' + r.file);
-        if (await openDeck(r.file)) showDrawer(false);
-    } catch (err) { toast(err.message, { error: true }); }
+app.gallery = new TemplateGallery($('gallery'), {
+    templates: fetchTemplates,
+    folder: () => ({ name: folderName(app.workspace), path: app.workspace }),
+    create: async (name, slug) => {
+        if (/[\\/:*?"<>|]/.test(name)) { toast('Type a name, not a path. Change folder (File menu) chooses where decks live.', { error: true, ms: 4500 }); return false; }
+        try {
+            const r = await api.newDeck(name + '/index.html', slug === 'blank' ? '' : slug);
+            toast('Created ' + deckName(r.file, '') + ' in ' + folderName(app.workspace));
+            if (await openDeck(r.file)) showDrawer(false);
+            return true;
+        } catch (err) { toast(err.message, { error: true }); return false; }
+    },
 });
+/* The gallery, opened with one design chosen (from the palette) or with the last choice. */
+export function newDeck(slug = '') {
+    showFileMenu(false);
+    $('drawer').hidden = true;
+    app.gallery.open(slug);
+}
+$('btnNewDeck').addEventListener('click', () => newDeck());
 
 /* Import: a native dialog on this machine picks a .md or .pptx; the server converts it into
    <name>/index.html in the current folder and the deck opens. Picking and converting are two
    calls, so the loader shows for the conversion only, not while the dialog is open. */
-$('btnImport').addEventListener('click', async () => {
+async function importDeck() {
     try {
         const pick = await withDialogFallback(() => api.importPick(), 'Full path of the Markdown (.md) or PowerPoint (.pptx) file to import:');
         if (pick.cancelled) return;
@@ -870,7 +908,8 @@ $('btnImport').addEventListener('click', async () => {
         status('');
         await afterImport(r);
     } catch (err) { status(''); toast('Import failed: ' + err.message, { error: true, ms: 7000 }); }
-});
+}
+$('btnImport').addEventListener('click', importDeck);
 /* An imported deck: say what the import noted, list it, open it in a tab of its own. */
 async function afterImport(r) {
     const notes = r.notes && r.notes.length ? ' | ' + r.notes.slice(0, 3).join(' | ') + (r.notes.length > 3 ? ` | +${r.notes.length - 3} more` : '') : '';
@@ -895,9 +934,43 @@ async function importDroppedDecks(files) {
     }
 }
 
-$('btnFiles').addEventListener('click', () => showDrawer(true));
-$('btnEmptyOpen').addEventListener('click', () => showDrawer(true));
-$('btnEmptyNew').addEventListener('click', () => { showDrawer(true); $('btnNewDeck').click(); });
+/* The File menu: making, opening and keeping decks, and the folder they live in. What needs an
+   open deck is off without one; the tour has no file of yours to rename or duplicate. */
+function showFileMenu(on) {
+    const dd = $('fileMenu').querySelector('.tb-dropdown');
+    dd.hidden = !on;
+    $('btnFile').setAttribute('aria-expanded', String(on));
+    if (!on) return;
+    const open = app.deck.isOpen && !!app.file, tour = open && app.file.startsWith('@diapo/');
+    for (const b of dd.querySelectorAll('[data-f]')) {
+        const needs = ['save', 'saveas', 'versions'].includes(b.dataset.f) ? open : ['rename', 'duplicate'].includes(b.dataset.f) ? open && !tour : true;
+        b.disabled = !needs;
+    }
+    $('fileFolder').textContent = 'Folder: ' + folderName(app.workspace);
+    $('fileFolder').title = app.workspace;
+}
+$('btnFile').addEventListener('click', () => showFileMenu($('fileMenu').querySelector('.tb-dropdown').hidden));
+document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#fileMenu')) showFileMenu(false); }, true);
+$('fileMenu').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-f]'); if (!b || b.disabled) return;
+    showFileMenu(false);
+    switch (b.dataset.f) {
+        case 'new': newDeck(); break;
+        case 'open': showDrawer(true); break;
+        case 'openfile': await pickDeckFile(); break;
+        case 'import': await importDeck(); break;
+        case 'save': await saveDeck(); break;
+        case 'saveas': await saveDeckAs(); break;
+        case 'versions': await showVersions(); break;
+        case 'rename': await renameDeck(app.file); break;
+        case 'duplicate': await duplicateDeck(app.file); break;
+        case 'folder': await changeFolder(); break;
+    }
+});
+$('btnEmptyNew').addEventListener('click', () => newDeck());
+$('btnEmptyOpen').addEventListener('click', pickDeckFile);
+$('btnEmptyImport').addEventListener('click', importDeck);
+$('btnHomeFolder').addEventListener('click', changeFolder);
 /* The sample deck: the tour of the editor (app/templates/welcome.html) copied to welcome/index.html
    in the current folder (reused when it is already there). */
 export async function openSampleDeck() {
@@ -909,7 +982,7 @@ export async function openSampleDeck() {
         try { made = await api.newDeck(file, 'welcome'); await refreshFiles(); } catch (err) { if (err.status !== 409) throw err; }
         if (await openDeck(file)) {
             showDrawer(false);
-            if (made && made.refreshed) toast('The tour is brought up to date with this Diapo; your earlier copy is under Export > Previous versions.', { ms: 6000 });
+            if (made && made.refreshed) toast('The tour is brought up to date with this Diapo; your earlier copy is under File > Previous versions.', { ms: 6000 });
             else if (made) toast('The sample deck has a folder of its own, outside your decks. Edit it freely; Save as puts a copy anywhere.', { ms: 6000 });
         }
     } catch (err) { toast('Could not create the sample deck: ' + err.message, { error: true, ms: 6000 }); }
@@ -953,7 +1026,7 @@ $('btnPreview').addEventListener('click', () => setPreview(true));
    Help overlay
    ------------------------------------------------------------ */
 const KEYS = [
-    ['Files', [['Ctrl+O', 'Open the deck list'], ['Ctrl+S', 'Save'], ['Ctrl+Shift+S', 'Save as: a new name or folder, with the deck\'s files copied along'], ['Ctrl+P', 'Export as PDF (Export menu: single HTML file)'], ['Ctrl+T', 'Theme panel (colours, fonts, base styles)'], ['F5', 'Preview'], ['P / Shift+F5', 'Presenter view (second window)'], ['Esc', 'Leave preview, close dialogs, deselect']]],
+    ['Files', [['Ctrl+O', 'Open the deck list (File menu: New deck, Import, Change folder)'], ['Ctrl+S', 'Save'], ['Ctrl+Shift+S', 'Save as: a new name or folder, with the deck\'s files copied along'], ['Ctrl+P', 'Export as PDF (Export menu: single HTML file, PowerPoint)'], ['Ctrl+T', 'Theme panel (colours, fonts, base styles)'], ['F5', 'Preview'], ['P / Shift+F5', 'Presenter view (second window)'], ['Esc', 'Leave preview, close dialogs, deselect']]],
     ['Slides', [['PgUp / PgDn', 'Previous / next slide'], ['Home / End', 'First / last slide'], ['Ctrl+M', 'New slide (layout picker; Ctrl+Shift+M: blank)'], ['Ctrl+D', 'Duplicate (slide or selection)'], ['Ctrl+Up / Down', 'Move the slide, or the picked slides, up / down'], ['Ctrl+click / Shift+click a thumbnail', 'Pick several slides; drag one of them to move them all'], ['Shift+Up / Down (strip)', 'Pick one more or one fewer slide (Esc: none)']]],
     ['Canvas', [['Click', 'Select'], ['Shift+click', 'Add to the selection'], ['Ctrl+click', 'Select the exact element under the cursor (a plain drag then moves just that)'], ['Alt+drag', 'Duplicate what you drag'], ['Ctrl while dragging', 'Disable snapping'], ['Shift / Alt while resizing', 'Keep the aspect ratio (corners) / resize about the centre; both together, both'], ['Right-click', 'Element menu'], ['Drag on empty space', 'Marquee select'], ['Double-click / Enter', 'Edit text (Esc when done; Ctrl+B / I / U, Ctrl+Shift+X strike, Ctrl+Shift+= superscript, Ctrl+= subscript while editing)'], ['Arrows', 'Nudge 1px (Shift: 10px)'], ['Delete', 'Delete the selection (Hide is in the panel and the menu)'], ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste, also across slides; images and text from elsewhere paste too'], ['Ctrl+Alt+C / Ctrl+Alt+V', 'Copy the look of an element (colours, border, type, padding) / put it on the selection'], ['Ctrl+G / Ctrl+Shift+G', 'Group / ungroup'], ['Ctrl+] / Ctrl+[', 'Bring forward / send backward (Shift: to front / to back)'], ['Tab', 'Next sibling'], ['Ctrl+F / Ctrl+H', 'Find / find and replace across the deck (Enter / Shift+Enter: next / previous match; Esc closes)'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'], ['Ctrl++ / Ctrl+- / Ctrl+0', 'Zoom in / out / fit'], ['Space+drag, middle button, wheel', 'Pan when zoomed in (the middle button grabs the view)'], ['Ctrl+\\', 'Hide / show both side panels (drag their edges to resize)']]],
 ];
@@ -1132,6 +1205,8 @@ function onKey(e) {
         if (app.preview) { setPreview(false); return stop(e); }
         if (app.textEdit.active) { app.textEdit.commit(); return stop(e); }
         if (document.querySelector('.help')) { document.querySelector('.help').remove(); return stop(e); }
+        if (app.gallery.isOpen) { app.gallery.close(); return stop(e); }
+        if (!$('fileMenu').querySelector('.tb-dropdown').hidden) { showFileMenu(false); $('btnFile').focus(); return stop(e); }
         if (!$('drawer').hidden) { showDrawer(false); return stop(e); }
         if (app.strip.picker) { app.strip.closeLayoutPicker(); return stop(e); }
         if (app.strip.closeMenu()) return stop(e);                     // a thumbnail's menu, or Move to...
@@ -1155,7 +1230,8 @@ function onKey(e) {
     if (app.preview) return;                                       // the deck owns the keys in preview
     if (app.fontPicker && app.fontPicker.isOpen && !ctrl) return;  // the font picker owns arrows and Enter
     if (app.iconPicker && app.iconPicker.isOpen && !ctrl) return;  // so does the icon picker
-    if (ctrl && k.toLowerCase() === 'k') { stop(e); app.palette.toggle(); return; }
+    if (app.gallery.isOpen && !ctrl) return;                       // and the New deck gallery (its cards, its name field)
+    if (ctrl && k.toLowerCase() === 'k') { stop(e); if (app.gallery.isOpen) app.gallery.close(); app.palette.toggle(); return; }
     if (ctrl && k.toLowerCase() === 's') { stop(e); if (e.shiftKey) saveDeckAs(); else saveDeck(); return; }
     if (ctrl && k.toLowerCase() === 'o') { stop(e); showDrawer(true); return; }
     if (k === 'F5' && e.shiftKey) { stop(e); app.presenter.open(); return; }
@@ -1396,8 +1472,6 @@ document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#export
 $('exportMenu').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-x]'); if (!b) return;
     showExportMenu(false);
-    if (b.dataset.x === 'saveas') await saveDeckAs();
-    if (b.dataset.x === 'versions') await showVersions();
     if (b.dataset.x === 'pdf') await app.exporter.pdf();
     if (b.dataset.x === 'handout') await app.exporter.pdf({ handout: true });
     if (b.dataset.x === 'html') await app.exporter.standalone();
@@ -1594,11 +1668,13 @@ function paletteEntries() {
         out.push({ group: 'View', label: 'Undo', hint: 'Ctrl+Z', run: () => app.history.undo() });
         out.push({ group: 'View', label: 'Redo', hint: 'Ctrl+Y', run: () => app.history.redo() });
     }
-    out.push({ group: 'Decks', label: 'Open a deck (the drawer)', run: () => showDrawer(true) });
-    out.push({ group: 'Decks', label: 'New deck...', run: click('#btnNewDeck') });
-    // Every template: the New form opens with it chosen, waiting for a name.
-    for (const t of templateList) out.push({ group: 'Decks', label: 'New deck from the ' + t.name + ' template...', keywords: 'template design theme ' + (t.tagline || ''), quiet: true, run: () => newDeckFrom(t.slug) });
-    out.push({ group: 'Decks', label: 'Import a PowerPoint or Markdown file...', run: click('#btnImport') });
+    out.push({ group: 'Decks', label: 'Open a deck (the deck list)', hint: 'Ctrl+O', run: () => showDrawer(true) });
+    out.push({ group: 'Decks', label: 'Open a deck file anywhere on this computer...', keywords: 'browse', run: () => pickDeckFile() });
+    out.push({ group: 'Decks', label: 'New deck...', keywords: 'template design gallery create', run: () => newDeck() });
+    // Every template: the gallery opens with it chosen, waiting for a name.
+    for (const t of templateList) out.push({ group: 'Decks', label: 'New deck from the ' + t.name + ' template...', keywords: 'template design theme ' + [t.tone, t.style, t.tagline].filter(Boolean).join(' '), quiet: true, run: () => newDeck(t.slug) });
+    out.push({ group: 'Decks', label: 'Import a PowerPoint or Markdown file...', run: () => importDeck() });
+    out.push({ group: 'Decks', label: 'Change folder...', keywords: 'browse directory where decks', run: () => changeFolder() });
     out.push({ group: 'Decks', label: 'Try the sample deck', run: () => openSampleDeck() });
     out.push({ group: 'Help', label: 'Keyboard map', hint: '?', run: () => showHelp(true, 'keys') });
     out.push({ group: 'Help', label: 'About Diapo', keywords: 'version release', run: () => showHelp(true, 'about') });
@@ -1768,7 +1844,7 @@ export async function saveDeck({ overwrite = false } = {}) {
         app.deck.setSource(html, { reparse: false });   // the head splice follows the file; generated-content baseline stays as loaded
         draftWritten = false;
         await api.draftDelete(app.file).catch(() => {});
-        toast(`Saved ${app.deckName}` + (refreshed ? ' | presentation features brought up to date' : '') + (r.backup ? ' | the previous version is under Export > Previous versions' : ''), { ms: 3500 });
+        toast(`Saved ${app.deckName}` + (refreshed ? ' | presentation features brought up to date' : '') + (r.backup ? ' | the previous version is under File > Previous versions' : ''), { ms: 3500 });
         status('Saved ' + new Date().toLocaleTimeString());
         window.dispatchEvent(new CustomEvent('editor:saved'));
     } catch (err) {
@@ -1870,7 +1946,7 @@ async function boot() {
     const file = new URLSearchParams(location.search).get('file');
     if (file) await tabs.restore(file);                  // the tabs of the last session, around the deck of the address
     if (file && await openDeck(file)) return;
-    showDrawer(true);
+    refreshFiles();                                      // no deck: the welcome screen is the home, the drawer stays closed
 }
 boot();
 
