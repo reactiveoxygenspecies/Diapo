@@ -256,15 +256,42 @@ export class EditOps {
         const z = (s) => { const v = parseInt(css(s).zIndex, 10); return isNaN(v) ? 0 : v; };
         return sibs.map((s, i) => ({ el: s, z: z(s), i })).sort((a, b) => a.z - b.z || a.i - b.i);
     }
+    /* The order the layer commands work on, for the layers list (layers.js). */
+    stack(el) { return this._stack(el); }
+    _setZ(el, z, label) {
+        return this.history.style(el, () => {
+            if (css(el).position === 'static') el.style.position = 'relative';
+            el.style.zIndex = String(z);
+        }, { label });
+    }
+    /* Put `el` directly above (or below) `target`, a sibling, in the stacking order: what a row
+       dropped in the layers list does, one undo step. Free elements take the target's z-index
+       and the place next to it in the file (the order Bring forward gives them); others get a
+       z-index one past it, which clears the neighbours it passes but is not always the exact
+       slot when several siblings share that z-index. */
+    layerTo(el, target, above) {
+        if (!el || !target || el === target || el.parentElement !== target.parentElement) return false;
+        const stack = this._stack(el);
+        const ie = stack.findIndex(s => s.el === el), it = stack.findIndex(s => s.el === target);
+        if (ie < 0 || it < 0 || ie === (above ? it + 1 : it - 1)) return false;
+        const label = 'Reorder layers';
+        const abs = (e) => /absolute|fixed/.test(css(e).position);
+        const tz = stack[it].z;
+        this.history.begin(label);
+        if (abs(el) && abs(target)) {
+            if (stack[ie].z !== tz) this._setZ(el, tz, label);
+            this.history.move(el, el.parentElement, above ? target.nextSibling : target, label);
+        } else this._setZ(el, above ? tz + 1 : tz - 1, label);
+        this.history.end();
+        this.selection.refresh();
+        return true;
+    }
     layer(how) {
         const items = this.selection.items.slice();
         if (!items.length) return;
         const labels = { front: 'Bring to front', back: 'Send to back', forward: 'Bring forward', backward: 'Send backward' };
         const abs = (el) => /absolute|fixed/.test(css(el).position);
-        const setZ = (el, z) => this.history.style(el, () => {
-            if (css(el).position === 'static') el.style.position = 'relative';
-            el.style.zIndex = String(z);
-        }, { label: labels[how] });
+        const setZ = (el, z) => this._setZ(el, z, labels[how]);
         // Going under something at z 0 must not mean a negative z-index: that paints the
         // element behind its parent's background (a card, the slide when it makes no stacking
         // context) and it vanishes. A free element takes the same z and an earlier place in the

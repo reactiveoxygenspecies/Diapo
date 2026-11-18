@@ -31,6 +31,7 @@ import { IconPicker } from './core/icons.js';
 import { Exporter } from './core/export.js';
 import { showPublish } from './core/publish.js';
 import { EditOps } from './core/editops.js';
+import { Layers } from './core/layers.js';
 import { Problems } from './core/problems.js';
 import { readableText } from './core/dom.js';
 import { deckName, DeckPreviews } from './core/previews.js';
@@ -371,7 +372,7 @@ new ResizeObserver(() => { if (app.zoomMode === 'fit' || app.preview) applyZoom(
    starts with the panels hidden unless the user chose otherwise.
    ------------------------------------------------------------ */
 const PANEL_KEY = 'deck-editor-panels';
-const PANEL_DEFAULTS = { strip: true, inspector: true, stripW: 220, inspectorW: 300 };
+const PANEL_DEFAULTS = { strip: true, inspector: true, stripW: 220, inspectorW: 300, layers: false, layersH: 200 };
 const PANEL_LIMITS = { strip: [150, 520], inspector: [240, 680] };
 const panels = { ...PANEL_DEFAULTS };
 try { Object.assign(panels, JSON.parse(localStorage.getItem(PANEL_KEY) || '{}')); } catch (e) { /* ignore */ }
@@ -386,6 +387,21 @@ function applyPanels() {
     $('btnTogglePanel').classList.toggle('off', !panels.inspector);
     $('btnToggleStrip').innerHTML = panels.strip ? '&#9664; Slides' : '&#9654; Slides';
     $('btnTogglePanel').innerHTML = panels.inspector ? 'Panel &#9654;' : 'Panel &#9664;';
+    document.documentElement.style.setProperty('--layers-h', panels.layersH + 'px');
+    if (app.layers) app.layers.setOpen(panels.layers);
+}
+/* The Layers list (core/layers.js) sits above the properties; opening it shows the panel. */
+export function setLayers(on = !panels.layers, { focus = false } = {}) {
+    if (!app.deck.isOpen) return;
+    if (on) { if (app.themeMode) setThemeMode(false); panels.inspector = true; }
+    panels.layers = on;
+    applyPanels(); rememberPanels();
+    if (on && focus) app.layers.focus();
+}
+function setLayersHeight(h, final) {
+    panels.layersH = h == null ? PANEL_DEFAULTS.layersH : Math.round(Math.max(60, Math.min(520, h)));
+    applyPanels();
+    if (final) rememberPanels();
 }
 /* Only what the user did is remembered; the narrow-window default is not. */
 function rememberPanels() { try { localStorage.setItem(PANEL_KEY, JSON.stringify(panels)); } catch (e) { /* ignore */ } }
@@ -1030,7 +1046,7 @@ $('btnPreview').addEventListener('click', () => setPreview(true));
 const KEYS = [
     ['Files', [['Ctrl+O', 'Open the deck list (File menu: New deck, Import, Change folder)'], ['Ctrl+S', 'Save'], ['Ctrl+Shift+S', 'Save as: a new name or folder, with the deck\'s files copied along'], ['Ctrl+P', 'Export as PDF (Export menu: single HTML file, PowerPoint)'], ['Ctrl+T', 'Theme panel (colours, fonts, base styles)'], ['F5', 'Preview'], ['P / Shift+F5', 'Presenter view (second window)'], ['Esc', 'Leave preview, close dialogs, deselect']]],
     ['Slides', [['PgUp / PgDn', 'Previous / next slide'], ['Home / End', 'First / last slide'], ['Ctrl+M', 'New slide (layout picker; Ctrl+Shift+M: blank)'], ['Ctrl+D', 'Duplicate (slide or selection)'], ['Ctrl+Up / Down', 'Move the slide, or the picked slides, up / down'], ['Ctrl+click / Shift+click a thumbnail', 'Pick several slides; drag one of them to move them all'], ['Shift+Up / Down (strip)', 'Pick one more or one fewer slide (Esc: none)']]],
-    ['Canvas', [['Click', 'Select'], ['Shift+click', 'Add to the selection'], ['Ctrl+click', 'Select the exact element under the cursor (a plain drag then moves just that)'], ['Alt+drag', 'Duplicate what you drag'], ['Ctrl while dragging', 'Disable snapping'], ['Shift / Alt while resizing', 'Keep the aspect ratio (corners) / resize about the centre; both together, both'], ['Right-click', 'Element menu'], ['Drag on empty space', 'Marquee select'], ['Double-click / Enter', 'Edit text (Esc when done; Ctrl+B / I / U, Ctrl+Shift+X strike, Ctrl+Shift+= superscript, Ctrl+= subscript, Alt+= an equation in the text while editing)'], ['Arrows', 'Nudge 1px (Shift: 10px)'], ['Delete', 'Delete the selection (Hide is in the panel and the menu)'], ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste, also across slides; images and text from elsewhere paste too'], ['Ctrl+Alt+C / Ctrl+Alt+V', 'Copy the look of an element (colours, border, type, padding) / put it on the selection'], ['Ctrl+G / Ctrl+Shift+G', 'Group / ungroup'], ['Ctrl+] / Ctrl+[', 'Bring forward / send backward (Shift: to front / to back)'], ['Tab', 'Next sibling'], ['Ctrl+F / Ctrl+H', 'Find / find and replace across the deck (Enter / Shift+Enter: next / previous match; Esc closes)'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'], ['Ctrl++ / Ctrl+- / Ctrl+0', 'Zoom in / out / fit'], ['Space+drag, middle button, wheel', 'Pan when zoomed in (the middle button grabs the view)'], ['Ctrl+\\', 'Hide / show both side panels (drag their edges to resize)']]],
+    ['Canvas', [['Click', 'Select'], ['Shift+click', 'Add to the selection'], ['Ctrl+click', 'Select the exact element under the cursor (a plain drag then moves just that)'], ['Alt+drag', 'Duplicate what you drag'], ['Ctrl while dragging', 'Disable snapping'], ['Shift / Alt while resizing', 'Keep the aspect ratio (corners) / resize about the centre; both together, both'], ['Right-click', 'Element menu'], ['Drag on empty space', 'Marquee select'], ['Double-click / Enter', 'Edit text (Esc when done; Ctrl+B / I / U, Ctrl+Shift+X strike, Ctrl+Shift+= superscript, Ctrl+= subscript, Alt+= an equation in the text while editing)'], ['Arrows', 'Nudge 1px (Shift: 10px)'], ['Delete', 'Delete the selection (Hide is in the panel and the menu)'], ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste, also across slides; images and text from elsewhere paste too'], ['Ctrl+Alt+C / Ctrl+Alt+V', 'Copy the look of an element (colours, border, type, padding) / put it on the selection'], ['Ctrl+G / Ctrl+Shift+G', 'Group / ungroup'], ['Ctrl+] / Ctrl+[', 'Bring forward / send backward (Shift: to front / to back)'], ['Tab', 'Next sibling'], ['Ctrl+Shift+L', 'Layers: the slide\'s elements front to back above the panel (click, Ctrl+click, Shift+click select; drag a row to restack; eye hides, lock locks; double-click or F2 renames; arrows, Enter and Delete work in it)'], ['Ctrl+F / Ctrl+H', 'Find / find and replace across the deck (Enter / Shift+Enter: next / previous match; Esc closes)'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'], ['Ctrl++ / Ctrl+- / Ctrl+0', 'Zoom in / out / fit'], ['Space+drag, middle button, wheel', 'Pan when zoomed in (the middle button grabs the view)'], ['Ctrl+\\', 'Hide / show both side panels (drag their edges to resize)']]],
 ];
 /* The "?" dialog: the keyboard map, and a tab "About Diapo" (version, checking for a new
    release, links). tab: 'keys' or 'about'. The shortcuts stay one keypress away: the dialog
@@ -1200,6 +1216,8 @@ function onKey(e) {
     if (app.cropper && app.cropper.active && !typing && app.cropper.handleKey(e)) return stop(e);
 
     if (k === 'Escape') {
+        if (app.layers && app.layers.endRename(false)) return stop(e);   // a name being typed in the Layers list
+        if (app.layers && app.layers.cancelDrag()) return stop(e);
         if (app.palette && app.palette.open) { app.palette.close(); return stop(e); }
         if (app.inlineMath && app.inlineMath.isOpen) { app.inlineMath.close(); return stop(e); }   // the text edit goes on, as it was
         if (app.find && app.find.open) { app.find.close(); return stop(e); }
@@ -1235,6 +1253,7 @@ function onKey(e) {
     if (app.iconPicker && app.iconPicker.isOpen && !ctrl) return;  // so does the icon picker
     if (app.gallery.isOpen && !ctrl) return;                       // and the New deck gallery (its cards, its name field)
     if (ctrl && k.toLowerCase() === 'k') { stop(e); if (app.gallery.isOpen) app.gallery.close(); app.palette.toggle(); return; }
+    if (ctrl && e.shiftKey && !e.altKey && k.toLowerCase() === 'l') { stop(e); setLayers(!panels.layers, { focus: true }); return; }
     if (ctrl && k.toLowerCase() === 's') { stop(e); if (e.shiftKey) saveDeckAs(); else saveDeck(); return; }
     if (ctrl && k.toLowerCase() === 'o') { stop(e); showDrawer(true); return; }
     if (k === 'F5' && e.shiftKey) { stop(e); app.presenter.open(); return; }
@@ -1252,6 +1271,8 @@ function onKey(e) {
     }
     if (ctrl && k.toLowerCase() === 'z') { stop(e); e.shiftKey ? redo() : undo(); return; }
     if (ctrl && k.toLowerCase() === 'y') { stop(e); redo(); return; }
+    // The Layers list has the focus: its arrows, Enter, Delete and F2 are its own.
+    if (!typing && app.layers && app.layers.isOpen && t && t.closest && t.closest('#layersList') && app.layers.handleKey(e)) return stop(e);
     if (typing) return;
     // A control reached with the keyboard keeps its keys: Enter and Space press it (a mark that
     // is not a <button> is pressed here), Tab moves on, arrows and Delete are not the canvas's.
@@ -1432,6 +1453,8 @@ app.insert = new Inserter(app);
 app.presenter = new Presenter(app);
 app.exporter = new Exporter(app);
 app.editops = new EditOps(app);
+app.layers = new Layers(app, { pane: $('layersPane'), host: { setOpen: (on) => setLayers(on, { focus: true }), setHeight: setLayersHeight } });
+applyPanels();                     // the Layers list's remembered state
 app.cropper = new Cropper(app);
 app.problems = new Problems(app, { badge: $('problemsBadge') });
 app.fileDrop = new FileDrop(app, { canvas: $('canvas'), importDecks: importDroppedDecks, toast: (m, o) => toast(m, o) });
@@ -1672,6 +1695,7 @@ function paletteEntries() {
         out.push({ group: 'View', label: 'Zoom to fit', hint: 'Ctrl+0', run: click('#btnZoomFit') });
         out.push({ group: 'View', label: 'Zoom in', hint: 'Ctrl++', run: click('#btnZoomIn') });
         out.push({ group: 'View', label: 'Zoom out', hint: 'Ctrl+-', run: click('#btnZoomOut') });
+        out.push({ group: 'View', label: (panels.layers ? 'Hide' : 'Show') + ' layers', hint: 'Ctrl+Shift+L', keywords: 'layers stacking order z-index front back elements list', run: () => setLayers(!panels.layers, { focus: true }) });
         out.push({ group: 'View', label: 'Hide or show the side panels', hint: 'Ctrl+\\', run: click('#btnTogglePanel') });
         out.push({ group: 'View', label: 'Undo', hint: 'Ctrl+Z', run: () => app.history.undo() });
         out.push({ group: 'View', label: 'Redo', hint: 'Ctrl+Y', run: () => app.history.redo() });

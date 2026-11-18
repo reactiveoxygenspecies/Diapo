@@ -208,6 +208,14 @@
 
   <aside id="inspector" aria-label="Properties">
     <div class="splitter" data-side="inspector" title="Drag to resize; double-click to reset"></div>
+    <!-- The Layers list (core/layers.js): the slide's elements front to back, docked above the properties. -->
+    <div id="layersPane" class="layers-pane">
+      <div class="layers-bar"><button type="button" id="btnLayers" aria-expanded="false" aria-controls="layersList" title="The elements of this slide, front to back: select, hide, lock, rename, or drag to change the stacking order (Ctrl+Shift+L)"><span class="lr-twist">&#9656;</span> Layers <span class="layers-count"></span></button></div>
+      <div class="layers-body" hidden>
+        <div id="layersList" class="layers-list" role="listbox" aria-label="Layers of this slide" aria-multiselectable="true" tabindex="0"></div>
+        <div class="layers-grip" title="Drag to resize; double-click to reset"></div>
+      </div>
+    </div>
     <div id="inspectorBody" class="inspector-body">
       <div class="insp-empty">Select something on the slide to edit it.</div>
     </div>
