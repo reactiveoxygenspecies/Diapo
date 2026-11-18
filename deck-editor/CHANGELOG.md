@@ -1,5 +1,67 @@
 # Changelog
 
+## Unreleased
+
+- **Interactive charts from Plotly.** Insert > Interactive chart (Plotly)...
+  takes a Plotly figure as pasted JSON, a `.json` file or a page saved with
+  `fig.write_html()`. On the slide it moves and sizes like any element; in
+  Preview and the saved deck it is live (hover, zoom, legend) with no "Trust
+  this deck". PDF, PowerPoint and the slide strip show its picture.
+- **Scatter (XY) charts.** X from the first column, a numeric X axis with its
+  own range, step and log scale, lines between points, Y error bars, and a trend
+  line per series with R² in the legend. Paste columns of numbers to fill X and
+  Y; a chart changes kind and back without losing its table. PowerPoint export
+  and import use native scatter charts.
+- **Maths inside a sentence.** While typing, Alt+= (or the ∑ button, or Ctrl+K)
+  puts an equation in the text from a LaTeX popover with a preview. It takes the
+  text's size, colour and baseline, Backspace removes it whole, it survives copy
+  and paste, and PowerPoint gets it as text with sub- and superscripts.
+- **Move several slides at once.** Pick slides in the strip (Ctrl+click,
+  Shift+click, Shift+Up/Down) and drag one of them, or use Ctrl+Up/Down or the
+  menu's moves and the new Move to...: they move together as one undo step, into
+  a section when dropped on its heading.
+- **Drop files on the slide.** Pictures, video and sound dragged from your
+  folders land where you drop them (copied into assets/); a PowerPoint or
+  Markdown file dragged into the window becomes a new deck.
+- **New elements go in a free spot**: the centre when it is free, else the
+  nearest clear place, instead of piling up in the middle.
+- **Find and replace across the deck.** Ctrl+F finds in every slide, the footer
+  and, if asked, the speaker notes; Ctrl+H replaces one or all (one undo step,
+  formatting kept).
+- **Layers list.** Ctrl+Shift+L (or the Layers bar above the panel) lists the
+  slide's elements front to back: click to select, the eye hides, the padlock
+  locks, double-click renames, and dragging a row restacks it in one undo step.
+- **Undo follows a deck through tab switches.** Ctrl+Z after coming back to a tab
+  undoes that deck's edits; up to four background decks are kept this way, each
+  with its last 200 steps.
+- **A home, a gallery and a File menu.** With no deck open the welcome screen is
+  the home (recent decks, the folder by name). New deck opens a large gallery of
+  the designs with Light / Dark and style filters. The File menu holds new, open,
+  import, save, save as, versions and the folder; Export keeps only the exports.
+- **Export > Publish...** prepares a folder for a free web host you own (Netlify
+  Drop, GitHub Pages, any host): the deck as `index.html` with what it uses,
+  optionally zipped, and the steps for each host. Diapo hosts nothing itself.
+- **The Theme panel speaks plainly** (Text 2, Side margin, Headings instead of
+  variable names), its base text styles fit without scrolling, and **Looks from
+  the designs** give any deck the colours, fonts and margins of one of the 31
+  designs in one undo step. Two colours with the same value share one swatch.
+- **Press ? while presenting** to see the keys (move, show, draw); a deck opened
+  on its own says "Press ? for keys" for a few seconds. Neither is saved or
+  printed. Decks get the presentation features script version 13.
+- **Check for updates.** The "?" dialog has an About Diapo tab (also in Ctrl+K)
+  that asks GitHub whether a newer release exists, only when you click. "Check
+  for updates when Diapo starts" is off by default.
+- **Diapo for AI agents.** `mcp_server.py` is an MCP server that Claude Desktop,
+  Cursor, Claude Code or a local model can start: it lists, reads, edits, checks,
+  renders, imports and exports decks in your folder, with the editor's backups,
+  version check and paused scripts. It sends nothing over the network.
+- **Editing options.** Look > Play entrances when changing slides (off by
+  default: a slide shows at once as it ends up) and Look > Check spelling while
+  typing (on; never saved in the file).
+- Slide numbers in the strip are darker, readable in every look.
+- CI: a Windows workflow runs the browser and Python tests on every push and pull
+  request to main, and fails if the generated deck copies are stale.
+
 ## 1.2.0 - 2026-11-13
 
 - **Click-reveal elements stay hidden through an auto-animate morph.** Going into
