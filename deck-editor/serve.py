@@ -1548,10 +1548,11 @@ def find_chrome():
     return None
 
 
-def print_pdf(html, deck_full, out_path, size=(1920, 1080)):
+def print_pdf(html, deck_full, out_path, size=(1920, 1080), extra_args=()):
     """Write `html` next to the deck, print it to out_path with headless Chrome, clean up.
     `size` is the deck's stage in px: the browser window is that size so anything the
-    deck lays out against the viewport matches the page."""
+    deck lays out against the viewport matches the page. `extra_args` go to the browser
+    (mcp_server.py keeps it off the network with them)."""
     chrome = find_chrome()
     if not chrome:
         raise LookupError("no Chrome or Edge found on this computer (set DECK_EDITOR_CHROME to the browser's path)")
@@ -1564,7 +1565,7 @@ def print_pdf(html, deck_full, out_path, size=(1920, 1080)):
     args = [chrome, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-extensions",
             "--hide-scrollbars", f"--window-size={size[0]},{size[1]}", "--run-all-compositor-stages-before-draw",
             "--virtual-time-budget=10000", "--no-pdf-header-footer", "--user-data-dir=" + profile,
-            "--print-to-pdf=" + tmp_pdf, "--allow-file-access-from-files", "file:///" + tmp_html.replace(os.sep, "/")]
+            "--print-to-pdf=" + tmp_pdf, "--allow-file-access-from-files", *extra_args, "file:///" + tmp_html.replace(os.sep, "/")]
     # Time scales with the deck: about a second per slide for a picture-heavy one, plus a floor.
     slides = len(re.findall(rb"<section\s[^>]*class=\"[^\"]*\bslide\b", html))
     try:

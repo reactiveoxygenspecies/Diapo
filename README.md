@@ -77,11 +77,20 @@ AI-drafted decks open like any other, as long as they follow the [Diapo Format](
 [`diapo-deck`](skills/diapo-deck) skill teaches Claude Code to write them, so an assistant can draft the deck and you
 can do the last touches by hand, which is exactly the workflow I was after.
 
+Other assistants (Claude Desktop, Cursor, a model running on your own machine, anything that speaks the Model Context
+Protocol) can work on your decks through `deck-editor/mcp_server.py`, a small program the assistant starts: it lists,
+reads and edits decks in your folder of decks, checks them, and shows the assistant a picture of a slide. Setting it
+up is in [REFERENCE.md](deck-editor/REFERENCE.md#diapo-for-ai-agents-mcp).
+
 ## Nothing leaves your computer
 
 Diapo runs locally: no account, no sign-in, no telemetry. It only goes online when you look up a Google Font, put a
 video or web page from elsewhere on a slide, or click "Check for updates" (About Diapo, under the "?" button),
 which asks GitHub for the latest release and sends nothing about you or your decks. Checking when Diapo starts is a setting, off until you turn it on. Your decks stay in the folders you keep them in.
+
+The MCP program sends nothing over the network either, and keeps the browser it draws slides with offline. What
+leaves your computer when an assistant works on a deck depends on the assistant you connect: a cloud one sees what it
+reads, a local model keeps everything local.
 
 ## Getting started
 

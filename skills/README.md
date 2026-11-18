@@ -13,6 +13,10 @@ Claude Code skills that belong to this repository.
   (`diapo-deck/LICENSE`), like the editor: copy it, ship it with
   your own tools, change it.
 
+Assistants other than Claude Code reach the same decks through Diapo's MCP
+server, `deck-editor/mcp_server.py` (list, read, write slides, check, render,
+import, PDF); see "Diapo for AI agents (MCP)" in `deck-editor/REFERENCE.md`.
+
 ## Installing
 
 Claude Code reads skills from `~/.claude/skills/<name>/SKILL.md` (every
