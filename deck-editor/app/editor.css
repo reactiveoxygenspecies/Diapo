@@ -789,6 +789,16 @@ select option { background: var(--bg-2); color: var(--ink); }
 .textbar button:hover { background: rgba(255,255,255,0.15); }
 .textbar button.on { background: var(--accent); }
 .textbar button[data-cmd=done] { margin-left: 4px; color: #9fe3b6; }
+.textbar button[data-cmd=math] { font-family: Georgia, serif; font-size: 15px; }
+/* An equation in the text being edited (inlinemath.js) */
+.mathpop { position: fixed; z-index: 85; width: 340px; max-width: calc(100vw - 16px); box-sizing: border-box; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--bg-2); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.28); font-size: 12px; }
+.mathpop-in { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: 13px var(--ui-mono); }
+.mathpop-in:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.mathpop-preview { min-height: 30px; padding: 4px 6px; font-size: 22px; line-height: 1.4; overflow-x: auto; white-space: nowrap; }
+.mathpop-preview:empty::before { content: 'The preview shows here'; font-size: 12px; color: var(--ink-3); }
+.mathpop-err { color: var(--warn); }
+.mathpop-hint { color: var(--ink-3); font-size: 11px; line-height: 1.45; }
+.mathpop-hint code, .mathpop-hint kbd { font: 11px var(--ui-mono); }
 
 /* ------------------------------------------------------------
    Slide strip thumbnails, drag reorder, context menu

@@ -13,6 +13,12 @@
 
    Chemistry: mhchem's \ce{} is on, so a reaction is typed as
    \ce{2H2 + O2 -> 2H2O}. Structures are chem.js.
+
+   Maths inside a sentence is a <span data-math="LaTeX"> in the
+   text (inlinemath.js puts it there): the same kind of drawing, in
+   MathJax's inline style, its size and its drop below the baseline
+   in em, so it follows the text's size and sits on its baseline.
+   The figure is a block of its own; the span is a word of the text.
    ============================================================ */
 import { loadVendor } from './vendor.js';
 
@@ -20,8 +26,13 @@ const FONT_KEY = 'diapo-math-font';  // the look new equations take
 export const lastMathFont = () => { try { return localStorage.getItem(FONT_KEY) === 'stix2' ? 'stix2' : 'classic'; } catch (e) { return 'classic'; } };
 const EM = 16, EX = 8;                  // MathJax measures in ex with these; out in em: ex * EX / EM
 
+/* An equation inside text. Everything that treats [data-math] as a figure of its own (picked,
+   moved, sized, exported as a picture) leaves these out: they are part of their text. */
+export const INLINE_MATH = 'span[data-math]';
+export const isInlineMath = (el) => !!el && typeof el.matches === 'function' && el.matches(INLINE_MATH);
+
 export function isMath(el) {
-    return !!el && typeof el.matches === 'function' && el.matches('[data-math]');
+    return !!el && typeof el.matches === 'function' && el.matches('[data-math]') && !el.matches(INLINE_MATH);
 }
 export function mathOf(el) {
     const m = el && el.closest ? el.closest('[data-math]') : null;
@@ -119,18 +130,21 @@ export const drawnTex = (tex) => scanTex(tex, tex.length, true).out;
 /* Whether a caret at the end of `text` is inside a \ce{...} (one not yet closed). */
 export const inCe = (text) => scanTex(text, text.length, false).stack.includes('ce');
 
-export const mathKey = (tex, font = 'classic') => { const t = drawnTex(tex); return 'm' + hash(font === 'stix2' ? 'stix2|' + t : t); };
+/* The drawing's key: the TeX as drawn, the look, and (for an equation in text) the inline style,
+   so a figure's drawing is never taken for a span's or the other way round. */
+export const mathKey = (tex, font = 'classic', inline = false) => { const t = drawnTex(tex); return 'm' + hash((inline ? 'inline|' : '') + (font === 'stix2' ? 'stix2|' + t : t)); };
 
 /* The drawing of `tex` in the given look as SVG markup, or an Error with MathJax's message
-   (unknown command, missing brace). */
-export async function texToSvg(tex, font = 'classic') {
+   (unknown command, missing brace). `inline`: MathJax's style for maths in a sentence (smaller
+   fractions and limits beside the sum), with the drop below the baseline kept. */
+export async function texToSvg(tex, font = 'classic', { inline = false } = {}) {
     let svg;
     const src = drawnTex(tex);                       // the arrows as drawn (the source keeps what was typed)
     if (font === 'stix2') {
         const frame = await loadStix();
         let timer;
         const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('the STIX Two drawing did not answer')), 20000); });
-        const markup = await Promise.race([frame.renderTex(src, { em: EM, ex: EX }), late])
+        const markup = await Promise.race([frame.renderTex(src, { em: EM, ex: EX, display: !inline }), late])
             .catch((err) => { throw new Error(err && err.message ? err.message : String(err)); })
             .finally(() => clearTimeout(timer));
         const t = document.createElement('template');
@@ -140,22 +154,31 @@ export async function texToSvg(tex, font = 'classic') {
     } else {
         const MJ = await loadMathJax();
         let node;
-        try { node = MJ.tex2svg(src, { display: true, em: EM, ex: EX, containerWidth: 1920 }); }
+        try { node = MJ.tex2svg(src, { display: !inline, em: EM, ex: EX, containerWidth: 1920 }); }
         catch (err) { throw new Error(err && err.message ? err.message : String(err)); }
         svg = node.querySelector('svg');
         if (!svg) throw new Error('nothing to draw');
         if (svg.querySelector('[data-mml-node="merror"]')) throw new Error((svg.textContent || 'error').trim());
     }
     const em = (v) => v && /ex$/.test(v) ? (Math.round(parseFloat(v) * EX / EM * 1000) / 1000) + 'em' : v;
-    svg.setAttribute('width', em(svg.getAttribute('width')));
-    svg.setAttribute('height', em(svg.getAttribute('height')));
-    svg.removeAttribute('style');                    // vertical-align: the figure is a block of its own
+    const w = em(svg.getAttribute('width')), h = em(svg.getAttribute('height'));
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+    // MathJax's vertical-align is how far the maths drops below the baseline (the depth of a
+    // subscript, a fraction's denominator), in ex.
+    const drop = em((/vertical-align:\s*(-?[\d.]+ex)/.exec(svg.getAttribute('style') || '') || [])[1] || '0ex');
+    svg.removeAttribute('style');
     svg.removeAttribute('focusable');
     svg.removeAttribute('aria-hidden');
-    svg.setAttribute('style', 'display:block; overflow:visible;');
+    // A figure's drawing is a block of its own. In text, the drawing sits on the baseline, and
+    // its size is in the style too: a deck's own rule for svg (width: 100%, display: block, a
+    // fixed height) would otherwise win over the attributes and break the line.
+    svg.setAttribute('style', inline
+        ? `display:inline; vertical-align:${drop}; width:${w}; height:${h}; max-width:none; margin:0; overflow:visible;`
+        : 'display:block; overflow:visible;');
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', tex);
-    svg.setAttribute('data-key', mathKey(tex, font));
+    svg.setAttribute('data-key', mathKey(tex, font, inline));
     svg.querySelectorAll('[data-mml-node], [data-c], [data-mjx-texclass], [data-latex], [data-semantic-type]').forEach(n => {
         for (const a of Array.from(n.attributes)) if (/^data-(mml-node|c|mjx-|latex|semantic)/.test(a.name)) n.removeAttribute(a.name);
     });
@@ -165,23 +188,174 @@ export async function texToSvg(tex, font = 'classic') {
 
 /* Draw the equation into its figure. Not an undo step by itself (see MathSection.commit). */
 export async function writeMath(el, tex = texOf(el)) {
-    const svg = await texToSvg(tex, fontOf(el));
+    const svg = await texToSvg(tex, fontOf(el), { inline: isInlineMath(el) });
     el.innerHTML = svg;
     return el;
 }
 
+/* Whether the element's drawing is the one its LaTeX and look make. */
+export function drawnRight(el) {
+    const svg = el.querySelector(':scope > svg');
+    return !!svg && svg.getAttribute('data-key') === mathKey(texOf(el), fontOf(el), isInlineMath(el));
+}
+
 /* Every equation in `root` whose drawing is missing or was made from other LaTeX, drawn.
-   Returns the ones that do not parse, with MathJax's message. */
+   Returns the ones that do not parse, with MathJax's message. An equation in text that does
+   not parse and has no drawing shows its LaTeX as text meanwhile, so it is not lost from sight. */
 export async function refreshMath(root) {
     const bad = [];
     if (!root) return bad;
     const list = root.matches && root.matches('[data-math]') ? [root] : Array.from(root.querySelectorAll('[data-math]'));
     for (const el of list) {
-        const tex = texOf(el), svg = el.querySelector(':scope > svg');
-        if (svg && svg.getAttribute('data-key') === mathKey(tex, fontOf(el))) continue;
-        try { await writeMath(el, tex); } catch (err) { bad.push({ el, message: err.message }); }
+        if (drawnRight(el)) continue;
+        const tex = texOf(el);
+        try { await writeMath(el, tex); } catch (err) {
+            bad.push({ el, message: err.message });
+            if (isInlineMath(el) && !el.querySelector(':scope > svg')) el.textContent = tex;
+        }
     }
     return bad;
+}
+
+/* ============================================================
+   The LaTeX as readable text, for where a drawing cannot go: a
+   line of PowerPoint text holds no picture. Greek letters and
+   operators become their characters, \frac{a}{b} a/b, \sqrt{x}
+   √x, \ce{H2O} H₂O; powers and indices are kept apart so they
+   can be raised or lowered. Not a TeX engine: what it does not
+   know comes out as the command's name.
+   ============================================================ */
+const TEX_CHARS = {
+    alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ϵ', varepsilon: 'ε', zeta: 'ζ', eta: 'η', theta: 'θ', vartheta: 'ϑ',
+    iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', pi: 'π', varpi: 'ϖ', rho: 'ρ', varrho: 'ϱ', sigma: 'σ', varsigma: 'ς',
+    tau: 'τ', upsilon: 'υ', phi: 'ϕ', varphi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω',
+    Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Xi: 'Ξ', Pi: 'Π', Sigma: 'Σ', Upsilon: 'Υ', Phi: 'Φ', Psi: 'Ψ', Omega: 'Ω',
+    times: '×', cdot: '·', div: '÷', pm: '±', mp: '∓', ast: '∗', star: '⋆', circ: '∘', bullet: '•', neq: '≠', ne: '≠', leq: '≤', le: '≤',
+    geq: '≥', ge: '≥', ll: '≪', gg: '≫', approx: '≈', sim: '∼', simeq: '≃', cong: '≅', equiv: '≡', propto: '∝', infty: '∞',
+    partial: '∂', nabla: '∇', sum: '∑', prod: '∏', int: '∫', iint: '∬', oint: '∮', to: '→', rightarrow: '→', leftarrow: '←', gets: '←',
+    leftrightarrow: '↔', Rightarrow: '⇒', Leftarrow: '⇐', Leftrightarrow: '⇔', implies: '⇒', iff: '⇔', rightleftharpoons: '⇌',
+    longrightarrow: '⟶', mapsto: '↦', uparrow: '↑', downarrow: '↓', in: '∈', notin: '∉', ni: '∋', subset: '⊂', subseteq: '⊆',
+    supset: '⊃', cup: '∪', cap: '∩', emptyset: '∅', varnothing: '∅', forall: '∀', exists: '∃', neg: '¬', land: '∧', lor: '∨',
+    wedge: '∧', vee: '∨', oplus: '⊕', otimes: '⊗', perp: '⊥', parallel: '∥', angle: '∠', ell: 'ℓ', hbar: 'ℏ', hslash: 'ℏ', Re: 'ℜ',
+    Im: 'ℑ', aleph: 'ℵ', prime: '′', degree: '°', AA: 'Å', angstrom: 'Å', ldots: '…', cdots: '⋯', dots: '…', vdots: '⋮',
+    langle: '⟨', rangle: '⟩', lceil: '⌈', rceil: '⌉', lfloor: '⌊', rfloor: '⌋', vert: '|', Vert: '‖', mid: '|', backslash: '\\',
+    quad: ' ', qquad: '  ', ',': ' ', ';': ' ', ':': ' ', '>': ' ', ' ': ' ', '!': '', '{': '{', '}': '}', '%': '%', '_': '_', '&': '&', '#': '#', '$': '$', '|': '‖',
+    lbrace: '{', rbrace: '}', lbrack: '[', rbrack: ']', dag: '†', dagger: '†', ddagger: '‡', checkmark: '✓', square: '□', triangle: '△',
+};
+const TEX_WORDS = new Set(['sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'arcsin', 'arccos', 'arctan', 'sinh', 'cosh', 'tanh', 'log', 'ln', 'lg', 'exp',
+    'lim', 'max', 'min', 'sup', 'inf', 'det', 'dim', 'ker', 'deg', 'gcd', 'arg', 'Pr', 'mod', 'bmod']);
+const TEX_ACCENTS = { hat: '̂', widehat: '̂', bar: '̄', overline: '̅', vec: '⃗', dot: '̇', ddot: '̈', tilde: '̃', widetilde: '̃', check: '̌', breve: '̆', acute: '́', grave: '̀' };
+const TEX_LETTERS = { mathbb: { R: 'ℝ', N: 'ℕ', Z: 'ℤ', Q: 'ℚ', C: 'ℂ', P: 'ℙ', E: '𝔼' } };
+const TEX_TEXT = /^(text|textrm|textit|textbf|textsf|texttt|mathrm|mathit|mathbf|mathsf|mathtt|mathcal|mathscr|mathfrak|boldsymbol|bm|operatorname|mbox|hbox|textnormal|displaystyle|textstyle|scriptstyle|mathbb)$/;
+
+/* mhchem's formula notation as plain LaTeX: H2O as H_{2}O, SO4^2- as SO_{4}^{2-}, -> as \to. */
+function ceToTex(s) {
+    return s.replace(/<=>|<->|->|<-/g, (a) => ({ '<=>': ' \\rightleftharpoons ', '<->': ' \\leftrightarrow ', '->': ' \\to ', '<-': ' \\leftarrow ' }[a]))
+        .replace(/([A-Za-z)\]])(\d+)/g, '$1_{$2}')
+        .replace(/\^([0-9]*[+-])/g, '^{$1}')
+        .replace(/([A-Za-z)\]])([+-])(?=\s|$|\})/g, '$1^{$2}');
+}
+
+/* `tex` as [{ t, script }] pieces, script '' (on the line), 'sup' or 'sub'. */
+export function texToRuns(tex) {
+    const out = [];
+    const emit = (t, script) => {
+        if (!t) return;
+        const last = out[out.length - 1];
+        if (last && last.script === script) last.t += t; else out.push({ t, script });
+    };
+    const src = drawnTex(String(tex || ''));
+    // A group: what one argument is ({...} or the next token), as its source.
+    const arg = (s, i) => {
+        while (s[i] === ' ') i++;
+        if (s[i] === '{') {
+            let depth = 0, j = i;
+            for (; j < s.length; j++) { if (s[j] === '\\') { j++; continue; } if (s[j] === '{') depth++; else if (s[j] === '}' && --depth === 0) break; }
+            return { body: s.slice(i + 1, j), end: j + 1 };
+        }
+        if (s[i] === '\\') { const m = /^\\([A-Za-z]+|.)/.exec(s.slice(i)); return { body: m ? m[0] : '\\', end: i + (m ? m[0].length : 1) }; }
+        return { body: s[i] || '', end: i + 1 };
+    };
+    const optArg = (s, i) => {
+        if (s[i] !== '[') return null;
+        const j = s.indexOf(']', i);
+        return j < 0 ? null : { body: s.slice(i + 1, j), end: j + 1 };
+    };
+    // The plain text of a piece, all on one level (for what goes inside a fraction or a root).
+    const flat = (s) => texToRuns(s).map(r => r.t).join('');
+    const wrapped = (s) => { const t = flat(s); return t.length > 1 && !/^[\p{L}\p{N}.]+$/u.test(t) ? '(' + t + ')' : t; };
+    function walk(s, script) {
+        for (let i = 0; i < s.length;) {
+            const c = s[i];
+            if (c === '\\') {
+                const m = /^\\([A-Za-z]+|.)/.exec(s.slice(i));
+                const name = m ? m[1] : '';
+                i += m ? m[0].length : 1;
+                if (name === 'frac' || name === 'dfrac' || name === 'tfrac' || name === 'cfrac') {
+                    const a = arg(s, i), b = arg(s, a.end); i = b.end;
+                    emit(wrapped(a.body) + '/' + wrapped(b.body), script);
+                } else if (name === 'sqrt') {
+                    const n = optArg(s, i); if (n) i = n.end;
+                    const a = arg(s, i); i = a.end;
+                    if (n) emit(flat(n.body), script || 'sup');
+                    emit('√' + wrapped(a.body), script);
+                } else if (name === 'ce') {
+                    const a = arg(s, i); i = a.end;
+                    walk(ceToTex(a.body), script);
+                } else if (TEX_TEXT.test(name)) {
+                    if (name === 'displaystyle' || name === 'textstyle' || name === 'scriptstyle') continue;
+                    const a = arg(s, i); i = a.end;
+                    const map = TEX_LETTERS[name];
+                    if (map) emit(a.body.replace(/[A-Z]/g, ch => map[ch] || ch), script);
+                    else if (/^(text|textrm|textit|textbf|textsf|texttt|mbox|hbox|textnormal)$/.test(name)) emit(a.body.replace(/\\(.)/g, '$1'), script);
+                    else walk(a.body, script);
+                } else if (TEX_ACCENTS[name]) {
+                    const a = arg(s, i); i = a.end;
+                    emit(flat(a.body) + TEX_ACCENTS[name], script);
+                } else if (/^(left|right|big|Big|bigg|Bigg|bigl|bigr|Bigl|Bigr|middle)$/.test(name)) {
+                    if (s[i] === '.') i++;                         // \left. is no bracket at all
+                } else if (name === '\\') emit(' ', script);
+                else if (name === 'begin' || name === 'end') { const a = arg(s, i); i = a.end; }
+                else if (TEX_WORDS.has(name)) emit(name, script);
+                else if (name in TEX_CHARS) emit(TEX_CHARS[name], script);
+                else emit(name, script);
+                continue;
+            }
+            if (c === '^' || c === '_') {
+                const a = arg(s, i + 1); i = a.end;
+                const inner = flat(a.body);
+                if (c === '^' && (inner === '∘' || inner === '°')) { emit('°', script); continue; }
+                if (c === '^' && /^′+$/.test(inner)) { emit(inner, script); continue; }
+                const level = script || (c === '^' ? 'sup' : 'sub');
+                walk(a.body, level);
+                continue;
+            }
+            if (c === '{' || c === '}') { i++; continue; }
+            if (c === '~') { emit(' ', script); i++; continue; }
+            if (c === '&') { emit(' ', script); i++; continue; }
+            if (c === "'") { emit('′', script); i++; continue; }
+            if (/\s/.test(c)) {
+                const last = out[out.length - 1];
+                if (last && !/ $/.test(last.t)) emit(' ', script);
+                while (i < s.length && /\s/.test(s[i])) i++;
+                continue;
+            }
+            emit(c, script); i++;
+        }
+    }
+    walk(src, '');
+    if (out.length) { out[0].t = out[0].t.replace(/^ +/, ''); out[out.length - 1].t = out[out.length - 1].t.replace(/ +$/, ''); }
+    return out.filter(r => r.t);
+}
+/* The same as one line of text, the powers and indices in Unicode where it has them. */
+const SUP = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', '+': '⁺', '-': '⁻', '−': '⁻', '=': '⁼', '(': '⁽', ')': '⁾', n: 'ⁿ', i: 'ⁱ' };
+const SUB = { 0: '₀', 1: '₁', 2: '₂', 3: '₃', 4: '₄', 5: '₅', 6: '₆', 7: '₇', 8: '₈', 9: '₉', '+': '₊', '-': '₋', '−': '₋', '=': '₌', '(': '₍', ')': '₎' };
+export function texToText(tex) {
+    return texToRuns(tex).map(r => {
+        if (!r.script) return r.t;
+        const map = r.script === 'sup' ? SUP : SUB, chars = Array.from(r.t);
+        return chars.every(ch => map[ch]) ? chars.map(ch => map[ch]).join('') : (r.script === 'sup' ? '^' : '_') + (chars.length > 1 ? '(' + r.t + ')' : r.t);
+    }).join('');
 }
 
 /* ============================================================

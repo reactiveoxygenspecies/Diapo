@@ -136,6 +136,8 @@ html.deck-editing .slide > aside.notes, html.deck-editing .slide > .notes { disp
 ::highlight(diapo-find-current) { background: rgba(255, 140, 0, 0.8); color: #000; }
 html.deck-editing .deck-stage [data-fragment] { opacity: 1 !important; pointer-events: auto !important; }
 html.deck-editing .deck-stage [data-placeholder] { display: flex !important; }
+html.deck-editing [contenteditable="true"] span[data-math] { cursor: pointer; border-radius: 3px; }
+html.deck-editing [contenteditable="true"] span[data-math]:hover { background: rgba(70, 120, 255, 0.16); }
 `;
 
 export class Deck extends EventTarget {

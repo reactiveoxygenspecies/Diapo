@@ -8,7 +8,8 @@
    background-color">. Everything else is dropped or reduced to its text: classes, ids, fonts
    and sizes (Word's pt sizes included), Mso styles, layout and position styles, event
    handlers, scripts, images. Blocks (paragraphs, headings, list items, table rows) become
-   lines, with the block's own colour and emphasis carried on its content.
+   lines, with the block's own colour and emphasis carried on its content. An equation inside
+   text (<span data-math>) keeps its LaTeX and nothing else.
 
    The result is built with DOM calls from parsed (inert) markup, never by string pasting, so
    nothing in the source can reach the output as an attribute or a tag.
@@ -117,6 +118,20 @@ export function cleanPastedHtml(html, doc, target) {
         if (node.nodeType === NODE_TEXT) { text(dst, node.data, pre); return; }
         if (node.nodeType !== NODE_ELEMENT) return;       // comments (Word's conditional ones) and the like
         const tag = node.localName;
+        // An equation inside text (copied from another text box here) keeps its LaTeX; its
+        // drawing is not taken from the clipboard but made again from the LaTeX (inlinemath.js),
+        // the LaTeX standing in as text until then.
+        if (tag === 'span' && node.hasAttribute('data-math') && !node.hasAttribute('hidden')) {
+            const tex = node.getAttribute('data-math').slice(0, 4000);
+            if (!tex.trim()) return;
+            const m = src.createElement('span');
+            m.setAttribute('data-math', tex);
+            if (node.getAttribute('data-math-font') === 'stix2') m.setAttribute('data-math-font', 'stix2');
+            m.textContent = tex;
+            dst.appendChild(m);
+            state.lineStart = false;
+            return;
+        }
         if (DROP.has(tag) || node.hasAttribute('hidden')) return;
         const st = node.style;
         if (st && (st.display === 'none' || st.visibility === 'hidden' || /mso-hide:\s*all/i.test(node.getAttribute('style') || ''))) return;

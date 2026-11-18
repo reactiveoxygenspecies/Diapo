@@ -300,6 +300,11 @@ deck) and the user edits in its Equation or Structure section.
   `color`; other atoms the usual colours, or one colour with
   `data-chem-colours="off"`. Aromatic rings get alternating double bonds;
   `data-chem-aromatic="circles"` draws circles.
+- Maths inside a sentence is a `span` in the text, not a figure:
+  `<p>The rate constant <span data-math="k_{obs}"></span> rises with T.</p>`.
+  The editor draws it in the text's size and colour, on its baseline (the user
+  puts one in with Alt+= while typing). Keep it short: a symbol, an index, a
+  small expression; a full equation is a figure.
 - No `<svg>` in what you write: the editor draws it when it opens the deck;
   save there (Ctrl+S) and the drawing is in the file. Until then the figure
   is empty outside the editor (check-deck warns), and a source that does not

@@ -21,6 +21,7 @@ import { History } from './core/history.js';
 import { Selection } from './core/selection.js';
 import { Inspector } from './core/inspector.js';
 import { TextEditor } from './core/textedit.js';
+import { InlineMath } from './core/inlinemath.js';
 import { SlideStrip, slidesWord } from './core/slides.js';
 import { Inserter, ICONS } from './core/insert.js';
 import { Presenter } from './core/present.js';
@@ -1029,7 +1030,7 @@ $('btnPreview').addEventListener('click', () => setPreview(true));
 const KEYS = [
     ['Files', [['Ctrl+O', 'Open the deck list (File menu: New deck, Import, Change folder)'], ['Ctrl+S', 'Save'], ['Ctrl+Shift+S', 'Save as: a new name or folder, with the deck\'s files copied along'], ['Ctrl+P', 'Export as PDF (Export menu: single HTML file, PowerPoint)'], ['Ctrl+T', 'Theme panel (colours, fonts, base styles)'], ['F5', 'Preview'], ['P / Shift+F5', 'Presenter view (second window)'], ['Esc', 'Leave preview, close dialogs, deselect']]],
     ['Slides', [['PgUp / PgDn', 'Previous / next slide'], ['Home / End', 'First / last slide'], ['Ctrl+M', 'New slide (layout picker; Ctrl+Shift+M: blank)'], ['Ctrl+D', 'Duplicate (slide or selection)'], ['Ctrl+Up / Down', 'Move the slide, or the picked slides, up / down'], ['Ctrl+click / Shift+click a thumbnail', 'Pick several slides; drag one of them to move them all'], ['Shift+Up / Down (strip)', 'Pick one more or one fewer slide (Esc: none)']]],
-    ['Canvas', [['Click', 'Select'], ['Shift+click', 'Add to the selection'], ['Ctrl+click', 'Select the exact element under the cursor (a plain drag then moves just that)'], ['Alt+drag', 'Duplicate what you drag'], ['Ctrl while dragging', 'Disable snapping'], ['Shift / Alt while resizing', 'Keep the aspect ratio (corners) / resize about the centre; both together, both'], ['Right-click', 'Element menu'], ['Drag on empty space', 'Marquee select'], ['Double-click / Enter', 'Edit text (Esc when done; Ctrl+B / I / U, Ctrl+Shift+X strike, Ctrl+Shift+= superscript, Ctrl+= subscript while editing)'], ['Arrows', 'Nudge 1px (Shift: 10px)'], ['Delete', 'Delete the selection (Hide is in the panel and the menu)'], ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste, also across slides; images and text from elsewhere paste too'], ['Ctrl+Alt+C / Ctrl+Alt+V', 'Copy the look of an element (colours, border, type, padding) / put it on the selection'], ['Ctrl+G / Ctrl+Shift+G', 'Group / ungroup'], ['Ctrl+] / Ctrl+[', 'Bring forward / send backward (Shift: to front / to back)'], ['Tab', 'Next sibling'], ['Ctrl+F / Ctrl+H', 'Find / find and replace across the deck (Enter / Shift+Enter: next / previous match; Esc closes)'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'], ['Ctrl++ / Ctrl+- / Ctrl+0', 'Zoom in / out / fit'], ['Space+drag, middle button, wheel', 'Pan when zoomed in (the middle button grabs the view)'], ['Ctrl+\\', 'Hide / show both side panels (drag their edges to resize)']]],
+    ['Canvas', [['Click', 'Select'], ['Shift+click', 'Add to the selection'], ['Ctrl+click', 'Select the exact element under the cursor (a plain drag then moves just that)'], ['Alt+drag', 'Duplicate what you drag'], ['Ctrl while dragging', 'Disable snapping'], ['Shift / Alt while resizing', 'Keep the aspect ratio (corners) / resize about the centre; both together, both'], ['Right-click', 'Element menu'], ['Drag on empty space', 'Marquee select'], ['Double-click / Enter', 'Edit text (Esc when done; Ctrl+B / I / U, Ctrl+Shift+X strike, Ctrl+Shift+= superscript, Ctrl+= subscript, Alt+= an equation in the text while editing)'], ['Arrows', 'Nudge 1px (Shift: 10px)'], ['Delete', 'Delete the selection (Hide is in the panel and the menu)'], ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste, also across slides; images and text from elsewhere paste too'], ['Ctrl+Alt+C / Ctrl+Alt+V', 'Copy the look of an element (colours, border, type, padding) / put it on the selection'], ['Ctrl+G / Ctrl+Shift+G', 'Group / ungroup'], ['Ctrl+] / Ctrl+[', 'Bring forward / send backward (Shift: to front / to back)'], ['Tab', 'Next sibling'], ['Ctrl+F / Ctrl+H', 'Find / find and replace across the deck (Enter / Shift+Enter: next / previous match; Esc closes)'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'], ['Ctrl++ / Ctrl+- / Ctrl+0', 'Zoom in / out / fit'], ['Space+drag, middle button, wheel', 'Pan when zoomed in (the middle button grabs the view)'], ['Ctrl+\\', 'Hide / show both side panels (drag their edges to resize)']]],
 ];
 /* The "?" dialog: the keyboard map, and a tab "About Diapo" (version, checking for a new
    release, links). tab: 'keys' or 'about'. The shortcuts stay one keypress away: the dialog
@@ -1200,6 +1201,7 @@ function onKey(e) {
 
     if (k === 'Escape') {
         if (app.palette && app.palette.open) { app.palette.close(); return stop(e); }
+        if (app.inlineMath && app.inlineMath.isOpen) { app.inlineMath.close(); return stop(e); }   // the text edit goes on, as it was
         if (app.find && app.find.open) { app.find.close(); return stop(e); }
         if (app.fontPicker && app.fontPicker.isOpen) { app.fontPicker.close(); return stop(e); }
         if (app.iconPicker && app.iconPicker.isOpen) { app.iconPicker.close(); return stop(e); }
@@ -1241,7 +1243,7 @@ function onKey(e) {
     if (k === 'F5') { stop(e); setPreview(true); return; }
     // Ctrl+F / Ctrl+H: find and replace across the deck (the browser's find does not see into it).
     // In a panel field they stay the browser's; in the find bar itself Ctrl+Z is the field's own undo.
-    if (typing && t.closest('#findBar') && ctrl && (k.toLowerCase() === 'z' || k.toLowerCase() === 'y')) return;
+    if (typing && t.closest('#findBar, .mathpop') && ctrl && (k.toLowerCase() === 'z' || k.toLowerCase() === 'y')) return;
     if (ctrl && !e.altKey && (k.toLowerCase() === 'f' || k.toLowerCase() === 'h')) {
         if (typing && !t.closest('#findBar') && !t.isContentEditable) return;
         stop(e);
@@ -1422,6 +1424,7 @@ app.toast = toast;
 app.selection = new Selection(app, { overlay: $('overlay'), wrap: $('stageWrap'), canvas: $('canvas') });
 app.inspector = new Inspector(app, $('inspectorBody'));
 app.textEdit = new TextEditor(app, { overlay: $('overlay'), wrap: $('stageWrap'), canvas: $('canvas') });
+app.inlineMath = new InlineMath(app);
 // The panel's type fields follow the part of the text that is selected while editing in place.
 app.textEdit.addEventListener('selection', () => app.inspector.sync());
 app.strip = new SlideStrip(app, { list: $('stripList'), addButton: $('btnAddSlide') });
@@ -1612,6 +1615,8 @@ function paletteEntries() {
         out.push({ group: 'Slide', label: 'Auto-animate to the next slide (on / off)', run: () => { const s = app.deck.currentSlide; if (s) { sel.clear(); $('inspAutoAnimate').checked = !s.hasAttribute('data-auto-animate'); $('inspAutoAnimate').dispatchEvent(new Event('change')); } } });
         for (const [kind, label] of [['text', 'Text box'], ['list', 'Bullet list'], ['olist', 'Numbered list'], ['table', 'Table'], ['chart', 'Chart'], ['code', 'Code block'], ['image', 'Image from file...'], ['image-url', 'Image from URL...'], ['placeholder', 'Image placeholder'], ['video', 'Video from file...'], ['embed', 'Embed web page or video...'], ['rect', 'Rectangle'], ['rounded', 'Rounded rectangle'], ['ellipse', 'Ellipse'], ['shape:triangle', 'Triangle'], ['shape:diamond', 'Diamond'], ['shape:hexagon', 'Hexagon'], ['shape:star', 'Star'], ['shape:block-arrow', 'Block arrow'], ['shape:chevron', 'Chevron'], ['shape:bubble', 'Speech bubble'], ['line', 'Line'], ['arrow', 'Arrow'], ['curved', 'Curved arrow'], ['double', 'Double arrow'], ['master-footer', 'Footer on every slide']]) out.push(insert(kind, label));
         out.push({ group: 'Insert', label: 'Equation', keywords: 'math maths latex formula tex', run: click('[data-insert="equation"]') });
+        // Into the text being edited, at the caret (or the text selected on the canvas, at its end).
+        if (app.textEdit.el || one) out.push({ group: 'Insert', label: 'Equation in the text', hint: 'Alt+=', keywords: 'inline math maths latex formula tex sentence', run: () => app.inlineMath.fromCaret() });
         out.push({ group: 'Insert', label: 'Interactive chart (Plotly)...', keywords: 'plot plotly json figure graph live hover zoom', run: click('[data-insert="plot"]') });
         out.push({ group: 'Insert', label: 'Chemical structure', keywords: 'chemistry molecule smiles compound', run: click('[data-insert="structure"]') });
         out.push({ group: 'Insert', label: 'Font Awesome icon...', keywords: 'icons fa', run: (q) => { app.iconPicker.open($('btnInsert')); const words = q.replace(/\b(font awesome|icon|icons|fa)\b/gi, '').trim(); if (words && app.iconPicker.search) { app.iconPicker.search.value = words; app.iconPicker.search.dispatchEvent(new Event('input')); } } });

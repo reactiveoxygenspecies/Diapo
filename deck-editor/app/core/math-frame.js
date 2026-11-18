@@ -24,7 +24,7 @@ script.src = '/vendor/mathjax4/tex-mml-svg-mathjax-stix2.js';
 const loaded = new Promise((resolve, reject) => { script.onload = resolve; script.onerror = () => reject(new Error('could not load MathJax 4')); });
 document.head.appendChild(script);
 
-window.renderTex = async function (tex, { em = 16, ex = 8 } = {}) {
+window.renderTex = async function (tex, { em = 16, ex = 8, display = true } = {}) {
     await loaded;
     await window.MathJax.startup.promise;
     // The synchronous call, retried when MathJax has to load glyphs first (it throws with a
@@ -32,7 +32,7 @@ window.renderTex = async function (tex, { em = 16, ex = 8 } = {}) {
     // not give a hidden frame in a window that is in the background.
     let node;
     for (let i = 0; !node; i++) {
-        try { node = window.MathJax.tex2svg(tex, { display: true, em, ex, containerWidth: 1920 }); }
+        try { node = window.MathJax.tex2svg(tex, { display, em, ex, containerWidth: 1920 }); }
         catch (err) {
             if (err && err.retry && i < 30) { await err.retry; continue; }
             throw new Error(err && err.message ? err.message : String(err));

@@ -86,8 +86,8 @@ current working directory; if that is the editor's own repository, its
   edits in the editor: say so and ask before touching the file.
 - Leave what the editor made as it is: `figure[data-chart]` (edit its JSON
   table, then open and save in the editor to redraw), `figure[data-math]` and
-  `figure[data-chem]` (change the attribute and drop the `<svg>`; the editor
-  draws it again), `figure[data-plot]` (change the JSON in its
+  `figure[data-chem]`, `span[data-math]` in text (change the attribute and drop
+  the `<svg>`; the editor draws it again), `figure[data-plot]` (change the JSON in its
   `script[data-plot-figure]` and delete its `<img data-plot-snapshot>`; the
   editor draws the picture again), `div[data-crop]` round
   a cropped picture, `data-fit`, `data-locked`, `data-guides`, `data-id`.
@@ -230,10 +230,11 @@ Then write the deck:
   `figure[data-plot="plotly"]` holding its JSON, editor-integration.md
   "Interactive charts (Plotly)": Diapo runs that library as its own, with no
   trust bar. Never a hand-written `Plotly.newPlot(...)` script.
-- Equations as `figure[data-math]` (LaTeX, mhchem's `\ce{}` for reactions) and
-  molecules as `figure[data-chem]` (SMILES), deck-template.md "Equations and
-  chemical structures": never a picture of a formula or a hand-drawn SVG
-  molecule, which the user cannot edit.
+- Equations as `figure[data-math]` (LaTeX, mhchem's `\ce{}` for reactions),
+  maths inside a sentence as `span[data-math]` in the text, and molecules as
+  `figure[data-chem]` (SMILES), deck-template.md "Equations and chemical
+  structures": never a picture of a formula, Unicode stand-ins for real maths,
+  or a hand-drawn SVG molecule, which the user cannot edit.
 - Entrances with `.reveal*` + `--i`; fragments where the argument builds;
   transitions and text effects sparingly; a footer master layer with the page
   counter unless the design rejects chrome.

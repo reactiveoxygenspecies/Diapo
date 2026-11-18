@@ -860,7 +860,7 @@ export class Inspector {
     /* What auto-animate can move: the leaves of a slide (text blocks, pictures, shapes, charts). */
     _morphCandidates(slide) {
         if (!slide) return [];
-        const els = Array.from(slide.querySelectorAll('h1, h2, h3, h4, p, li, img, svg, div:empty, [data-edit], [data-fig], [data-svg], [data-id]')).filter(el => !el.closest(DRAWN) || el.matches(DRAWN));
+        const els = Array.from(slide.querySelectorAll('h1, h2, h3, h4, p, li, img, svg, div:empty, [data-edit], [data-fig], [data-svg], [data-id]')).filter(el => (!el.closest(DRAWN) || el.matches(DRAWN)) && !el.closest('span[data-math]'));   // an equation in text moves with its text
         return els.filter(el => !(el.querySelector('[data-edit], h1, h2, h3, p, li') && !el.matches('[data-edit], h1, h2, h3, h4, p, li')));   // leaves only
     }
     _uniqueId() { return uniqueId(this.deck.doc); }
