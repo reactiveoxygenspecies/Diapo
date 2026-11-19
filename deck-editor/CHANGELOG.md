@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 - 2026-11-19
 
 - **Interactive charts from Plotly.** Insert > Interactive chart (Plotly)...
   takes a Plotly figure as pasted JSON, a `.json` file or a page saved with
