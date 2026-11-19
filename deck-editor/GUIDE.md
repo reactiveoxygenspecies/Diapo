@@ -75,6 +75,15 @@ any browser, without Diapo, and presents on its own.
 - **Preview** (F5) shows the deck full screen in the window; Esc comes back.
 - **Presenter** (P) opens a second window with the next slide, your notes and
   a timer; put it on your laptop screen and the deck on the projector.
+- While Diapo is in front, the screen stays on and the computer does not go
+  to sleep, so a slide can stay up while people work. **Look > Keep the screen
+  on** turns this off. A saved deck opened on its own always keeps the screen
+  on while it is in front.
+- To find a slide while presenting, press **Ctrl+Shift+F** (or **/**) and type
+  words from its title or text: the overview keeps the slides that match, and
+  Enter goes there, shows the steps up to what you looked for and outlines it.
+  The presenter window's **Find** also searches your notes, out of the class's
+  sight. Typing a slide's number and Enter goes straight to it.
 - In the saved file, on any computer: **P** presenter view, **O** overview,
   **L** laser pointer, **D** draw on the slide, **A** run by itself. Press
   **?** to see the keys over the deck; a deck opened on its own says

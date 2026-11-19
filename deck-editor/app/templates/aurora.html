@@ -530,6 +530,15 @@ new SlidePresentation();
      O                overview: a grid of all slides; click or arrows +
                       Enter to jump,
                       O or Esc closes
+     Ctrl+Shift+F, Ctrl+K, /
+                      find a slide: the overview with a field that keeps
+                      the slides whose title, words, pictures' descriptions,
+                      chart titles, equations or section match; Enter goes
+                      there, shows its steps up to what matched and outlines
+                      it. The presenter window has the same (Find), with the
+                      notes searched too. Inside a frame only / (the editor
+                      keeps its Ctrl keys)
+     12 Enter         go to slide 12 (Backspace, Esc while typing)
      A                run by itself: each slide (and each fragment) waits
                       its data-auto-advance seconds, then moves on
      L                laser pointer on / off
@@ -543,6 +552,9 @@ new SlidePresentation();
                       on its own in a browser says "Press ? for keys" for 4 s.
                       (Home / End and H belong to the deck's controller; the
                       list names them too.)
+
+   A deck opened on its own keeps the screen on while it is in front
+   (the browser's Screen Wake Lock), so a slide left up stays up.
 
    Markup it understands
      [data-fragment]                    revealed one step at a time
@@ -641,11 +653,15 @@ new SlidePresentation();
     // large enough for a projector. It sits outside the stage, so it is never part of a slide, and it is
     // dropped on save (the editor keeps only what the file had), from print and from thumbnails.
     var KEY_GROUPS = [
-        ['Move', [['Right  Down  Space  PgDn', 'Next step, then next slide'], ['Left  Up  PgUp', 'Back one step or slide'], ['Home  End', 'First or last slide']]],
-        ['Show', [['P', 'Presenter view in a second window'], ['O', 'Overview of all slides (arrows and Enter to pick)'], ['A', 'Run by itself, on or off'], ['L', 'Laser pointer'], ['H', 'Hide or show the arrows'], ['?', 'This list']]],
+        ['Move', [['Right  Down  Space  PgDn', 'Next step, then next slide'], ['Left  Up  PgUp', 'Back one step or slide'], ['Home  End', 'First or last slide'], ['12  Enter', 'Go to slide 12: type its number']]],
+        ['Show', [['P', 'Presenter view in a second window'], ['O', 'Overview of all slides (arrows and Enter to pick)'], ['Ctrl+Shift+F  /', 'Find a slide by its title or words'], ['A', 'Run by itself, on or off'], ['L', 'Laser pointer'], ['H', 'Hide or show the arrows'], ['?', 'This list']]],
         ['Draw', [['D', 'Draw on the slide, D or Esc when done'], ['1 - 5', 'Pen colour'], ['[   ]', 'Thinner or thicker'], ['Ctrl+Z', 'Undo a stroke'], ['C', 'Clear this slide']]]
     ];
-    var PRESENTER_KEY_GROUPS = [['Move', [['Right  Down  Space  PgDn', 'Next step, then next slide'], ['Left  Up  PgUp', 'Back one step or slide'], ['Home  End', 'First or last slide']]]];
+    var PRESENTER_KEY_GROUPS = [['Move', [['Right  Down  Space  PgDn', 'Next step, then next slide'], ['Left  Up  PgUp', 'Back one step or slide'], ['Home  End', 'First or last slide'], ['12  Enter', 'Go to slide 12: type its number'], ['Ctrl+Shift+F  /', 'Find a slide by its title, words or notes']]]];
+    /* "?" is the key that types it; Shift+/ also counts on the "/" key itself (code Slash), never on a
+       keyboard where "/" is typed with Shift (Shift+7 on an Italian or German one): there "/" finds. */
+    function isHelpKey(e) { return e.key === '?' || (e.key === '/' && e.shiftKey && e.code === 'Slash'); }
+    var FRAMED = (function () { try { return window.top !== window; } catch (err) { return true; } })();   // in the editor, a presenter preview or another page
     var KEYS_CSS = [
         '.deck-keys{position:fixed;inset:0;z-index:100003;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.4);font:20px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#f2f2f4;cursor:pointer}',
         '.deck-keys .dk-panel{max-width:min(1100px,100%);max-height:100%;overflow:auto;box-sizing:border-box;padding:28px 36px 24px;border-radius:16px;background:rgba(18,19,23,.94);box-shadow:0 0 0 1px rgba(255,255,255,.14),0 24px 60px rgba(0,0,0,.55);outline:none;cursor:default}',
@@ -660,6 +676,33 @@ new SlidePresentation();
         '.deck-keyhint.fade{opacity:0}',
         '@media print{.deck-keys,.deck-keyhint{display:none!important}}'
     ].join('\n');
+    // Finding: the list in a presenter window (the deck's own, or the editor's), the number being
+    // typed, and the outline round what was found. Put into whichever document shows them.
+    var FIND_CSS = [
+        '.deck-finder{position:fixed;inset:0;z-index:100003;display:flex;align-items:flex-start;justify-content:center;padding:8vh 24px 24px;background:rgba(0,0,0,.45);font:16px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#f2f2f4}',
+        '.deck-finder .df-panel{width:min(760px,100%);max-height:100%;display:flex;flex-direction:column;border-radius:14px;background:rgba(18,19,23,.97);box-shadow:0 0 0 1px rgba(255,255,255,.14),0 24px 60px rgba(0,0,0,.55);overflow:hidden}',
+        '.deck-finder .df-input{margin:0;padding:16px 20px;border:0;border-bottom:1px solid rgba(255,255,255,.12);background:transparent;color:#fff;font:inherit;font-size:22px;outline:none}',
+        '.deck-finder .df-input::placeholder{color:#7d808a}',
+        '.deck-finder .df-list{overflow:auto;padding:6px 0}',
+        '.deck-finder .df-item{display:grid;grid-template-columns:3.2em 1fr auto;gap:2px 10px;padding:9px 20px;cursor:pointer}',
+        '.deck-finder .df-item.on{background:rgba(77,141,255,.22);box-shadow:inset 3px 0 #4d8dff}',
+        '.deck-finder .df-n{font-weight:700;font-variant-numeric:tabular-nums;color:#e8e9ec}',
+        '.deck-finder .df-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+        '.deck-finder .df-where{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#9ab8ff}',
+        '.deck-finder .df-snip{grid-column:2/-1;font-size:14px;color:#b6b8c0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+        '.deck-finder .df-none{padding:14px 20px;color:#9a9da6}',
+        '.deck-finder .df-foot{margin:0;padding:8px 20px;border-top:1px solid rgba(255,255,255,.12);font-size:13px;color:#7d808a}',
+        '.deck-finder mark,.deck-overview mark{background:#ffcc00;color:#111;border-radius:2px}',
+        '.deck-num{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:100002;padding:9px 18px;border-radius:999px;background:rgba(18,19,23,.9);color:#f2f2f4;font:600 20px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;pointer-events:none}',
+        '.deck-found{position:fixed;z-index:100001;pointer-events:none;border:4px solid #ffcc00;border-radius:10px;box-shadow:0 0 0 3px rgba(0,0,0,.35),0 0 26px 6px rgba(255,204,0,.5);opacity:0;animation:deck-found 2.2s ease forwards}',
+        '@keyframes deck-found{10%{opacity:1}28%{opacity:.45}44%{opacity:1}78%{opacity:1}100%{opacity:0}}',
+        '@media print{.deck-finder,.deck-num,.deck-found{display:none!important}}'
+    ].join('\n');
+    function findStyle(doc) {
+        if (doc.getElementById('deck-find-style')) return;
+        var st = doc.createElement('style'); st.id = 'deck-find-style'; st.textContent = FIND_CSS;
+        (doc.head || doc.body).appendChild(st);
+    }
     function buildKeys(doc, groups) {
         var box = doc.createElement('div');
         box.className = 'deck-keys';
@@ -724,6 +767,26 @@ new SlidePresentation();
         setTimeout(removeHint, 4700);
     })();
 
+    /* Keep the screen on while a deck opened on its own is in front (the browser's Screen Wake
+       Lock), so a slide left up stays up. The browser lets go whenever the page is hidden, so it
+       is asked for again when the page comes back; a browser without it (or a battery saver
+       that refuses it) leaves the power settings in charge. Inside the editor or a frame the
+       host decides (the editor has its own, under Look > Keep the screen on). */
+    (function () {
+        var framed = true;
+        try { framed = window.top !== window; } catch (err) { /* cross-origin parent: framed */ }
+        if (framed || !(navigator.wakeLock && navigator.wakeLock.request)) return;
+        var lock = null, asking = false;
+        function sync() {
+            if (document.visibilityState !== 'visible' || editing() || asking || (lock && !lock.released)) return;
+            asking = true;
+            navigator.wakeLock.request('screen').then(function (s) { lock = s; }, function () { /* refused */ })
+                .then(function () { asking = false; });
+        }
+        document.addEventListener('visibilitychange', sync);
+        sync();
+    })();
+
     /* ---------- base styles for fragments and the overview ---------- */
     var style = document.createElement('style');
     style.id = 'deck-runtime-style';
@@ -753,6 +816,12 @@ new SlidePresentation();
         '.deck-overview .ov-inner{position:absolute;left:0;top:0;width:var(--deck-w,1920px);height:var(--deck-h,1080px);transform-origin:0 0;background:#fff;pointer-events:none}',
         '.deck-overview .ov-inner *{transition:none!important;animation:none!important}',
         '.deck-overview .ov-inner [data-fragment]{opacity:1!important}',
+        '.deck-overview [hidden]{display:none!important}',
+        '.deck-overview .ov-find{flex:1 1 auto;max-width:440px;margin:0 auto 0 8px;padding:7px 12px;border:1px solid rgba(255,255,255,.2);border-radius:8px;background:#1b1d22;color:#f2f2f4;font:14px system-ui,sans-serif;outline:none}',
+        '.deck-overview .ov-find:focus{border-color:#4d8dff;box-shadow:0 0 0 3px rgba(77,141,255,.3)}',
+        '.deck-overview .ov-find::placeholder{color:#7d808a}',
+        '.deck-overview .ov-snip{margin-top:4px;padding:0 2px;color:#b6b8c0;font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
+        '.deck-overview .ov-none{grid-column:1/-1;padding:30px 2px;font-size:15px;color:#9a9da6}',
         'html.deck-laser-on, html.deck-laser-on *{cursor:none!important}',
         '.deck-laser{position:fixed;left:-100px;top:-100px;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:radial-gradient(circle,#fff 0 18%,#ff2d2d 30%,rgba(255,45,45,.85) 55%,rgba(255,45,45,0) 75%);box-shadow:0 0 18px 6px rgba(255,45,45,.55);pointer-events:none;z-index:100001;opacity:0}',
         '.deck-draw{position:fixed;inset:0;z-index:99999;cursor:crosshair;touch-action:none}',
@@ -761,7 +830,8 @@ new SlidePresentation();
         '.deck-draw-bar button{height:28px;min-width:28px;padding:0 8px;border:2px solid transparent;border-radius:8px;background:#2a2d35;color:#fff;font:inherit;cursor:pointer}',
         '.deck-draw-bar button[data-colour]{width:28px;padding:0}.deck-draw-bar button.on{border-color:#fff}.deck-draw-bar button:hover{filter:brightness(1.15)}',
         '.deck-draw-bar .sep{width:1px;height:20px;background:#3a3d46;margin:0 2px}',
-        KEYS_CSS
+        KEYS_CSS,
+        FIND_CSS
     ].join('\n');
     document.head.appendChild(style);
 
@@ -847,6 +917,7 @@ new SlidePresentation();
             textEffects(to);
         }
         notify();
+        if (findPending && findPending.index === i) applyFind();      // a slide picked from a search: its steps and the outline
     }
 
     /* ============================================================
@@ -1189,17 +1260,26 @@ new SlidePresentation();
        OVERVIEW (O)
        ============================================================ */
     var overview = null, ovIndex = 0;
-    function openOverview() {
-        if (overview) return;
+    var ovTiles = [], ovRecs = null, ovFind = null, ovCount = null, ovNone = null;
+    /* focusFind: opened to search (Ctrl+Shift+F, /), so the field has the keys. Opened with O, the
+       keys stay the deck's (O closes it again); / or a click goes into the field. */
+    function openOverview(focusFind) {
+        if (overview) { if (focusFind && ovFind) { ovFind.focus(); ovFind.select(); } return; }
         var all = slides(), cur = current();
         overview = document.createElement('div');
         overview.className = 'deck-overview';
         var head = document.createElement('div');
         head.className = 'ov-head';
-        var title = document.createElement('b'); title.textContent = (document.title || 'Deck').trim() + ' · ' + all.length + (all.length === 1 ? ' slide' : ' slides');
-        var hint = document.createElement('span'); hint.innerHTML = 'Click or <kbd>Enter</kbd> opens a slide, arrows move, <kbd>Esc</kbd> closes';
-        head.appendChild(title); head.appendChild(hint);
+        var title = document.createElement('b'); title.textContent = (document.title || 'Deck').trim() + ' · ';
+        ovCount = document.createElement('span'); title.appendChild(ovCount);
+        ovFind = document.createElement('input');
+        ovFind.className = 'ov-find'; ovFind.type = 'search'; ovFind.autocomplete = 'off'; ovFind.spellcheck = false;
+        ovFind.placeholder = 'Find a slide: its title, words on it, or its number';
+        ovFind.setAttribute('aria-label', 'Find a slide');
+        var hint = document.createElement('span'); hint.innerHTML = 'Click or <kbd>Enter</kbd> opens a slide, arrows move, <kbd>/</kbd> finds, <kbd>Esc</kbd> closes';
+        head.appendChild(title); head.appendChild(ovFind); head.appendChild(hint);
         overview.appendChild(head);
+        ovTiles = [];
         all.forEach(function (slide, i) {
             if (slide.getAttribute('data-section')) {
                 var label = document.createElement('div');
@@ -1224,52 +1304,410 @@ new SlidePresentation();
             tile.appendChild(frame);
             var cap = document.createElement('div'); cap.className = 'ov-cap';
             var num = document.createElement('span'); num.className = 'ov-n'; num.textContent = i + 1; cap.appendChild(num);
-            var name = labelOf(slide);
-            if (name) { var t = document.createElement('span'); t.className = 'ov-t'; t.textContent = name; cap.appendChild(t); }
+            var name = labelOf(slide), t = null;
+            if (name) { t = document.createElement('span'); t.className = 'ov-t'; t.textContent = name; cap.appendChild(t); }
             tile.appendChild(cap);
-            tile.addEventListener('click', function () { closeOverview(); goTo(i); });
+            var snip = document.createElement('div'); snip.className = 'ov-snip'; snip.hidden = true;
+            tile.appendChild(snip);
+            tile.addEventListener('click', function () { pickOverview(i); });
             overview.appendChild(tile);
+            ovTiles.push({ tile: tile, index: i, name: name, t: t, snip: snip, section: tile.previousElementSibling && tile.previousElementSibling.className === 'ov-section' ? tile.previousElementSibling : null });
         });
+        ovNone = document.createElement('div'); ovNone.className = 'ov-none'; ovNone.hidden = true;
+        overview.appendChild(ovNone);
         document.body.appendChild(overview);
         ovIndex = cur;
+        ovRecs = null;
+        countOverview(all.length);
+        ovFind.addEventListener('input', function () { filterOverview(ovFind.value); });
+        // The field keeps its keys from the deck (the controller would take arrows, Space and H).
+        ovFind.addEventListener('keydown', function (e) {
+            e.stopPropagation();
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            var k = e.key;
+            if (k === 'Escape') { e.preventDefault(); closeOverview(); }
+            else if (k === 'Enter') { e.preventDefault(); pickOverview(ovIndex); }
+            else if (k === 'ArrowDown' || k === 'ArrowUp') { e.preventDefault(); moveOverview(0, k === 'ArrowDown' ? 1 : -1); }
+            else if (k === 'ArrowRight' || k === 'ArrowLeft') { e.preventDefault(); moveOverview(k === 'ArrowRight' ? 1 : -1, 0); }
+        });
         scaleOverview();
         window.addEventListener('resize', scaleOverview);
         var c = overview.querySelector('.ov-tile.current');   // centred, unless it is in view from the top with the header
         if (c && c.offsetTop + c.offsetHeight > overview.clientHeight) c.scrollIntoView({ block: 'center' });
+        if (focusFind) ovFind.focus();
     }
-    /* Arrow keys move the highlight through the grid (up/down by a row); Enter opens it. */
-    function moveOverview(dx, dy) {
-        var tiles = overview.querySelectorAll('.ov-tile');
-        if (!tiles.length) return;
-        var n = tiles.length, i = ovIndex, cols = 1;
-        if (dy) {
-            var top = tiles[0].offsetTop;
-            while (cols < n && tiles[cols].offsetTop === top) cols++;
+    function countOverview(shown) {
+        var n = ovTiles.length;
+        ovCount.textContent = shown === n ? n + (n === 1 ? ' slide' : ' slides') : shown + ' of ' + n + ' slides';
+    }
+    /* Typing in the field keeps the slides that match (title, words, pictures' descriptions, chart
+       titles, equations, section) in the deck's order, marks the words, and picks the best match:
+       the slide of that number, else the first whose title has the words, else the first. */
+    function filterOverview(q) {
+        if (!overview) return;
+        var terms = termsOf(q), byIndex = {}, best = null, shown = 0;
+        if (q.trim()) {
+            if (!ovRecs) ovRecs = records(false);
+            search(q, { records: ovRecs }).forEach(function (r) {
+                byIndex[r.index] = r;
+                if (!best || r.rank < best.rank) best = r;
+            });
         }
-        i += dx + dy * cols;
-        if (i < 0 || i >= n) { if (dx) i = (i + n) % n; else return; }
-        if (i === ovIndex) return;
-        tiles[ovIndex].classList.remove('current');
-        tiles[i].classList.add('current');
+        var filtering = !!q.trim();
+        ovTiles.forEach(function (o) {
+            var r = byIndex[o.index], show = !filtering || !!r;
+            o.tile.hidden = !show;
+            if (show) shown++;
+            if (o.t) { o.t.textContent = ''; o.t.appendChild(marked(document, o.name, filtering ? terms : [])); }
+            o.snip.textContent = '';
+            o.snip.hidden = !(r && r.snippet);
+            if (r && r.snippet) o.snip.appendChild(marked(document, r.snippet, terms));
+        });
+        // A section label shows while any slide under it does.
+        Array.prototype.forEach.call(overview.querySelectorAll('.ov-section'), function (label) {
+            var any = false;
+            for (var n = label.nextElementSibling; n && n.className.indexOf('ov-section') < 0; n = n.nextElementSibling) if (n.classList.contains('ov-tile') && !n.hidden) { any = true; break; }
+            label.hidden = !any;
+        });
+        ovNone.hidden = shown > 0;
+        ovNone.textContent = shown ? '' : 'No slide has “' + q.trim() + '”.';
+        countOverview(shown);
+        if (best) setOverviewCurrent(best.index);
+        else if (!filtering) setOverviewCurrent(ovIndex);
+        scaleOverview();
+    }
+    function setOverviewCurrent(i) {
+        ovTiles.forEach(function (o) { o.tile.classList.toggle('current', o.index === i); });
         ovIndex = i;
-        tiles[i].scrollIntoView({ block: 'nearest' });
+        var o = ovTiles[i];
+        if (o && !o.tile.hidden) o.tile.scrollIntoView({ block: 'nearest' });
+    }
+    function pickOverview(i) {
+        var q = ovFind ? ovFind.value.trim() : '';
+        var o = ovTiles[i];
+        if (!o || o.tile.hidden) return;
+        var byNumber = /^\d+$/.test(q) && parseInt(q, 10) === i + 1;
+        closeOverview();
+        if (q && !byNumber) reveal(i, q); else goTo(i);
+    }
+    /* Arrow keys move the highlight through the slides on show (up/down by a row); Enter opens it. */
+    function moveOverview(dx, dy) {
+        var tiles = ovTiles.filter(function (o) { return !o.tile.hidden; });
+        if (!tiles.length) return;
+        var n = tiles.length, at = 0, cols = 1;
+        for (var j = 0; j < n; j++) if (tiles[j].index === ovIndex) { at = j; break; }
+        if (dy) {
+            var top = tiles[0].tile.offsetTop;
+            while (cols < n && tiles[cols].tile.offsetTop === top) cols++;
+        }
+        var i = at + dx + dy * cols;
+        if (i < 0 || i >= n) { if (dx) i = (i + n) % n; else return; }
+        if (tiles[i].index === ovIndex) return;
+        setOverviewCurrent(tiles[i].index);
     }
     function scaleOverview() {
         if (!overview) return;
         // The tiles are scaled copies of the stage, whatever size the deck's CSS gives it.
         var sw = stage.offsetWidth || 1920, sh = stage.offsetHeight || 1080;
         overview.style.setProperty('--deck-w', sw + 'px'); overview.style.setProperty('--deck-h', sh + 'px'); overview.style.setProperty('--deck-ar', sw + '/' + sh);
-        Array.prototype.forEach.call(overview.querySelectorAll('.ov-tile'), function (tile) {
-            var k = tile.clientWidth / sw;
-            tile.querySelector('.ov-inner').style.transform = 'scale(' + k + ')';
+        ovTiles.forEach(function (o) {
+            if (o.tile.hidden) return;
+            var k = o.tile.clientWidth / sw;
+            o.tile.querySelector('.ov-inner').style.transform = 'scale(' + k + ')';
         });
     }
     function closeOverview() {
         if (!overview) return;
         window.removeEventListener('resize', scaleOverview);
         overview.remove();
-        overview = null;
+        overview = null; ovTiles = []; ovRecs = null; ovFind = null;
     }
+
+    /* ============================================================
+       FIND (Ctrl+Shift+F, Ctrl+K or / in the deck; a number and Enter)
+       Slides are found by their title, the words on them, the
+       descriptions of their pictures, chart titles, equations (by
+       their LaTeX) and the name of their section. A presenter window
+       also finds words in the notes, which the deck itself never
+       shows (the class would see them). Picking a slide found by its
+       words goes there, shows its steps up to the element that matched
+       and outlines that element for a moment.
+       ============================================================ */
+    /* Lower case without accents, one character for one, so a place in the folded text is the same
+       place in the text. */
+    function fold(s) {
+        var out = '';
+        for (var i = 0; i < s.length; i++) {
+            var c = s.charAt(i), f = (c.normalize ? c.normalize('NFD').replace(/[̀-ͯ]/g, '') : c).toLowerCase();
+            out += f ? f.charAt(0) : c;
+        }
+        return out;
+    }
+    function termsOf(q) { return fold(String(q || '')).split(/\s+/).filter(Boolean); }
+    function hasAll(text, terms) {
+        for (var i = 0; i < terms.length; i++) if (text.indexOf(terms[i]) < 0) return false;
+        return terms.length > 0;
+    }
+    function isNotes(el) {
+        if (!el.matches) return false;
+        return el.matches('aside.notes') || (el.classList.contains('notes') && !!el.parentNode && !!el.parentNode.classList && el.parentNode.classList.contains('slide'));
+    }
+    function jsonTitle(script, plot) {
+        try {
+            var d = JSON.parse(script.textContent), t = plot ? d.layout && d.layout.title : d.title;
+            return typeof t === 'string' ? t : (t && typeof t.text === 'string' ? t.text : '');
+        } catch (e) { return ''; }
+    }
+    var INLINE = /^(a|abbr|b|bdi|bdo|br|cite|code|dfn|em|font|i|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)$/i;
+    /* What can be found in an element: its text, a picture's description, an equation's LaTeX, a
+       chart's title; never the notes, styles, scripts or a chart's data. */
+    function textOf(node) {
+        if (node.nodeType === 3) return node.nodeValue;
+        if (node.nodeType !== 1 || isNotes(node)) return '';
+        var tag = node.tagName.toLowerCase();
+        if (tag === 'script') return node.hasAttribute('data-plot-figure') ? ' ' + jsonTitle(node, true) + ' ' : node.hasAttribute('data-chart-data') ? ' ' + jsonTitle(node, false) + ' ' : '';
+        if (tag === 'style' || tag === 'template' || tag === 'noscript') return '';
+        if (node.hasAttribute('data-math')) return ' ' + node.getAttribute('data-math') + ' ';
+        var gap = INLINE.test(tag) ? '' : ' ', out = gap;
+        var alt = node.getAttribute('alt') || node.getAttribute('aria-label');
+        if (alt) out += ' ' + alt + ' ';
+        for (var c = node.firstChild; c; c = c.nextSibling) out += textOf(c);
+        return out + gap;
+    }
+    /* The title shown for a slide in a list: its heading, else its name. Both are found as its title. */
+    function titleOf(slide) {
+        var h = slide.querySelector('h1, h2, h3');
+        return h ? h.textContent.trim().replace(/\s+/g, ' ') : (slide.getAttribute('data-name') || '');
+    }
+    function records(withNotes) {
+        var section = '';
+        return slides().map(function (slide, i) {
+            if (slide.getAttribute('data-section')) section = slide.getAttribute('data-section');
+            var r = { index: i, title: titleOf(slide), section: section, body: textOf(slide).replace(/\s+/g, ' ').trim(),
+                notes: withNotes ? notesOf(slide).replace(/\s+/g, ' ').trim() : '', skip: slide.hasAttribute('data-skip') };
+            r.fTitle = fold(r.title + ' ' + (slide.getAttribute('data-name') || '')); r.fSection = fold(r.section); r.fBody = fold(r.body); r.fNotes = fold(r.notes);
+            return r;
+        });
+    }
+    var WHERE = ['number', 'title', 'slide', 'section', 'notes'];
+    /* How a slide answers: 0 by its number, 1 by its title, 2 by the words on it, 3 with its
+       section's name, 4 only with its notes; -1 not at all. A skipped slide answers only to its number. */
+    function rankOf(r, terms, n) {
+        if (n && r.index === n - 1) return 0;
+        if (!terms.length || r.skip) return -1;
+        if (hasAll(r.fTitle, terms)) return 1;
+        var text = r.fTitle + ' ' + r.fBody;
+        if (hasAll(text, terms)) return 2;
+        text = r.fSection + ' ' + text;
+        if (hasAll(text, terms)) return 3;
+        if (r.fNotes && hasAll(text + ' ' + r.fNotes, terms)) return 4;
+        return -1;
+    }
+    function snippetOf(r, rank, terms) {
+        if (rank === 1 || rank === 3) return '';
+        var text = rank === 4 ? r.notes : r.body, f = rank === 4 ? r.fNotes : r.fBody;
+        if (rank !== 4 && r.title && text.indexOf(r.title) === 0) {      // the title is shown already
+            text = text.slice(r.title.length).trim(); f = fold(text);
+        }
+        if (!text) return '';
+        var at = -1;
+        for (var i = 0; i < terms.length && at < 0; i++) at = f.indexOf(terms[i]);
+        if (at < 0) at = 0;
+        var from = Math.max(0, at - 40), to = Math.min(text.length, from + 130);
+        if (from > 0) { var sp = text.indexOf(' ', from); if (sp > 0 && sp < at) from = sp + 1; }
+        return (from > 0 ? '… ' : '') + text.slice(from, to).trim() + (to < text.length ? ' …' : '');
+    }
+    /* The slides that answer a query, in the deck's order, each with how (rank, where) and a line of
+       text round the first word. opts.notes: also in the notes; opts.records: ready-made records. */
+    function search(query, opts) {
+        opts = opts || {};
+        var recs = opts.records || records(!!opts.notes);
+        var q = String(query || '').trim(), terms = termsOf(q), n = /^\d+$/.test(q) ? parseInt(q, 10) : 0;
+        var out = [];
+        recs.forEach(function (r) {
+            var rank = rankOf(r, terms, n);
+            if (rank < 0) return;
+            out.push({ index: r.index, rank: rank, where: WHERE[rank], title: r.title, section: r.section, snippet: snippetOf(r, rank, terms) });
+        });
+        return out;
+    }
+    /* Text with the query's words in <mark>, as nodes of doc. */
+    function marked(doc, text, terms) {
+        var frag = doc.createDocumentFragment();
+        text = text || '';
+        var f = fold(text), on = [];
+        terms.forEach(function (t) {
+            for (var at = f.indexOf(t); at >= 0; at = f.indexOf(t, at + t.length)) for (var k = at; k < at + t.length; k++) on[k] = true;
+        });
+        for (var i = 0; i < text.length;) {
+            var j = i;
+            while (j < text.length && !!on[j] === !!on[i]) j++;
+            var piece = text.slice(i, j);
+            if (on[i]) { var m = doc.createElement('mark'); m.textContent = piece; frag.appendChild(m); }
+            else frag.appendChild(doc.createTextNode(piece));
+            i = j;
+        }
+        return frag;
+    }
+    /* The element on the slide that holds the words: the innermost one with all of them (or, when they
+       are spread over several, the one with the first), widened from a word in a sentence to its line. */
+    function findIn(slide, terms) {
+        if (!terms.length) return null;
+        function deepest(el, words) {
+            for (var c = el.firstElementChild; c; c = c.nextElementSibling) if (!isNotes(c) && hasAll(fold(textOf(c)), words)) return deepest(c, words);
+            return el;
+        }
+        var el = deepest(slide, terms);
+        if (el === slide) el = deepest(slide, [terms[0]]);
+        while (el && el !== slide && (INLINE.test(el.tagName) || (el.namespaceURI === 'http://www.w3.org/2000/svg' && el.tagName.toLowerCase() !== 'svg'))) el = el.parentNode;
+        return el === slide ? null : el;
+    }
+    var findPending = null, findTimer = 0;
+    /* Go to slide index for a query: show its steps up to what matched and outline it. */
+    function reveal(index, query) {
+        if (!slides()[index]) return;
+        var moved = index !== current();
+        findPending = { index: index, terms: termsOf(query), moved: moved, at: Date.now() };
+        if (moved) goTo(index); else applyFind();
+    }
+    function applyFind() {
+        var p = findPending;
+        findPending = null;
+        if (!p || Date.now() - p.at > 5000) return;
+        var slide = slides()[p.index], el = slide && findIn(slide, p.terms);
+        if (!el) return;
+        // The steps: up to the one that holds the element, or the last one inside it.
+        var groups = fragmentsOf(slide), k = -1, own = el.closest('[data-fragment]');
+        var steps = own && slide.contains(own) ? [own] : Array.prototype.slice.call(el.querySelectorAll('[data-fragment]'));
+        groups.forEach(function (g, i) { steps.forEach(function (s) { if (g.els.indexOf(s) >= 0) k = Math.max(k, i); }); });
+        if (k >= 0) {
+            groups.forEach(function (g, i) {
+                g.els.forEach(function (e) {
+                    var on = i <= k, was = e.classList.contains('visible');
+                    e.classList.toggle('visible', on);
+                    if (on && !was && e.hasAttribute('data-text-effect')) playTextEffect(e);
+                });
+            });
+            notify();
+        }
+        clearTimeout(findTimer);
+        findTimer = setTimeout(function () { outline(el); }, p.moved ? 650 : 60);   // after the slide's transition
+    }
+    function outline(el) {
+        if (!el.isConnected) return;
+        var r = el.getBoundingClientRect();
+        if (!r.width && !r.height) return;
+        var box = document.createElement('div');
+        box.className = 'deck-found';
+        box.style.left = (r.left - 8) + 'px'; box.style.top = (r.top - 8) + 'px';
+        box.style.width = (r.width + 16) + 'px'; box.style.height = (r.height + 16) + 'px';
+        box.style.boxSizing = 'border-box';
+        document.body.appendChild(box);
+        setTimeout(function () { box.remove(); }, 2300);
+    }
+
+    /* The list to find a slide in a presenter window: doc is that window's document; opts.notes finds
+       in the notes too; opts.pick(index, query) goes there. The deck's own presenter and the
+       editor's both use it. Enter or a click picks, arrows choose, Esc or a click outside closes. */
+    var finders = [];
+    function openFinder(doc, opts) {
+        opts = opts || {};
+        var open = doc.querySelector('.deck-finder');
+        if (open) { open.querySelector('.df-input').focus(); open.querySelector('.df-input').select(); return; }
+        findStyle(doc);
+        var recs = records(!!opts.notes), sel = 0, shown = [];
+        var box = doc.createElement('div'); box.className = 'deck-finder';
+        var panel = doc.createElement('div'); panel.className = 'df-panel';
+        panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Find a slide');
+        var input = doc.createElement('input');
+        input.className = 'df-input'; input.type = 'search'; input.autocomplete = 'off'; input.spellcheck = false;
+        input.placeholder = opts.notes ? 'Find a slide: its title, words on it or in its notes, or its number' : 'Find a slide: its title, words on it, or its number';
+        input.setAttribute('aria-label', 'Find a slide');
+        var list = doc.createElement('div'); list.className = 'df-list'; list.setAttribute('role', 'listbox');
+        var foot = doc.createElement('p'); foot.className = 'df-foot'; foot.textContent = 'Enter goes there · ↑ ↓ choose · Esc closes';
+        panel.appendChild(input); panel.appendChild(list); panel.appendChild(foot);
+        box.appendChild(panel);
+        function close() { box.remove(); finders = finders.filter(function (b) { return b !== box; }); if (opts.closed) opts.closed(); }
+        function choose(i) {
+            var items = list.querySelectorAll('.df-item');
+            if (!items.length) return;
+            sel = Math.max(0, Math.min(items.length - 1, i));
+            Array.prototype.forEach.call(items, function (it, j) { it.classList.toggle('on', j === sel); it.setAttribute('aria-selected', j === sel ? 'true' : 'false'); });
+            items[sel].scrollIntoView({ block: 'nearest' });
+        }
+        function pick(i) {
+            var r = shown[i];
+            if (!r) return;
+            var q = input.value.trim();
+            close();
+            if (opts.pick) opts.pick(r.index, r.rank >= 1 && q ? q : '');     // by its number: just the slide
+        }
+        function render() {
+            var q = input.value.trim(), terms = termsOf(q);
+            if (q) {
+                shown = search(q, { records: recs });
+                shown.sort(function (a, b) { return a.rank - b.rank || a.index - b.index; });
+            } else {
+                shown = recs.filter(function (r) { return !r.skip; }).map(function (r) { return { index: r.index, rank: 1, where: 'title', title: r.title, snippet: '' }; });
+            }
+            list.textContent = '';
+            shown.slice(0, 60).forEach(function (r, i) {
+                var it = doc.createElement('div'); it.className = 'df-item'; it.setAttribute('role', 'option');
+                var n = doc.createElement('span'); n.className = 'df-n'; n.textContent = r.index + 1;
+                var t = doc.createElement('span'); t.className = 'df-t'; t.appendChild(marked(doc, r.title || 'Slide ' + (r.index + 1), terms));
+                var w = doc.createElement('span'); w.className = 'df-where'; w.textContent = r.where === 'notes' ? 'In the notes' : r.where === 'section' ? 'Section ' + r.section : '';
+                it.appendChild(n); it.appendChild(t); it.appendChild(w);
+                if (r.snippet) { var s = doc.createElement('span'); s.className = 'df-snip'; s.appendChild(marked(doc, r.snippet, terms)); it.appendChild(s); }
+                it.addEventListener('mousedown', function (e) { e.preventDefault(); });      // the field keeps the focus
+                it.addEventListener('click', function () { pick(i); });
+                list.appendChild(it);
+            });
+            if (!shown.length) { var none = doc.createElement('div'); none.className = 'df-none'; none.textContent = 'No slide has “' + q + '”.'; list.appendChild(none); }
+            choose(0);
+        }
+        input.addEventListener('input', render);
+        input.addEventListener('keydown', function (e) {
+            e.stopPropagation();                               // the window's own keys (arrows, Space) wait
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.key === 'Escape') { e.preventDefault(); close(); }
+            else if (e.key === 'Enter') { e.preventDefault(); pick(sel); }
+            else if (e.key === 'ArrowDown') { e.preventDefault(); choose(sel + 1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); choose(sel - 1); }
+            else if (e.key === 'PageDown') { e.preventDefault(); choose(sel + 8); }
+            else if (e.key === 'PageUp') { e.preventDefault(); choose(sel - 8); }
+        });
+        box.addEventListener('click', function (e) { if (e.target === box) close(); });
+        doc.body.appendChild(box);
+        finders.push(box);
+        render();
+        input.focus();
+    }
+
+    /* Typing a slide's number and Enter goes there: the number shows at the bottom while it is typed,
+       Backspace takes a digit back, Esc or 3 s without a key forget it. One per document. */
+    function numberPad(doc, go) {
+        var typed = '', timer = 0, pill = null;
+        function show() {
+            if (!typed) { if (pill) { pill.remove(); pill = null; } return; }
+            if (!pill) { findStyle(doc); pill = doc.createElement('div'); pill.className = 'deck-num'; pill.setAttribute('role', 'status'); doc.body.appendChild(pill); }
+            pill.textContent = 'Go to slide ' + typed + '  ↵';
+        }
+        function reset() { typed = ''; clearTimeout(timer); show(); }
+        return function (e) {
+            if (/^[0-9]$/.test(e.key)) {
+                if (typed.length < 4) typed += e.key;
+                clearTimeout(timer); timer = setTimeout(reset, 3000);
+                show();
+                return true;
+            }
+            if (!typed) return false;
+            if (e.key === 'Enter') { var n = parseInt(typed, 10); reset(); if (n >= 1) go(n - 1); return true; }
+            if (e.key === 'Backspace') { typed = typed.slice(0, -1); show(); return true; }
+            if (e.key === 'Escape') { reset(); return true; }
+            return false;
+        };
+    }
+    var deckNumber = numberPad(document, goTo);
 
     /* ============================================================
        PRESENTER WINDOW (P)
@@ -1297,6 +1735,7 @@ new SlidePresentation();
         + '<div class="sizes"><button data-size="-1">A-</button><button data-size="1">A+</button></div><div class="notes" id="notes"></div></div>'
         + '<div class="bar"><div class="time" id="time" title="Click to reset">00:00</div><div class="slidetime" id="slidetime" title="On this slide">00:00</div><button id="reset">Reset</button><div class="clock" id="clock"></div><div class="grow"></div>'
         + '<div class="count"><b id="now">-</b> / <span id="total">-</span> <span class="hint" id="frag"></span> <span class="hint" id="name"></span></div>'
+        + '<button id="find" title="Find a slide by its title, words or notes (Ctrl+Shift+F or /)">Find</button>'
         + '<button class="big" id="prev">&larr;</button><button class="big" id="next-btn">&rarr;</button></div></div>';
 
     var slideStarted = Date.now(), notifiedIndex = -1;
@@ -1312,7 +1751,11 @@ new SlidePresentation();
         d.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Presenter</title><style>' + CSS + KEYS_CSS + '</style></head><body>' + HTML + '</body></html>');
         d.close();
         ui = {};
-        ['cur', 'next', 'end', 'notes', 'time', 'slidetime', 'reset', 'clock', 'now', 'total', 'frag', 'name', 'prev', 'next-btn'].forEach(function (id) { ui[id] = d.getElementById(id); });
+        ['cur', 'next', 'end', 'notes', 'time', 'slidetime', 'reset', 'clock', 'now', 'total', 'frag', 'name', 'prev', 'next-btn', 'find'].forEach(function (id) { ui[id] = d.getElementById(id); });
+        // Found here, the class sees nothing of the search; the notes are searched too.
+        var find = function () { openFinder(d, { notes: true, pick: function (i, q) { if (q) reveal(i, q); else goTo(i); } }); };
+        var number = numberPad(d, goTo);
+        ui.find.onclick = find;
         var base = deckUrl();
         ui.cur.src = base + '#' + (current() + 1);
         ui.next.src = base + '#' + (current() + 2);
@@ -1321,10 +1764,13 @@ new SlidePresentation();
         ui.reset.onclick = function () { started = Date.now(); slideStarted = Date.now(); tick(); };
         ui.time.onclick = ui.reset.onclick;
         d.addEventListener('keydown', function (e) {
+            if (isFindKey(e)) { e.preventDefault(); find(); return; }
             if (e.ctrlKey || e.metaKey || e.altKey) return;
             var open = d.querySelector('.deck-keys');
             if (open && e.key === 'Escape') { open.remove(); e.preventDefault(); return; }
-            if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+            if (!open && number(e)) { e.preventDefault(); return; }
+            if (e.key === '/' && !isHelpKey(e)) { e.preventDefault(); find(); return; }
+            if (isHelpKey(e)) {
                 e.preventDefault();
                 if (open) { open.remove(); return; }
                 var box = buildKeys(d, PRESENTER_KEY_GROUPS);
@@ -1563,15 +2009,31 @@ new SlidePresentation();
         if (el.getAttribute('data-href-target') === '_self') location.href = url; else window.open(url, '_blank', 'noopener');
     }, true);
 
+    /* Ctrl+Shift+F (Cmd+Shift+F) or Ctrl+K: no browser keeps either for itself on Windows. In a
+       frame (the editor's Preview) they stay the page's around it: the editor has its own. */
+    function isFindKey(e) {
+        if (!(e.ctrlKey || e.metaKey) || e.altKey) return false;
+        var k = (e.key || '').toLowerCase();
+        return (e.shiftKey && (k === 'f' || e.code === 'KeyF')) || (!e.shiftKey && k === 'k');
+    }
+    function openSearch() {
+        closeKeys();
+        if (draw) setDrawing(false);
+        openOverview(true);
+    }
     window.addEventListener('keydown', function (e) {
         if (editing()) return;
+        if (!FRAMED && isFindKey(e)) { openSearch(); e.preventDefault(); e.stopImmediatePropagation(); return; }
         var t = e.target;
         if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
         if ((e.ctrlKey || e.metaKey) && draw && (e.key === 'z' || e.key === 'Z')) { undoStroke(); e.preventDefault(); e.stopImmediatePropagation(); return; }
         if (e.ctrlKey || e.metaKey || e.altKey) return;
         // The list of keys comes first and leaves the rest alone: it can be opened while drawing or running by itself.
-        if (e.key === '?' || (e.key === '/' && e.shiftKey)) { keysBox ? closeKeys() : openKeys(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+        if (isHelpKey(e)) { keysBox ? closeKeys() : openKeys(); e.preventDefault(); e.stopImmediatePropagation(); return; }
         if (keysBox && e.key === 'Escape') { closeKeys(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+        if (e.key === '/') { openSearch(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+        // A slide's number and Enter (not while drawing, where 1 - 5 are the colours, nor in the overview).
+        if (!draw && !overview && deckNumber(e)) { e.preventDefault(); e.stopImmediatePropagation(); return; }
         var consumed = true;
         if (autoOn && e.key !== 'a' && e.key !== 'A') setAuto(false);        // a key takes the deck back
         switch (e.key) {
@@ -1605,7 +2067,7 @@ new SlidePresentation();
         if (e.deltaY > 0 ? nextFragment() : prevFragment()) e.stopImmediatePropagation();
     }, { capture: true, passive: true });
 
-    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, openKeys: openKeys, closeKeys: closeKeys, version: 13 };
+    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, openKeys: openKeys, closeKeys: closeKeys, search: search, reveal: reveal, openSearch: openSearch, openFinder: openFinder, version: 15 };
 })();
 </script>
 </body>

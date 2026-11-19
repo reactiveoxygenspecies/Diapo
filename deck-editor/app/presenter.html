@@ -47,6 +47,10 @@ button.big { font-size: 20px; padding: 6px 18px; }
 .deck-keys dd { margin: 0; color: #c8cad1; font-size: 18px; }
 .deck-keys kbd { display: inline-block; margin: 0 5px 0 0; padding: 1px 9px; border: 1px solid rgba(255,255,255,0.28); border-bottom-width: 2px; border-radius: 6px; background: rgba(255,255,255,0.08); font: 600 18px/1.4 ui-monospace, Consolas, monospace; color: #fff; white-space: pre; }
 .deck-keys .dk-foot { margin: 18px 0 0; font-size: 16px; color: var(--ink-3); }
+/* The slide number being typed (12 Enter), and a short message (Find on a deck without the runtime). */
+.typed, .say { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); z-index: 5; padding: 9px 18px; border-radius: 999px; background: rgba(18,19,23,0.94); box-shadow: 0 0 0 1px rgba(255,255,255,0.14); font-size: 20px; font-weight: 600; pointer-events: none; }
+.say { max-width: min(720px, 90vw); border-radius: 12px; font-size: 15px; font-weight: 400; text-align: center; }
+.typed[hidden], .say[hidden] { display: none; }
 /* The loader while the editor reconnects: a copy of editor.css's .loader (brand/loader.svg), the
    mount turning three quarters and resting upright; after 300 ms; with reduced motion it breathes. */
 .loader { width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; opacity: 0; animation: loader-in 0.2s 0.3s forwards; }
@@ -73,12 +77,15 @@ button.big { font-size: 20px; padding: 6px 18px; }
     <div class="hint" id="link" hidden><svg class="loader" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><g class="l-turn"><rect x="2" y="2" width="96" height="96" rx="7" fill="#EAE3D0"/><rect x="14" y="26" width="72" height="48" rx="1.5" fill="#141418"/><rect class="l-breathe" x="14" y="26" width="72" height="48" rx="1.5" fill="#F7F5EF"/><circle cx="8" cy="92" r="2.6" fill="#8B8574"/></g></svg>Editor closed or reloading. Reconnecting...</div>
     <div class="grow"></div>
     <div class="count"><b id="now">-</b> / <span id="total">-</span> <span id="name" class="hint"></span></div>
+    <button id="btnFind" title="Find a slide by its title, words or notes (Ctrl+Shift+F or /)">Find</button>
     <span class="hint">? for keys</span>
     <button class="big" id="btnPrev" title="Previous (Left, PgUp)">&larr;</button>
     <button class="big" id="btnNext" title="Next (Right, Space, PgDn)">&rarr;</button>
   </div>
 </div>
 
+<div class="typed" id="typed" role="status" hidden></div>
+<div class="say" id="say" role="status" hidden></div>
 <script src="presenter.js"></script>
 </body>
 </html>

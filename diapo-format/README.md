@@ -21,7 +21,7 @@ server, with no build step and no network access except the fonts it links.
 The files are generated from the editor's own template and runtime by
 `deck-editor/tools/build-format.py`, so they are always exactly what the
 editor writes into a new deck. `deck-runtime.js` reports its version as
-`window.deckRuntime.version` (currently 13); the editor offers to update older
+`window.deckRuntime.version` (currently 15); the editor offers to update older
 copies in a deck.
 
 ## A deck
@@ -163,7 +163,10 @@ Events: the deck dispatches `deck:slide` when it navigates and listens for
 that caches its slide list should re-read it then (the controller reads the
 list live, so it needs no listener).
 
-Keys the runtime adds: `P` / Shift+F5 presenter window, `O` overview, `L`
+Keys the runtime adds: `P` / Shift+F5 presenter window, `O` overview,
+Ctrl+Shift+F / Ctrl+K / `/` find a slide (the overview filtered by title,
+text, pictures' descriptions, equations and section; the presenter window's
+Find also searches the notes), a number and Enter to go to that slide, `L`
 laser, `D` draw (1-5 colours, `[` `]` width, Ctrl+Z, `C` clear), Space /
 arrows / PgUp / PgDn for fragments and slides, `?` a list of all the keys over
 the deck (and "Press ? for keys" for 4 s when the file is opened on its own;

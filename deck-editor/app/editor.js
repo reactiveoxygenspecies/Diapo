@@ -40,6 +40,7 @@ import { loader } from './core/loader.js';
 import { DeckTabs } from './core/tabs.js';
 import { FileDrop } from './core/filedrop.js';
 import { keepNamed } from './core/a11y.js';
+import { WakeLock } from './core/wakelock.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -497,6 +498,14 @@ export function setEntrances(on) {
 }
 let savedEntrances = null;
 try { savedEntrances = localStorage.getItem(ENTRANCES_KEY); } catch (e) { /* ignore */ }
+/* Keep the screen on: while Diapo is in front, the computer does not turn the screen off or
+   sleep (core/wakelock.js), so a slide left up while the class works stays up. On by default. */
+app.wake = new WakeLock();
+export function setWake(on) {
+    app.wake.set(on);
+    $('btnWake').classList.toggle('on', on);
+    $('btnWakeState').textContent = !app.wake.supported ? 'not in this browser' : on ? 'on' : 'off';
+}
 let savedLook = null;
 try { savedLook = localStorage.getItem(LOOK_KEY); } catch (e) { /* ignore */ }
 applyLook(savedLook);
@@ -510,10 +519,12 @@ lookDropdown.addEventListener('click', (e) => {
     if (e.target.closest('[data-opt="rulers"]')) setRulers(document.documentElement.dataset.rulers !== 'on');
     if (e.target.closest('[data-opt="spell"]')) setSpell(!app.spellcheck);
     if (e.target.closest('[data-opt="entrances"]')) setEntrances(!app.deck.playEntrances);
+    if (e.target.closest('[data-opt="wake"]')) setWake(!app.wake.on);
 });
 setHints(savedHints === '1');
 setSpell(savedSpell !== '0');
 setEntrances(savedEntrances === '1');
+setWake(WakeLock.saved());
 
 /* ------------------------------------------------------------
    Opening a deck

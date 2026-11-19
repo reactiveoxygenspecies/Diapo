@@ -66,6 +66,14 @@ export class Presenter {
 
     _onMessage(m) {
         if (m.type === 'hello') { this.send(); return; }
+        /* A slide found in the presenter window: in Preview the deck's runtime goes there, shows the
+           steps up to what matched and outlines it; editing, the editor just goes to the slide. */
+        if (m.type === 'find' && this.deck.isOpen && typeof m.index === 'number') {
+            const rt = this.deck.win.deckRuntime;
+            if (m.query && this.app.preview && rt && rt.reveal) rt.reveal(m.index, m.query);
+            else this.deck.goTo(m.index);
+            return;
+        }
         if (m.type === 'nav' && this.deck.isOpen) {
             const rt = this.deck.win.deckRuntime;                 // fragments-aware when the deck has the runtime
             if (typeof m.to === 'number') this.deck.goTo(m.to);

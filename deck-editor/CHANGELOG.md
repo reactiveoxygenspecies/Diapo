@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- **Find a slide while presenting.** In a saved deck, Ctrl+Shift+F (or Ctrl+K,
+  or /) opens the overview with a search field. It keeps the slides whose
+  title, name, text, picture descriptions, chart titles, equations or section
+  match what you type, with or without accents. Enter goes to the slide, shows
+  its steps up to the match and outlines what was found for a moment. The
+  notes are not searched there, since the class sees the screen. The
+  presenter windows (the deck's own and the editor's) have a **Find** button
+  that also searches the notes. Typing a slide's number and Enter goes
+  straight to it. Decks get the presentation features script version 15.
+- **"/" no longer opens the keys list on keyboards that type it with Shift**
+  (Shift+7 on an Italian keyboard): there it finds, and ? is the key for the
+  list.
+
+- **The screen stays on while Diapo is in front.** The computer no longer
+  dims, turns off the screen or sleeps while a slide is left up. This applies to
+  the editor, Preview and the presenter window. Turn it off with Look > Keep
+  the screen on. A saved deck opened on its own keeps the screen on too, and
+  always does (presentation features script version 15: every template carries
+  it; an existing deck picks it up the next time it is saved).
+
 - **Check for updates stands out.** The button in About Diapo is filled with
   the look's accent colour, so it reads as a button.
 - **Diapo checks for updates at start by default** (at most once a day). Turn

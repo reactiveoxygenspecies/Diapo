@@ -84,8 +84,47 @@ window.addEventListener('focus', () => channel.postMessage({ type: 'hello' }));
 const nav = (delta) => channel.postMessage({ type: 'nav', delta });
 $('btnPrev').addEventListener('click', () => nav(-1));
 $('btnNext').addEventListener('click', () => nav(1));
+/* Find a slide (Ctrl+Shift+F, Ctrl+K, / or the Find button): the list is the deck runtime's
+   (deck-runtime.js openFinder, 15 and later), borrowed from the deck in the "current" frame so the
+   matching is the same as in a presented deck; it searches the notes too, since only the presenter
+   sees this window. A pick asks the editor to go there (present.js), which in Preview also shows
+   the steps up to what matched and outlines it. */
+function find() {
+    let rt = null;
+    try { rt = $('cur').contentWindow.deckRuntime; } catch (e) { /* not loaded */ }
+    if (!state || !state.file) return;
+    if (!rt || !rt.openFinder) { say('Finding a slide needs the deck\'s presentation features: add them from the Presenter menu in the editor, or save the deck to bring them up to date.'); return; }
+    keysList(false);
+    rt.openFinder(document, { notes: true, pick: (index, query) => channel.postMessage({ type: 'find', index, query }) });
+}
+$('btnFind').addEventListener('click', find);
+let sayTimer = 0;
+function say(text) {
+    const el = $('say');
+    el.textContent = text; el.hidden = false;
+    clearTimeout(sayTimer); sayTimer = setTimeout(() => { el.hidden = true; }, 6000);
+}
+/* A slide's number and Enter goes there, as in the deck. */
+let typed = '', typedTimer = 0;
+function typeNumber(e) {
+    const pill = $('typed');
+    const show = () => { pill.hidden = !typed; pill.textContent = 'Go to slide ' + typed + '  ↵'; };
+    if (/^[0-9]$/.test(e.key)) {
+        if (typed.length < 4) typed += e.key;
+        clearTimeout(typedTimer); typedTimer = setTimeout(() => { typed = ''; show(); }, 3000);
+        show(); return true;
+    }
+    if (!typed) return false;
+    if (e.key === 'Enter') { const n = parseInt(typed, 10); typed = ''; show(); if (n >= 1 && state) channel.postMessage({ type: 'nav', to: Math.min(n, state.total) - 1 }); return true; }
+    if (e.key === 'Backspace') { typed = typed.slice(0, -1); show(); return true; }
+    if (e.key === 'Escape') { typed = ''; show(); return true; }
+    return false;
+}
+const isFindKey = (e) => (e.ctrlKey || e.metaKey) && !e.altKey && ((e.shiftKey && (e.key.toLowerCase() === 'f' || e.code === 'KeyF')) || (!e.shiftKey && e.key.toLowerCase() === 'k'));
+const isHelpKey = (e) => e.key === '?' || (e.key === '/' && e.shiftKey && e.code === 'Slash');   // "/" typed with Shift (an Italian keyboard) finds
+
 /* "?" lists the keys, as in a presented deck (deck-runtime.js); only the ones this window has. */
-const KEYS = [['Right  Down  Space  PgDn', 'Next step, then next slide'], ['Left  Up  PgUp', 'Back one step or slide'], ['Home  End', 'First or last slide']];
+const KEYS = [['Right  Down  Space  PgDn', 'Next step, then next slide'], ['Left  Up  PgUp', 'Back one step or slide'], ['Home  End', 'First or last slide'], ['12  Enter', 'Go to slide 12: type its number'], ['Ctrl+Shift+F  /', 'Find a slide by its title, words or notes']];
 function keysList(on) {
     let box = document.querySelector('.deck-keys');
     if (!on) { if (box) box.remove(); return; }
@@ -116,9 +155,12 @@ function keysList(on) {
     panel.focus();
 }
 window.addEventListener('keydown', (e) => {
+    if (isFindKey(e)) { e.preventDefault(); find(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key === '?' || (e.key === '/' && e.shiftKey)) { e.preventDefault(); keysList(!document.querySelector('.deck-keys')); return; }
+    if (isHelpKey(e)) { e.preventDefault(); keysList(!document.querySelector('.deck-keys')); return; }
     if (e.key === 'Escape' && document.querySelector('.deck-keys')) { e.preventDefault(); keysList(false); return; }
+    if (e.key === '/') { e.preventDefault(); find(); return; }
+    if (typeNumber(e)) { e.preventDefault(); return; }
     switch (e.key) {
         case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': e.preventDefault(); nav(1); break;
         case 'ArrowLeft': case 'ArrowUp': case 'PageUp': e.preventDefault(); nav(-1); break;
@@ -145,4 +187,27 @@ let notesSize = +localStorage.getItem('deck-editor-notes-size') || 20;
 const applySize = () => { $('notes').style.fontSize = notesSize + 'px'; try { localStorage.setItem('deck-editor-notes-size', notesSize); } catch (e) { /* ignore */ } };
 document.querySelector('.notes-size').addEventListener('click', (e) => { const b = e.target.closest('[data-size]'); if (!b) return; notesSize = Math.max(12, Math.min(48, notesSize + 2 * +b.dataset.size)); applySize(); });
 applySize();
+
+/* Keep the screen on while this window is in front, as the editor does (core/wakelock.js, the
+   same setting: Look > Keep the screen on, followed here as it changes). The browser lets go
+   whenever the window is hidden, so it is asked for again when it comes back. */
+let wakeLock = null, wakeAsking = false;
+const wakeWanted = () => { let on = true; try { on = localStorage.getItem('deck-editor-wake') !== '0'; } catch (e) { /* default on */ } return on && document.visibilityState === 'visible'; };
+async function syncWake() {
+    if (!(navigator.wakeLock && navigator.wakeLock.request)) return;
+    const held = !!(wakeLock && !wakeLock.released);
+    if (wakeWanted() && !held) {
+        if (wakeAsking) return;
+        wakeAsking = true;
+        try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* refused: the power settings stay in charge */ }
+        wakeAsking = false;
+        if (!wakeWanted() && wakeLock && !wakeLock.released) syncWake();   // switched off or hidden meanwhile
+    } else if (!wakeWanted() && held) {
+        const s = wakeLock; wakeLock = null;
+        try { await s.release(); } catch (e) { /* already gone */ }
+    }
+}
+document.addEventListener('visibilitychange', syncWake);
+window.addEventListener('storage', (e) => { if (e.key === 'deck-editor-wake') syncWake(); });
+syncWake();
 })();

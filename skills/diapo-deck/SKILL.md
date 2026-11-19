@@ -337,7 +337,8 @@ verification.
    - Where the file is, the style name, the slide count, which folder the
      editor now lists.
    - How to present: open `index.html` in any browser; arrows / Space, `#n` in
-     the URL; P presenter view, O overview, L laser, D draw, A runs it by
+     the URL; P presenter view, O overview, Ctrl+Shift+F or / finds a slide
+     (a number and Enter jumps to it), L laser, D draw, A runs it by
      itself, H hides the on-screen controls. Presenter > Rehearse the timings
      in the editor records a time per slide.
    - How to edit: everything on the slide is direct manipulation in the

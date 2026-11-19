@@ -54,8 +54,8 @@ I'm not 100% happy with it yet but it's in a decent functional state and some co
 ## Presenting
 
 Press **F5** and the deck fills the screen. Everything you need while talking is a key away: **P** opens a presenter
-view with your notes, a timer and the next slide, **O** shows all the slides at once, and the steps you set up are
-revealed one at a time.
+view with your notes, a timer and the next slide, **O** shows all the slides at once, **Ctrl+Shift+F** finds a slide
+by its title or words (and a number with Enter jumps to it), and the steps you set up are revealed one at a time.
 
 ![The welcome deck's cover slide, presented full screen](docs/present.png)
 
