@@ -14,8 +14,8 @@ A release (see RELEASING.md for the whole list, signing and the site included):
      section with something in it;
   2. APP_VERSION and APP_RELEASED (serve.py), the version in package.json and
      package-lock.json, and the changelog heading ("## 0.2.0 - 2026-10-05") are set;
-  3. the generated files are rebuilt: diapo-format/ and the skill's copies
-     (tools/build-format.py), app/known-scripts.json (tools/build-known-scripts.py),
+  3. the generated files are rebuilt: the templates' scripts, diapo-format/ and
+     the skill's copies (tools/build-templates.py, which runs tools/build-format.py), app/known-scripts.json (tools/build-known-scripts.py),
      the site's version line when site/ is there (site/build.py; the site is not in the repository);
   4. the tests run (Python, then the browser tests unless --no-browser-tests);
   5. the executable is built (unless --no-exe);
@@ -86,7 +86,7 @@ def package_versions():
 
 def rebuild_generated():
     """Bring the generated files up to date; returns the ones that changed."""
-    run(PY + ["tools/build-format.py"])
+    run(PY + ["tools/build-templates.py"])        # every template's scripts, then diapo-format/ and the skill's copies
     run(PY + ["tools/build-known-scripts.py"])
     if os.path.isfile(SITE_BUILD):
         run(PY + [SITE_BUILD])

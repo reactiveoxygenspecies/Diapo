@@ -20,8 +20,9 @@ This checks four things:
 - `serve.py`, `package.json`, `package-lock.json` and the newest dated
   changelog heading agree on the version, and the changelog's date is
   `APP_RELEASED`.
-- The generated files are current: `diapo-format/` and the skill's runtime
-  (`tools/build-format.py`) and `app/known-scripts.json`
+- The generated files are current: every template's controller and runtime,
+  `diapo-format/` and the skill's runtime (`tools/build-templates.py`, which
+  runs `tools/build-format.py`) and `app/known-scripts.json`
   (`tools/build-known-scripts.py`), plus the site's version line
   (`site/build.py`) when a local `site/` folder is there. It rebuilds them;
   commit what changed.
