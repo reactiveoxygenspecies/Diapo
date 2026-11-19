@@ -82,6 +82,35 @@ test('an empty folder says so in plain words, on the welcome screen and in the d
     }
 });
 
+test('a recent deck from another folder still shows its first slide, served read-only from its own folder', async ({ page, request }) => {
+    await request.post('/api/recent?file=' + encodeURIComponent(FILE), { headers: own });
+    const elsewhere = fs.mkdtempSync(path.join(require('os').tmpdir(), 'diapo-elsewhere-'));
+    try {
+        await request.post('/api/workspace?path=' + encodeURIComponent(elsewhere), { headers: own });
+        const entry = (await (await request.get('/api/status')).json()).recent.find(r => r.file === FILE && r.workspace === WS);
+        expect(entry.key).toMatch(/^[0-9a-f]{16}$/);
+        await home(page);
+        const card = page.locator(`#homeRecent .home-deck[data-path="${FILE}"]`);
+        await expect(card.locator('.deck-thumb')).toHaveAttribute('data-url', new RegExp('^/recent/' + entry.key + '/'));
+        await expect(card.locator('.deck-thumb.filled iframe')).toHaveAttribute('sandbox', 'allow-same-origin');
+        expect(await card.locator('.deck-thumb iframe').evaluate(f => f.contentDocument.querySelectorAll('.slide').length)).toBe(1);
+        // The drawer's Recent list too.
+        await page.keyboard.press('Control+o');
+        await expect(page.locator(`#drawerRecent .drawer-file[data-path="${FILE}"] .deck-thumb.filled iframe`)).toHaveCount(1);
+        // Read-only, no scripts, nothing outside the deck's folder, nothing for a deck not on the list.
+        const deckUrl = '/recent/' + entry.key + '/' + FILE.split('/').map(encodeURIComponent).join('/');
+        const ok = await request.get(deckUrl);
+        expect(ok.status()).toBe(200);
+        expect(ok.headers()['content-security-policy']).toContain("script-src 'none'");
+        expect((await request.get('/recent/' + entry.key + '/../outside.html')).status()).not.toBe(200);
+        expect((await request.get('/recent/' + '0'.repeat(16) + '/' + FILE)).status()).toBe(403);
+        expect((await request.post(deckUrl, { headers: own })).status()).not.toBe(200);
+    } finally {
+        await request.post('/api/workspace?path=' + encodeURIComponent(WS), { headers: own });
+        fs.rmSync(elsewhere, { recursive: true, force: true });
+    }
+});
+
 test('gallery: big previews, Light / Dark and style filters, a closer look at the chosen design', async ({ page }) => {
     await home(page);
     await page.click('#btnEmptyNew');

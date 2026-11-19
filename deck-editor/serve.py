@@ -40,6 +40,9 @@ Routes
     DELETE /api/draft?file=<path> removes the sidecar (after a save, or on Discard)
     GET  /deck/<path>?draft=1    serves <path>.~draft in place of the file, same URL so
                                  relative assets and the deck's own scripts behave identically
+    GET  /recent/<key>/<path>    read-only, for previews: a file inside the folder of a deck on the
+                                 recent list (key from /api/status), path relative to that deck's
+                                 workspace; no scripts run in anything served here
     POST /api/workspace?path=    switch the workspace to another folder (remembered)
     POST /api/workspace/pick     native folder dialog on this machine, then switch to it
     POST /api/workspace/pick-file native file dialog; switches to the file's folder and returns it
@@ -401,18 +404,46 @@ def link_url(page, tag=""):
     return RELEASES_BASE + LINK_PAGES.get(page, "/releases")
 
 
+def recent_full(r):
+    """The file on this computer behind an entry of the recent list."""
+    file = r.get("file", "")
+    if is_virtual(file):
+        return os.path.join(SAMPLES_DIR, file[len(SAMPLES_PREFIX):].lstrip("/").replace("/", os.sep))
+    return os.path.join(r.get("workspace", ""), file.replace("/", os.sep))
+
+
+def recent_key(r):
+    """A short name for a recent deck that stays the same while the list reorders: the
+    welcome screen's previews of decks in other folders are fetched under /recent/<key>/."""
+    return hashlib.sha256((r.get("workspace", "") + "\n" + r.get("file", "")).encode("utf-8")).hexdigest()[:16]
+
+
 def recent_decks():
-    """Recently opened decks that still exist, newest first, each with its title."""
+    """Recently opened decks that still exist, newest first, each with its title, size and
+    modification time (for its preview) and its key (see recent_key)."""
     out = []
     for r in SETTINGS.get("recent", []):
-        file = r.get("file", "")
-        if is_virtual(file):
-            full = os.path.join(SAMPLES_DIR, file[len(SAMPLES_PREFIX):].lstrip("/").replace("/", os.sep))
-        else:
-            full = os.path.join(r.get("workspace", ""), file.replace("/", os.sep))
+        full = recent_full(r)
         if os.path.isfile(full):
-            out.append({**r, "title": deck_title(full)})
+            st = os.stat(full)
+            out.append({**r, "title": deck_title(full), "key": recent_key(r), "size": st.st_size, "mtime": int(st.st_mtime)})
     return out
+
+
+def recent_path(key, rel):
+    """A file under /recent/<key>/<path>: <path> is relative to the folder of the workspace the
+    recent deck <key> lives in, and must stay inside that deck's own folder (its pictures,
+    stylesheets and fonts). Only decks on the recent list are reachable, so the welcome screen
+    can show the first slide of a deck in another folder without opening that folder up."""
+    r = next((r for r in SETTINGS.get("recent", []) if recent_key(r) == key and not is_virtual(r.get("file", ""))), None)
+    if r is None:
+        raise PermissionError("not a recent deck")
+    deck = os.path.realpath(recent_full(r))
+    root = os.path.dirname(deck)
+    full = os.path.realpath(os.path.join(r.get("workspace", ""), urllib.parse.unquote(rel or "").replace("\\", "/").lstrip("/")))
+    if not full.startswith(root + os.sep):
+        raise PermissionError("path is outside the recent deck's folder")
+    return full
 
 
 TITLE_RE = re.compile(rb"<title[^>]*>(.*?)</title\s*>", re.I | re.S)
@@ -2006,6 +2037,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     return self._fail("not found", 404)
                 extra = {"X-Diapo-Version": served_version(full, served)} if served.lower().endswith(DECK_DOC_EXT) else None
                 return self._send_file(served, csp=self._deck_policy(full, served, route), headers=extra)
+            if route.startswith("/recent/"):
+                key, _, rel = route[len("/recent/"):].partition("/")
+                # Read for a preview only: nothing served here ever runs a script.
+                return self._send_file(recent_path(key, rel), csp=f"script-src 'none'; form-action 'none'; {FRAME_POLICY}")
             if route == "/":
                 route = "/index.html"
             # Everything else is the editor app itself (no path escapes here either).

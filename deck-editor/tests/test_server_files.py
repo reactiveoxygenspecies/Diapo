@@ -59,5 +59,34 @@ class TourExport(unittest.TestCase):
         self.assertTrue(any("outside" in n for n in inl.notes), inl.notes)
 
 
+class RecentPreviews(unittest.TestCase):
+    """/recent/<key>/<path> serves a recent deck's own folder, and nothing else."""
+
+    def test_only_the_recent_decks_folder_is_reachable(self):
+        with tempfile.TemporaryDirectory(dir=TMP) as ws:
+            os.makedirs(os.path.join(ws, "talk", "assets"))
+            os.makedirs(os.path.join(ws, "other"))
+            for p in (("talk", "index.html"), ("talk", "assets", "a.png"), ("other", "index.html"), ("loose.html",)):
+                open(os.path.join(ws, *p), "w").close()
+            entry = {"workspace": ws, "file": "talk/index.html", "when": 1}
+            key = serve.recent_key(entry)
+            with mock.patch.dict(serve.SETTINGS, {"recent": [entry]}):
+                self.assertEqual(serve.recent_path(key, "talk/index.html"), os.path.realpath(os.path.join(ws, "talk", "index.html")))
+                self.assertEqual(serve.recent_path(key, "talk/assets/a.png"), os.path.realpath(os.path.join(ws, "talk", "assets", "a.png")))
+                for rel in ("other/index.html", "loose.html", "talk/../other/index.html", "talk/%2e%2e/loose.html", "talk", ""):
+                    with self.subTest(rel=rel), self.assertRaises(PermissionError):
+                        serve.recent_path(key, rel)
+                with self.assertRaises(PermissionError):
+                    serve.recent_path("0" * 16, "talk/index.html")              # not on the list
+                listed = serve.recent_decks()
+                self.assertEqual(listed[0]["key"], key)
+                self.assertEqual(listed[0]["size"], 0)
+
+    def test_the_tour_is_not_served_this_way(self):
+        entry = {"workspace": TMP, "file": "@diapo/welcome/index.html", "when": 1}
+        with mock.patch.dict(serve.SETTINGS, {"recent": [entry]}), self.assertRaises(PermissionError):
+            serve.recent_path(serve.recent_key(entry), "@diapo/welcome/index.html")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -38,6 +38,8 @@
   the home (recent decks, the folder by name). New deck opens a large gallery of
   the designs with Light / Dark and style filters. The File menu holds new, open,
   import, save, save as, versions and the folder; Export keeps only the exports.
+  Recent decks from other folders show their first slide too (on the home and in
+  the drawer), read from that deck's own folder only.
 - **Export > Publish...** prepares a folder for a free web host you own (Netlify
   Drop, GitHub Pages, any host): the deck as `index.html` with what it uses,
   optionally zipped, and the steps for each host. Diapo hosts nothing itself.

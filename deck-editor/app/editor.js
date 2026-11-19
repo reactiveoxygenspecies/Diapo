@@ -679,7 +679,7 @@ function renderRecent() {
         const when = r.when ? new Date(r.when * 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '';
         const here = sample || r.workspace === app.workspace;
         return `<div class="drawer-file recent${r.file === app.file && here ? ' open' : ''}" data-ws="${escapeHtml(r.workspace)}" data-path="${escapeHtml(r.file)}" title="${escapeHtml(full)}">
-            <button type="button" class="drawer-deck">${deckThumb(here ? r.file : '', r.when)}
+            <button type="button" class="drawer-deck">${recentThumb(r)}
             <span class="drawer-text"><span class="name">${escapeHtml(deckName(r.file, r.title))}</span><span class="meta">${escapeHtml(sample ? full : shortPath(full))}${when ? ' | ' + when : ''}</span></span></button>
         </div>`;
     }).join('');
@@ -688,6 +688,16 @@ function renderRecent() {
 /* The slot a deck's preview fills when its row scrolls into view (none for a deck in another folder). */
 function deckThumb(path, mtime) {
     return path ? `<span class="deck-thumb" data-path="${escapeHtml(path)}" data-mtime="${mtime || ''}"></span>` : '<span class="deck-thumb"></span>';
+}
+/* A recent deck's slot: from the open folder like any deck there; from another folder through
+   /recent/<key>/, which serves that deck's own folder read-only (see serve.py). */
+function recentThumb(r) {
+    const sample = r.file.startsWith('@diapo/');
+    if (!sample && r.size > PREVIEW_MAX_BYTES) return deckThumb('', 0);
+    if (sample || r.workspace === app.workspace) return deckThumb(r.file, r.mtime || r.when);
+    if (!r.key) return deckThumb('', 0);
+    const url = '/recent/' + r.key + '/' + r.file.split('/').map(encodeURIComponent).join('/');
+    return `<span class="deck-thumb" data-url="${escapeHtml(url)}" data-mtime="${r.mtime || r.when || ''}"></span>`;
 }
 const previews = new DeckPreviews($('drawer').querySelector('.drawer-body'));
 // A single-file export (fonts and pictures inside) is too heavy to fetch for a preview.
@@ -882,11 +892,11 @@ $('drawerList').addEventListener('click', async (e) => {
    ------------------------------------------------------------ */
 const HOME_DECKS = 8;
 const homePreviews = new DeckPreviews($('canvasEmpty'));
-function homeCard({ ws = '', path, title, when, here, full }) {
+function homeCard({ ws = '', path, title, when, here, full, thumb }) {
     const date = when ? new Date(when * 1000).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '';
-    const where = path.startsWith('@diapo/') ? 'Diapo tour' : here ? '' : folderName(ws);
+    const where = path.startsWith('@diapo/') ? 'Diapo tour' : here || ws === app.workspace ? '' : folderName(ws);
     return `<button type="button" class="home-deck" data-ws="${escapeHtml(ws)}" data-path="${escapeHtml(path)}" title="${escapeHtml(full)}">
-        ${deckThumb(here ? path : '', when)}
+        ${thumb || deckThumb(here ? path : '', when)}
         <span class="name">${escapeHtml(deckName(path, title))}</span>
         <span class="meta">${escapeHtml([where, date].filter(Boolean).join(' | '))}</span></button>`;
 }
@@ -894,7 +904,7 @@ function renderHome() {
     const recent = recentList.slice(0, HOME_DECKS).map(r => {
         const sample = r.file.startsWith('@diapo/');
         const here = sample || r.workspace === app.workspace;
-        return homeCard({ ws: r.workspace, path: r.file, title: r.title, when: r.when, here, full: sample ? 'The Diapo tour, in a folder of its own' : fullPathOf(r.workspace, r.file) });
+        return homeCard({ ws: r.workspace, path: r.file, title: r.title, when: r.when, here, thumb: recentThumb(r), full: sample ? 'The Diapo tour, in a folder of its own' : fullPathOf(r.workspace, r.file) });
     });
     $('homeRecent').innerHTML = recent.length ? `<h2>Recent</h2><div class="home-grid">${recent.join('')}</div>` : '';
     // The folder's own decks, newest first, without the ones Recent already shows.

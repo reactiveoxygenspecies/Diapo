@@ -96,7 +96,9 @@ The Decks drawer (Ctrl+O, File > Open...) is the deck list while you work:
 - **Recent** lists the decks you opened last, wherever they are; one click reopens
   them. Every deck in the drawer goes by its name (its `<title>`, else its
   folder), with a picture of its first slide (the deck's own CSS, no scripts;
-  a single-file export over 3 MB gets none) and, under it, where it is, when
+  a single-file export over 3 MB gets none; a recent deck in another folder is
+  read through `/recent/<key>/`, which serves only that deck's own folder,
+  read-only and with no scripts) and, under it, where it is, when
   it changed and its size; the folder list shows the most recently changed
   first. The title bar names the open deck the same way, with the whole path
   on hover. The last folder and the recent decks are remembered in
