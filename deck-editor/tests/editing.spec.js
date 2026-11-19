@@ -1994,6 +1994,13 @@ test('76 paragraph box: centring the text of a <p> box (the browser wraps it in 
         const r = doc.createRange(); r.selectNodeContents(p);
         const s = ed.deck.win.getSelection(); s.removeAllRanges(); s.addRange(r);
         ed.textEdit.exec('center');
+        // Firefox centres the <p> by styling it; Chrome wraps its text in a <div>. Build Chrome's
+        // shape by hand in Firefox, so the save path is tested in both browsers.
+        if (!p.firstElementChild) {
+            p.style.removeProperty('text-align');
+            const d = doc.createElement('div'); d.style.textAlign = 'center';
+            d.append(...p.childNodes); p.append(d);
+        }
         ed.textEdit.commit();
         const cs = getComputedStyle(p);
         return { inner: p.innerHTML, rect: ed.deck.stageRect(p.firstElementChild), size: cs.fontSize, line: cs.lineHeight };
