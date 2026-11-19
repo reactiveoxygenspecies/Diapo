@@ -15,33 +15,42 @@ const openAbout = async (page) => {
 
 test.afterAll(() => fs.rmSync(STUB, { force: true }));
 
-test('the start-up check is off by default, then shows a notice for a newer release (once a day)', async ({ page }) => {
+test('the start-up check is on by default, shows a notice for a newer release (once a day), and can be turned off', async ({ page }) => {
     stub(release('v9.0.0'));
+    const status = async () => (await (await page.request.get('/api/status')).json()).update_auto;
+    expect(await status()).toBe(true);                                               // on by default
     await openDeck(page);
-    await expect(page.locator('#brandVersion')).toContainText('v');
-    await page.waitForTimeout(400);
-    await expect(page.locator('.update-notice')).toHaveCount(0);                    // off: nothing asked
-    expect((await (await page.request.get('/api/status')).json()).update_auto).toBe(false);
-
-    await openAbout(page);
-    await page.getByLabel('Check for updates when Diapo starts').check();
-    await expect.poll(async () => (await (await page.request.get('/api/status')).json()).update_auto).toBe(true);
-    await page.keyboard.press('Escape');
-
-    await page.reload();
     const notice = page.locator('.update-notice');
     await expect(notice).toContainText('Diapo 9.0.0 is available');
     await notice.getByRole('button', { name: "See what's new" }).click();
     await expect(page.locator('#aboutResult')).toContainText('Diapo 9.0.0 is available');
+    await expect(page.getByLabel('Check for updates when Diapo starts')).toBeChecked();
+    await page.keyboard.press('Escape');
 
     // The check was made just now: a second start within the day asks nothing.
     await page.reload();
     await page.waitForTimeout(500);
-    await expect(page.locator('.update-notice')).toHaveCount(0);
+    await expect(notice).toHaveCount(0);
 
     await openAbout(page);
     await page.getByLabel('Check for updates when Diapo starts').uncheck();
-    await expect.poll(async () => (await (await page.request.get('/api/status')).json()).update_auto).toBe(false);
+    await expect.poll(status).toBe(false);
+    await page.reload();
+    await openAbout(page);
+    await expect(page.getByLabel('Check for updates when Diapo starts')).not.toBeChecked();
+    await page.getByLabel('Check for updates when Diapo starts').check();
+    await expect.poll(status).toBe(true);
+});
+
+test('Check for updates is filled with the look\'s accent colour', async ({ page }) => {
+    await openDeck(page);
+    await openAbout(page);
+    const btn = page.getByRole('button', { name: 'Check for updates' });
+    const accent = await page.evaluate(() => {
+        const probe = document.createElement('i'); probe.style.color = 'var(--accent)'; document.body.appendChild(probe);
+        const c = getComputedStyle(probe).color; probe.remove(); return c;
+    });
+    await expect(btn).toHaveCSS('background-color', accent);
 });
 
 test('About Diapo: version, newer release with notes and the page button, same version, errors', async ({ page }) => {

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Check for updates stands out.** The button in About Diapo is filled with
+  the look's accent colour, so it reads as a button.
+- **Diapo checks for updates at start by default** (at most once a day). Turn
+  it off with "Check for updates when Diapo starts" in About Diapo; a choice
+  already made in the settings is kept.
+- **Theme panel: "Looks from the designs" starts folded**, so the settings of
+  the current theme are near the top. Opened once, it stays open.
+
 ## 1.3.0 - 2026-11-19
 
 - **Interactive charts from Plotly.** Insert > Interactive chart (Plotly)...

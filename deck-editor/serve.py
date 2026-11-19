@@ -18,7 +18,7 @@ Routes
                                  about itself) -> {current, latest, newer, url, published, notes};
                                  auto=1 is the start-up check: {skipped} unless the setting is on and
                                  the last check is over a day old
-    POST /api/update-settings?auto=0|1  "check for updates when Diapo starts" (off by default)
+    POST /api/update-settings?auto=0|1  "check for updates when Diapo starts" (on by default)
     POST /api/open-link?page=release|releases|guide|changelog[&tag=1.3.0]  opens a fixed
                                  github.com/reactiveoxygenspecies/Diapo page in the normal browser
     GET  /api/list?dir=<path>    *.html files under the workspace, recursive, each with its title and
@@ -277,7 +277,7 @@ APP_RELEASED = "2026-11-19"
 
 # -- Checking for a new release -------------------------------------------------
 # The one request Diapo makes about itself: GET the latest release from GitHub when the user
-# clicks "Check for updates" (or, if they turned it on, once a day at start). Nothing is sent
+# clicks "Check for updates" and, unless they turned it off, once a day at start. Nothing is sent
 # but a generic User-Agent. DIAPO_UPDATE_URL replaces the address (a local JSON file or a stub
 # server), which is how the tests run without the network.
 UPDATE_URL = "https://api.github.com/repos/reactiveoxygenspecies/Diapo/releases/latest"
@@ -378,12 +378,21 @@ def update_check():
     return out
 
 
+def update_auto():
+    """Whether the start-up check is on: it is unless the user switched it off."""
+    with SETTINGS_LOCK:
+        u = SETTINGS.get("update_check")
+        return bool(u.get("auto", True)) if isinstance(u, dict) else True
+
+
 def update_due():
     """True when the start-up check is switched on and a day has passed since the last one."""
+    if not update_auto():
+        return False
     with SETTINGS_LOCK:
         u = SETTINGS.get("update_check")
         u = u if isinstance(u, dict) else {}
-        return bool(u.get("auto")) and time.time() - float(u.get("last") or 0) >= UPDATE_EVERY
+        return time.time() - float(u.get("last") or 0) >= UPDATE_EVERY
 
 
 LINK_PAGES = {"releases": "/releases", "guide": "/blob/main/deck-editor/GUIDE.md", "changelog": "/blob/main/deck-editor/CHANGELOG.md"}
@@ -1993,7 +2002,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return self._json({"ok": True, "themes": themes})
             if route == "/api/status":
                 return self._json({"ok": True, "workspace": WORKSPACE, "recent": recent_decks(), "version": 1, "app": APP_VERSION, "released": APP_RELEASED,
-                                   "update_auto": bool((SETTINGS.get("update_check") or {}).get("auto"))})
+                                   "update_auto": update_auto()})
             if route == "/api/list":
                 d = safe_path(self._query().get("dir", ""))
                 if not os.path.isdir(d):

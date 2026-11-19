@@ -32,6 +32,7 @@
     --ink-3: #64656b;
     --accent: #2f6fed;        /* selection, primary buttons */
     --accent-soft: rgba(47, 111, 237, 0.14);
+    --accent-ink: #fff;       /* text on a solid accent fill */
     --warn: #c8532d;
     --ok: #2a9d5c;
 
@@ -113,7 +114,7 @@ html[data-look="dark"] {
     color-scheme: dark;
     --bg: #1c1c21; --bg-2: #26262c; --canvas: #121215; --line: #303038; --line-2: #3d3d46;
     --ink: #ecebe6; --ink-2: #a9a9b0; --ink-3: #a5a5ab;
-    --accent: #7f88ff; --accent-soft: rgba(127, 136, 255, 0.2); --warn: #ffb14d; --ok: #4cc98a;
+    --accent: #7f88ff; --accent-soft: rgba(127, 136, 255, 0.2); --accent-ink: #14152b; --warn: #ffb14d; --ok: #4cc98a;
     --radius: 6px; --radius-sm: 4px; --thumb-r: 3px;
     --tb-bg: #141418; --tb-ink: #e8e9f0; --tb-line: #26262c; --tb-sep: #33333b;
     --tb-hover: rgba(255,255,255,0.08); --tb-hover-line: rgba(255,255,255,0.14); --tb-active: rgba(255,255,255,0.14);
@@ -537,6 +538,9 @@ html[data-look="ink"] .canvas-loading .loader, html[data-look="slate"] .canvas-l
 .help-tabs button { font: inherit; font-size: var(--fs-body); padding: 6px 12px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--ink-2); cursor: pointer; margin-bottom: -1px; }
 .help-tabs button.on { color: var(--ink); border-bottom-color: var(--ink); }
 .help-card .about-row { margin: 12px 0; display: flex; align-items: center; gap: 8px; }
+.tb-btn.about-check { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; padding: 0 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+.tb-btn.about-check:hover { background: var(--accent); border-color: var(--accent); filter: brightness(1.1); }
+.tb-btn.about-check:active { filter: brightness(0.92); }
 .help-card .about-result { min-height: 20px; font-size: 13px; }
 .help-card .about-result p { margin: 8px 0; }
 .help-card .muted { color: var(--ink-3); }
@@ -973,7 +977,11 @@ body.theme-mode.panel-collapsed #workspace { grid-template-columns: var(--strip-
 .anim-grid button.on { background: var(--seg-on); color: #fff; border-color: var(--seg-on); }
 .anim-grid button i { position: absolute; right: 5px; top: 1px; font-style: normal; font-size: var(--fs-label); color: var(--ink-3); }
 .anim-grid button.on i { color: #cfd3ff; }
-.anim-timing { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 6px; margin-top: 8px; }
+/* Duration and Delay side by side, the easing on its own row: three across left the numbers
+   no room beside their labels and spin buttons. */
+.anim-timing { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.anim-timing .insp-field[data-prop="_animEase"] { grid-column: 1 / -1; }
+.anim-timing input[type=number] { text-align: right; padding-right: 2px; }
 .anim-timing .insp-field > label { font-size: var(--fs-label); color: var(--ink-3); padding-left: 6px; }
 .anim-timing select { flex: 1; min-width: 0; height: 100%; border: 0; background: var(--bg-2); border-radius: 3px; font: inherit; font-size: var(--fs-label); padding: 0 4px; }
 #animDeckRow { margin-top: 8px; }
@@ -1347,6 +1355,7 @@ body.theme-mode #layersPane { display: none; }
 .layers-bar button:hover { background: var(--accent-soft); color: var(--ink); }
 .layers-bar .lr-twist { display: inline-block; transition: transform 0.12s; font-size: var(--fs-label); }
 .layers-pane.open .layers-bar .lr-twist { transform: rotate(90deg); }
+.layers-bar .layers-icon { flex: none; width: 14px; height: 14px; }
 .layers-count { margin-left: auto; font-weight: 400; color: var(--ink-3); letter-spacing: 0; }
 .layers-body { display: flex; flex-direction: column; height: var(--layers-h, 200px); max-height: 55vh; min-height: 60px; }
 .layers-body[hidden] { display: none; }

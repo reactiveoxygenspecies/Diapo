@@ -1129,10 +1129,10 @@ function showHelp(on, tab) {
 
 /* ------------------------------------------------------------
    About Diapo and updates. The only time Diapo goes online on its own account is a click on
-   "Check for updates" (the server asks GitHub for the latest release), or, when the user
-   switched it on, once a day at start.
+   "Check for updates" (the server asks GitHub for the latest release) and, unless the user
+   switched it off, once a day at start.
    ------------------------------------------------------------ */
-app.version = ''; app.released = ''; app.updateAuto = false;
+app.version = ''; app.released = ''; app.updateAuto = true;
 app.updateResult = null;                     // the last answer: {current, latest, newer, url, published, notes}, {busy} or {error}
 const niceDate = (iso) => { const d = new Date(iso + 'T12:00:00'); return isNaN(d) ? iso : d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }); };
 const openLink = (page, tag = '') => api.openLink(page, tag).catch(err => toast('Could not open the browser: ' + err.message, { error: true }));
@@ -1140,11 +1140,11 @@ const openLink = (page, tag = '') => api.openLink(page, tag).catch(err => toast(
 function aboutHtml() {
     return `<h2>Diapo ${escapeHtml(app.version || '')}</h2>
         <p class="muted">${app.released ? 'Released ' + escapeHtml(niceDate(app.released)) + '. ' : ''}Slides that are plain HTML files, edited on your own computer.</p>
-        <div class="row about-row"><button class="tb-btn" id="aboutCheck">Check for updates</button><span class="spacer"></span>
+        <div class="row about-row"><button class="tb-btn about-check" id="aboutCheck">Check for updates</button><span class="spacer"></span>
             <button class="mini-btn" data-link="guide">Guide</button><button class="mini-btn" data-link="changelog">Changelog</button></div>
         <div id="aboutResult" class="about-result" role="status" aria-live="polite"></div>
         <label class="about-auto"><input type="checkbox" id="aboutAuto" ${app.updateAuto ? 'checked' : ''}> Check for updates when Diapo starts</label>
-        <p class="muted about-note">Off by default. Diapo asks GitHub for the latest release and sends nothing about you or your decks. A click on the button does the same, once.</p>`;
+        <p class="muted about-note">On by default. Diapo asks GitHub for the latest release and sends nothing about you or your decks. A click on the button does the same, once.</p>`;
 }
 
 /* Fills the result area of the About tab from app.updateResult. */
@@ -1185,7 +1185,7 @@ function showUpdateNotice(latest) {
     document.body.appendChild(n);
 }
 
-/* The start-up check, when the user turned it on; the server decides whether a day has passed. */
+/* The start-up check, unless the user turned it off; the server decides whether a day has passed. */
 async function autoUpdateCheck() {
     if (!app.updateAuto) return;
     try {

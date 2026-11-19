@@ -73,6 +73,12 @@ test('theme looks: the designs\' looks are cards; applying one restyles the deck
     await page.click('#btnTheme');
     await expect(page.locator('#thLooks .theme-look')).toHaveCount(31);
     await expect(page.locator('#thSaved')).toBeHidden();          // no saved themes yet: no empty list
+    // Folded at first, so the current theme's settings are near the top; opening it is remembered.
+    await expect(page.locator('#thLooksFold')).not.toHaveAttribute('open', '');
+    await expect(page.locator('#thLooks')).toBeHidden();
+    await page.locator('#thLooksFold > summary').click();
+    await expect(page.locator('#thLooks')).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('diapo-theme-looks-open'))).toBe('1');
     const folio = page.locator('#thLooks .theme-look[data-key="folio"]');
     await expect(folio.locator('.theme-look-name')).toHaveText('Folio');
     await expect(folio.locator('.theme-look-font')).toHaveText('Fraunces');
@@ -144,6 +150,7 @@ body { margin: 0; background: #000; }
     await page.click('#btnTheme');
     // Its own names are humanised in the panel.
     await expect(page.locator('.theme-var[data-var="border-col"] > label')).toHaveText('Border col');
+    await page.locator('#thLooksFold > summary').click();
     await page.locator('#thLooks .theme-look[data-key="folio"] .theme-look-apply').click();
     await expect(page.locator('#thLookHint')).toContainText('Folio look applied');
     const vars = await page.evaluate(() => ({ ...window.deckEditor.deck.overrides.vars }));

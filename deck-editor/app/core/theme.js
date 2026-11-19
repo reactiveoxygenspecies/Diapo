@@ -72,7 +72,7 @@ export class ThemePanel {
             <div class="theme-sub">Your themes</div>
             <div class="theme-looks" id="thSavedList"></div>
           </div>
-          <details class="theme-looks-fold" id="thLooksFold" open>
+          <details class="theme-looks-fold" id="thLooksFold">
             <summary class="theme-sub">Looks from the designs</summary>
             <div class="insp-hint" style="margin:0 0 6px">The colours, fonts and margins of each design that comes with Diapo.</div>
             <div class="theme-looks" id="thLooks"></div>
@@ -634,7 +634,7 @@ export class ThemePanel {
 
         // The designs' looks: open until folded, and remembered either way.
         const looksFold = this.$('thLooksFold');
-        try { if (localStorage.getItem(LOOKS_OPEN_KEY) === '0') looksFold.open = false; } catch (err) { /* private window */ }
+        try { if (localStorage.getItem(LOOKS_OPEN_KEY) === '1') looksFold.open = true; } catch (err) { /* private window */ }      // folded unless the user opened it
         looksFold.addEventListener('toggle', () => { try { localStorage.setItem(LOOKS_OPEN_KEY, looksFold.open ? '1' : '0'); } catch (err) { /* private window */ } });
 
         // Deck CSS: folded until asked for (remembered), applied on leaving a box, Ctrl+Enter or the button.

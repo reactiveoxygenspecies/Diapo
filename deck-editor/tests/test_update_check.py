@@ -138,7 +138,10 @@ class Check(unittest.TestCase):
             srv.shutdown()
 
     def test_once_a_day_and_only_when_on(self):
-        self.assertFalse(serve.update_due())                                 # off by default
+        self.assertTrue(serve.update_due())                                  # on by default
+        with serve.settings_change() as s:
+            s["update_check"] = {"auto": False}
+        self.assertFalse(serve.update_due())                                 # switched off
         with serve.settings_change() as s:
             s["update_check"] = {"auto": True}
         self.assertTrue(serve.update_due())

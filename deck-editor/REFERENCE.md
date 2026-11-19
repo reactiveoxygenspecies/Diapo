@@ -993,7 +993,8 @@ styling, applied live to whatever slide is shown:
     a name, apply a saved theme to any deck that uses the same variable names
     (decks made from the same template), delete with its "x". Themes live in
     `~/.deck-editor.json`.
-  - **Looks from the designs** (folds; remembered): the colours, fonts and
+  - **Looks from the designs** (folded at first; opening or closing it is
+    remembered): the colours, fonts and
     margins of the 31 designs, read from `app/templates/looks.json`, which
     `tools/build-templates.py` extracts from each design's `:root` variables
     (motion left out, `var()` pointers resolved) with the Google families it
@@ -1275,8 +1276,9 @@ rate-limited, no releases and an unreadable answer each give their own message.
 The dialog also says how to update (a new `diapo.exe`, or `git pull` / the ZIP
 again); decks are not affected.
 
-"Check for updates when Diapo starts" (same tab) is off by default, the
-`update_check.auto` entry of the settings file. When on, the editor asks once at
+"Check for updates when Diapo starts" (same tab) is on by default, the
+`update_check.auto` entry of the settings file (missing counts as on; unticking it
+writes `false`). When on, the editor asks once at
 start; the server answers only if the last check is over 24 hours old
 (`update_check.last`, written by every check), so at most once a day, and a newer
 release shows a small notice with a link to the About tab. For tests and offline
