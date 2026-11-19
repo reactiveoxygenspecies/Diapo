@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.0 - 2026-11-19
 
 - **Find a slide while presenting.** In a saved deck, Ctrl+Shift+F (or Ctrl+K,
   or /) opens the overview with a search field. It keeps the slides whose
