@@ -755,7 +755,7 @@ export class PptxCollector {
     standaloneSvg(svg, w, h, bleed = 0) {
         const clone = svg.cloneNode(true);
         const live = [svg, ...svg.querySelectorAll('*')], copy = [clone, ...clone.querySelectorAll('*')];
-        const props = ['fill', 'stroke', 'stroke-width', 'opacity', 'fill-opacity', 'stroke-opacity', 'stop-color', 'stop-opacity', 'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin'];
+        const props = ['fill', 'stroke', 'stroke-width', 'opacity', 'fill-opacity', 'stroke-opacity', 'stop-color', 'stop-opacity', 'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'vector-effect'];
         live.forEach((n, i) => {
             const c = copy[i]; if (!c || !c.setAttribute) return;
             const cs = this.css(n);

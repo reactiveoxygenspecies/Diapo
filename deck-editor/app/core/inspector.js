@@ -8,7 +8,7 @@
    Changes preview on `input` and become one undo step on `change`;
    they apply to every selected element and reflect the primary one.
    ============================================================ */
-import { describe, nameOf, uniqueId, isShape, css, isEditableText, isMaster, isLocked, isLayoutUnit, MEDIA_TAGS, DRAWN, colourNames, uniqueColours, setSwatches } from './dom.js';
+import { describe, nameOf, uniqueId, isShape, pathShapeOf, css, isEditableText, isMaster, isLocked, isLayoutUnit, MEDIA_TAGS, DRAWN, colourNames, uniqueColours, setSwatches } from './dom.js';
 import { getOffset, setOffset, setRotation, afterResize, fitText, refitAll } from './transform.js';
 import { styleCmd } from './history.js';
 import { PRESETS, EASES, animationCss, deckRevealClasses, describeAnimation, applyPreset, setTiming, replay, setFragment, fragmentOf, TEXT_EFFECTS, setTextEffect } from './animate.js';
@@ -374,6 +374,7 @@ export class Inspector {
         this._num('inspW', 'width', 'px', (el) => afterResize(el));
         this._num('inspH', 'height', 'px', (el) => afterResize(el));
         this._field('inspBorder', (el, v) => {
+            if (pathShapeOf(el)) { setOutline(el, { width: v }); return; }
             el.style.borderWidth = v === '' ? '' : v + 'px';
             if (v !== '' && +v > 0 && css(el).borderStyle === 'none') el.style.borderStyle = 'solid';
         }, 'Border');
@@ -768,6 +769,7 @@ export class Inspector {
             if (prop === '_x') { const o = getOffset(el); setOffset(el, 0, o.y); }
             else if (prop === '_y') { const o = getOffset(el); setOffset(el, o.x, 0); }
             else if (prop === 'rotate') setRotation(el, 0);
+            else if (prop === 'borderWidth' && pathShapeOf(el)) setOutline(el, { width: '', color: '' });
             else if (prop === 'borderWidth') { el.style.borderWidth = ''; el.style.borderStyle = ''; }
             else if (prop === 'fontStyle') { el.style.fontStyle = ''; el.style.textTransform = ''; }
             else if (prop === 'width' || prop === 'height') { el.style[prop] = ''; if (el.tagName === 'IMG') { el.style.maxWidth = ''; el.style.maxHeight = ''; } afterResize(el); }
@@ -1117,6 +1119,7 @@ export class Inspector {
     colourProp(el) {
         const t = this.colourTarget;
         if (isShape(el)) return t === 'text' ? 'fill' : 'stroke';
+        if (pathShapeOf(el)) return t === 'border' ? 'stroke' : 'color';      // a drawn shape: its fill is currentColor
         return t === 'text' ? 'color' : t === 'fill' ? 'backgroundColor' : 'borderColor';
     }
     applyColour(value, final) {
@@ -1126,6 +1129,7 @@ export class Inspector {
         if (this.colourTarget === 'text' && this.app.textEdit.colourSelection(value)) { if (final && value && !value.startsWith('var(')) this._remember(value); return; }
         this._preview(label, (el) => {
             const p = this.colourProp(el);
+            if (p === 'stroke' && pathShapeOf(el)) { setOutline(el, { color: value }); return; }
             el.style[p] = value;
             if (p === 'borderColor' && value) {
                 const cs = css(el);
@@ -1291,11 +1295,12 @@ export class Inspector {
         $('inspType').hidden = noText;
         $('inspUnhide').hidden = !(this.deck.currentSlide && this.deck.currentSlide.querySelector('[data-hidden]'));
 
-        // Colour
-        const shape = isShape(el);
+        // Colour. A drawn shape has no text: Fill colours the shape, Border its outline.
+        const shape = isShape(el), drawn = !!pathShapeOf(el);
+        if (drawn && this.colourTarget === 'text') this.colourTarget = 'fill';
         this.root.querySelectorAll('#inspColourTarget button').forEach(b => {
             b.classList.toggle('on', b.dataset.t === this.colourTarget);
-            b.hidden = (shape && b.dataset.t === 'border') || (isLn && b.dataset.t !== 'text');
+            b.hidden = (shape && b.dataset.t === 'border') || (isLn && b.dataset.t !== 'text') || (drawn && b.dataset.t === 'text');
             if (shape) b.textContent = b.dataset.t === 'text' ? 'Fill' : 'Stroke';
             else if (isLn) b.textContent = 'Line';
             else b.textContent = b.dataset.t === 'text' ? 'Text' : b.dataset.t === 'fill' ? 'Fill' : 'Border';
@@ -1339,7 +1344,7 @@ export class Inspector {
         $('inspH').value = st.height ? parseFloat(st.height) : Math.round(r.h);
         $('inspPad').value = st.padding ? parseFloat(st.padding) : Math.round(parseFloat(cs.paddingTop)) || 0;
         $('inspRadius').value = st.borderRadius ? parseFloat(st.borderRadius) : Math.round(parseFloat(cs.borderTopLeftRadius)) || 0;
-        $('inspBorder').value = st.borderWidth ? parseFloat(st.borderWidth) : Math.round(parseFloat(cs.borderTopWidth)) || 0;
+        $('inspBorder').value = drawn ? (parseFloat(st.strokeWidth) || 0) : st.borderWidth ? parseFloat(st.borderWidth) : Math.round(parseFloat(cs.borderTopWidth)) || 0;
         const shadow = this.shadowKeys.find(([, raw, norm]) => raw === st.boxShadow || norm === st.boxShadow);
         $('inspShadow').value = shadow ? shadow[0] : '';
         $('inspOpacity').value = cs.opacity; $('inspOpacityV').textContent = Math.round(cs.opacity * 100) + '%';
@@ -1366,7 +1371,7 @@ export class Inspector {
         const flags = {
             fontFamily: hasT('fontFamily'), fontSize: hasT('fontSize'), fontWeight: hasT('fontWeight'), lineHeight: has('lineHeight'), fontStyle: hasT('fontStyle') || hasT('textTransform'),
             letterSpacing: hasT('letterSpacing'), textAlign: has('textAlign'), width: has('width'), height: has('height'),
-            padding: has('padding'), borderRadius: has('borderRadius'), borderWidth: has('borderWidth'), boxShadow: has('boxShadow'),
+            padding: has('padding'), borderRadius: has('borderRadius'), borderWidth: has('borderWidth') || (drawn && has('strokeWidth')), boxShadow: has('boxShadow'),
             opacity: has('opacity'), _x: o.x !== 0, _y: o.y !== 0, rotate: o.r !== 0, zIndex: has('zIndex'),
         };
         this.root.querySelectorAll('.insp-field[data-prop]').forEach(f => f.classList.toggle('set', !!flags[f.dataset.prop]));
@@ -1374,6 +1379,24 @@ export class Inspector {
 }
 
 /* --- small helpers ------------------------------------------------ */
+/* The border of a drawn shape (see pathShapeOf) is the outline of its path: stroke and
+   stroke-width on the <svg>, which the path inherits, so the style attribute holds all of it
+   and undo takes it back like any border. The path draws it non-scaling (the same width all
+   round however the box is stretched), and the svg shows the half of it outside the path.
+   A colour without a width gets 2 px, a width without a colour the slide's text colour (the
+   shape's own colour would hide it), the way a box border starts. A CSS border left from
+   before (it drew the box) goes. '' for both takes the outline off. */
+function setOutline(el, { color, width }) {
+    const path = pathShapeOf(el); if (!path) return;
+    if (color !== undefined) el.style.stroke = color || '';
+    if (width !== undefined) el.style.strokeWidth = width === '' ? '' : width + 'px';
+    const on = (!!el.style.stroke && el.style.stroke !== 'none') || parseFloat(el.style.strokeWidth) > 0;
+    if (on && color && !el.style.strokeWidth) el.style.strokeWidth = '2px';
+    if (on && parseFloat(el.style.strokeWidth) > 0 && !el.style.stroke) el.style.stroke = css(el.parentElement || el).color;
+    el.style.overflow = on ? 'visible' : '';
+    if (on && path.getAttribute('vector-effect') !== 'non-scaling-stroke') path.setAttribute('vector-effect', 'non-scaling-stroke');
+    for (const p of ['border', 'border-width', 'border-style', 'border-color']) el.style.removeProperty(p);
+}
 /* "example.com/x" -> "https://example.com/x"; mail and hash addresses pass; empty stays empty. */
 function normaliseUrl(s) {
     s = String(s || '').trim();

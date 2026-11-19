@@ -115,6 +115,16 @@ export function isShape(el) {
     return el instanceof win(el).SVGElement && el.tagName.toLowerCase() !== 'svg' && !el.closest(DRAWN) && !inInlineMath(el);
 }
 
+/* The outline of a drawn shape (a triangle, a hexagon, a star ... inserted as an <svg> whose one
+   path is stretched to the box, preserveAspectRatio none), or null for any other element. Such a
+   shape is a box to the panel, but its border has to follow the path: a CSS border would draw
+   the box around it. */
+export function pathShapeOf(el) {
+    if (!el || !el.matches || !el.matches('svg[preserveAspectRatio="none"]:not([data-line])')) return null;
+    const kids = Array.from(el.children).filter(c => !/^(title|desc|defs)$/i.test(c.localName));
+    return kids.length === 1 && /^(path|polygon|ellipse|circle|rect)$/i.test(kids[0].localName) && !el.querySelector('text') ? kids[0] : null;
+}
+
 /* The <svg> root that owns a shape, or the [data-svg] host wrapping it. */
 export function svgHostOf(el) {
     const svg = el.closest('svg');

@@ -163,7 +163,7 @@ test('22 insert: lists edit as a whole, tables cell by cell with Tab, code keeps
         return { star: star.outerHTML, embed: em.getAttribute('src'), video: vid.outerHTML };
     });
     expect(rest.star.replace(/ (style="[^"]*") (data-id="[^"]*")/, ' $2 $1'))   // Firefox writes style first
-        .toMatch(/<svg viewBox="0 0 100 100" preserveAspectRatio="none" data-id="el-\d+" style="[^"]*color: var\(--accent\)[^"]*"><path d="[^"]+" fill="currentColor"><\/path><\/svg>/);   // every insert has a data-id (auto-animate)
+        .toMatch(/<svg viewBox="0 0 100 100" preserveAspectRatio="none" data-id="el-\d+" style="[^"]*color: var\(--accent\)[^"]*"><path d="[^"]+" fill="currentColor" vector-effect="non-scaling-stroke"><\/path><\/svg>/);   // every insert has a data-id (auto-animate)
     expect(rest.embed).toBe('https://www.youtube.com/embed/dQw4w9WgXcQ');
     expect(rest.video).toMatch(/<video src="assets\/clip.mp4" controls="" playsinline="" preload="metadata"/);
 
@@ -1926,4 +1926,96 @@ test('70 equations and structures: LaTeX and SMILES drawn as SVG in the deck, ed
     await expect(page.locator('#problemsBadge')).toHaveText('1 problem');
     await page.click('#problemsBadge');
     await expect(page.locator('.problems')).toContainText('Equation not drawn on slide 1');
+});
+
+/* ------------------------------------------------------------
+   75. A drawn shape's border follows its outline
+   ------------------------------------------------------------ */
+test('75 shape border: on a triangle or hexagon the Border colour and width outline the path (not the box), Fill colours the shape, one undo step each', async ({ page }) => {
+    await openDeck(page);
+    const look = () => page.evaluate(() => { const el = window.deckEditor.selection.primary, cs = getComputedStyle(el); return { stroke: cs.stroke, width: el.style.strokeWidth, boxBorder: cs.borderTopWidth, color: el.style.color, ve: el.firstElementChild.getAttribute('vector-effect'), tabs: Array.from(document.querySelectorAll('#inspColourTarget button')).filter(b => !b.hidden).map(b => b.textContent), field: document.getElementById('inspBorder').value }; });
+    await page.evaluate(() => { const ed = window.deckEditor; ed.selection.select(ed.insert.shape('hexagon')); });
+    expect((await look()).tabs).toEqual(['Fill', 'Border']);
+    await page.click('#inspColourTarget [data-t="border"]');
+    await page.fill('#inspHex', '#ff0000');
+    await page.locator('#inspHex').press('Enter');
+    let l = await look();
+    expect(l.stroke).toBe('rgb(255, 0, 0)');
+    expect(l.width).toBe('2px');                                   // a colour alone starts at 2 px, like a box border
+    expect(l.boxBorder).toBe('0px');                               // never the box
+    expect(l.ve).toBe('non-scaling-stroke');
+    await page.fill('#inspBorder', '12');
+    await page.locator('#inspBorder').press('Tab');
+    l = await look();
+    expect(l.width).toBe('12px');
+    expect(l.field).toBe('12');
+    expect(l.boxBorder).toBe('0px');
+    // Fill colours the shape (its currentColor), not the box behind it.
+    await page.click('#inspColourTarget [data-t="fill"]');
+    await page.fill('#inspHex', '#00ff00');
+    await page.locator('#inspHex').press('Enter');
+    l = await look();
+    expect(l.color).toBe('rgb(0, 255, 0)');
+    expect(await page.evaluate(() => getComputedStyle(window.deckEditor.selection.primary).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+    // Undo takes back one step at a time: the fill, then the width.
+    await page.evaluate(() => window.deckEditor.history.undo());
+    await page.evaluate(() => window.deckEditor.history.undo());
+    expect((await look()).width).toBe('2px');
+    // The x on the Border field takes the outline off.
+    await page.evaluate(() => window.deckEditor.inspector.sync());
+    await page.click('.insp-field[data-prop="borderWidth"] .insp-clear');
+    l = await look();
+    expect(l.stroke).toBe('none');
+    expect(l.width).toBe('');
+    // A shape that got a box border before this: setting a border width turns it into an outline.
+    await page.evaluate(() => { const el = window.deckEditor.selection.primary; el.style.border = '13px solid rgb(0, 0, 255)'; window.deckEditor.inspector.sync(); });
+    await page.fill('#inspBorder', '6');
+    await page.locator('#inspBorder').press('Tab');
+    l = await look();
+    expect(l.boxBorder).toBe('0px');
+    expect(l.width).toBe('6px');
+    expect(l.stroke).not.toBe('none');
+});
+
+/* ------------------------------------------------------------
+   76. A paragraph text box keeps its text when centred
+   ------------------------------------------------------------ */
+test('76 paragraph box: centring the text of a <p> box (the browser wraps it in a <div>) saves it as a <div> box that opens whole, in place and in the same size', async ({ page }) => {
+    await openDeck(page);
+    // A layout's body text is a <p>; the bar's Centre wraps its text in <div style="text-align: center">.
+    const before = await page.evaluate(() => {
+        const ed = window.deckEditor, doc = ed.deck.doc;
+        const p = doc.createElement('p');
+        p.setAttribute('data-edit', '');
+        p.style.cssText = 'position: absolute; left: 300px; top: 400px; width: 900px; margin: 0px;';
+        p.textContent = 'Molecules';
+        ed.history.insert(p, ed.deck.currentSlide, null, 'Insert');
+        ed.textEdit.start(p);
+        const r = doc.createRange(); r.selectNodeContents(p);
+        const s = ed.deck.win.getSelection(); s.removeAllRanges(); s.addRange(r);
+        ed.textEdit.exec('center');
+        ed.textEdit.commit();
+        const cs = getComputedStyle(p);
+        return { inner: p.innerHTML, rect: ed.deck.stageRect(p.firstElementChild), size: cs.fontSize, line: cs.lineHeight };
+    });
+    expect(before.inner).toMatch(/^<div style="text-align: center;">Molecules<\/div>$/);
+    await save(page);
+    const saved = readDeck();
+    expect(saved).not.toMatch(/<p\b[^>]*>(?:(?!<\/p>)[\s\S])*<div/);           // never a block inside a <p> in the file
+    expect(saved).toMatch(/<div data-edit[^>]*position: absolute; left: 300px; top: 400px;[^>]*><div style="text-align: center;">Molecules<\/div><\/div>/);
+    // Opened again: the text is in its box, where it was, at the size it had (no stray empty paragraph).
+    await openDeck(page);
+    const after = await page.evaluate(() => {
+        const ed = window.deckEditor, doc = ed.deck.doc;
+        const t = Array.from(doc.querySelectorAll('div')).find(d => d.textContent === 'Molecules' && !d.firstElementChild);
+        const box = t.parentElement, cs = getComputedStyle(box);
+        return { box: box.getAttribute('style'), rect: ed.deck.stageRect(t), size: cs.fontSize, line: cs.lineHeight, strays: doc.querySelectorAll('.slide p:empty:not([class]):not([style])').length, picked: ed.selection.pick(t) === box };
+    });
+    expect(after.box).toContain('position: absolute');
+    expect(after.picked).toBe(true);
+    expect(after.strays).toBe(0);
+    expect(after.size).toBe(before.size);
+    expect(after.line).toBe(before.line);
+    near(after.rect.x, before.rect.x, 0.5, 'x'); near(after.rect.y, before.rect.y, 0.5, 'y');
+    near(after.rect.w, before.rect.w, 0.5, 'w'); near(after.rect.h, before.rect.h, 0.5, 'h');
 });

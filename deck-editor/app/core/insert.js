@@ -502,7 +502,7 @@ export class Inserter {
         const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('viewBox', '0 0 100 100');
         svg.setAttribute('preserveAspectRatio', 'none');
-        svg.innerHTML = `<path d="${path}" fill="currentColor"/>`;
+        svg.innerHTML = `<path d="${path}" fill="currentColor" vector-effect="non-scaling-stroke"/>`;      // a border (stroke) keeps its width when the box stretches
         const sizes = { 'block-arrow': [360, 200], chevron: [300, 200], bubble: [420, 300] };
         const [w, h] = sizes[kind] || [300, 300];
         this.place(svg, w, h);

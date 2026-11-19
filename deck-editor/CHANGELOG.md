@@ -65,6 +65,18 @@
   looks, and every field and icon button has an accessible name. Insert's shapes
   and lines have small pictures, and leftover technical wording is gone.
 - Slide numbers in the strip are darker, readable in every look.
+- Borders on triangles, diamonds, hexagons, stars, arrows, chevrons and speech
+  bubbles follow the shape's outline (the same width all round when the shape is
+  stretched) instead of drawing a box around it, and Fill colours the shape
+  itself. A shape that already had a box border becomes an outline when its
+  Border is changed. Test 75.
+- A paragraph text box (the body text of a slide layout) no longer loses its
+  text when the deck is opened again. Centring its text, or making it a list,
+  put a block inside the paragraph, which HTML does not allow: on the next open
+  the box was left empty and the text fell out to the top of the slide, small
+  and full width. Such a box is now saved as a `<div>` with the same look. A deck
+  saved by an earlier version keeps text that already fell out; put it back in
+  place and save. Test 76.
 - CI: a Windows workflow runs the browser and Python tests on every push and pull
   request to main, and fails if the generated deck copies are stale.
 

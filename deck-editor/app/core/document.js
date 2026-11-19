@@ -530,7 +530,12 @@ export class Deck extends EventTarget {
             if (isEdited(host)) { host.setAttribute('data-ed-keep', '1'); keep.push(host); }
             else host.setAttribute('data-ed-gen', '1');
         }
+        // Paragraphs holding a block are written as <div>s (see paragraphsAsDivs); their look is read here, live.
+        const paras = Array.from(live.querySelectorAll('.deck-stage p')).filter(p => p.querySelector(BREAKS_P));
+        const paraLooks = paras.map((p, i) => { const look = paragraphLook(p); p.setAttribute('data-ed-para', String(i)); return look; });
         const root = live.documentElement.cloneNode(true);
+        paras.forEach(p => p.removeAttribute('data-ed-para'));
+        paragraphsAsDivs(root, paraLooks);
         keep.forEach(h => h.removeAttribute('data-ed-keep'));
         live.querySelectorAll('[data-ed-gen]').forEach(h => h.removeAttribute('data-ed-gen'));
 
@@ -824,6 +829,48 @@ export class Deck extends EventTarget {
             link.rel = 'stylesheet'; link.href = href; link.setAttribute('data-ed-restored', '');
             head.insertBefore(link, st || this.doc.getElementById(OVERRIDES_ID));
         }
+    }
+}
+
+/* A <p> cannot hold a block: when the file is opened, the parser ends the paragraph where a
+   <div>, a list, a table or another <p> starts inside it. The text box is left empty where it
+   was, what it held falls out onto the slide with no place of its own (at the top, in the
+   slide's own font size), and the </p> becomes a stray empty paragraph. The browser's own
+   editing makes exactly such paragraphs: in a text box that is a <p> (the body text of a slide
+   layout), Centre wraps the text in a <div style="text-align: center">, and the list button
+   puts a <ul> in it. So a paragraph holding a block is written as a <div> with the same
+   attributes, with the look the deck gave it as a <p> (its size, line height, margins) written
+   inline: it reads the same, and comes back whole. */
+const BREAKS_P = 'address, article, aside, blockquote, details, dialog, div, dl, fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, header, hgroup, hr, main, menu, nav, ol, p, pre, section, table, ul';
+const PARA_LOOK = ['font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing', 'word-spacing',
+    'color', 'text-align', 'text-transform', 'text-indent', 'white-space', 'max-width',
+    'margin-top', 'margin-right', 'margin-bottom', 'margin-left', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left'];
+/* What a paragraph's <p> rules give it that a <div> in its place would not have: [property, value]
+   pairs, measured against a hidden <div> with the same attributes put beside it for the moment. */
+export function paragraphLook(p) {
+    const doc = p.ownerDocument, win = doc.defaultView, probe = doc.createElement('div');
+    for (const a of Array.from(p.attributes)) if (!/^(id|data-ed-para)$/.test(a.name)) probe.setAttribute(a.name, a.value);
+    probe.style.visibility = 'hidden';
+    p.after(probe);
+    const a = win.getComputedStyle(p), b = win.getComputedStyle(probe), out = [];
+    for (const prop of PARA_LOOK) {
+        const v = a.getPropertyValue(prop);
+        if (v !== b.getPropertyValue(prop) && !p.style.getPropertyValue(prop)) out.push([prop, v]);
+    }
+    probe.remove();
+    return out;
+}
+/* In a serialised copy: every [data-ed-para] paragraph becomes a <div> with its attributes, its
+   content and looks[n] written inline. */
+export function paragraphsAsDivs(root, looks) {
+    for (const p of Array.from(root.querySelectorAll('[data-ed-para]'))) {
+        const n = +p.getAttribute('data-ed-para');
+        p.removeAttribute('data-ed-para');
+        const div = p.ownerDocument.createElement('div');
+        for (const a of Array.from(p.attributes)) div.setAttribute(a.name, a.value);
+        for (const [prop, v] of looks[n] || []) div.style.setProperty(prop, v);
+        div.append(...p.childNodes);
+        p.replaceWith(div);
     }
 }
 
