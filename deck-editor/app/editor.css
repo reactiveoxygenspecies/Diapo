@@ -563,6 +563,12 @@ html[data-look="ink"] .canvas-loading .loader, html[data-look="slate"] .canvas-l
 .about-auto { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; }
 .about-note { font-size: var(--fs-label); margin: 6px 0; }
 .update-notice { position: fixed; right: 16px; bottom: 44px; z-index: 85; display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-radius: 10px; background: var(--chrome); color: #fff; font-size: var(--fs-body); box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+/* On the dark chrome: white text, not the light .mini-btn fill (which left white on white). */
+.update-notice .mini-btn { color: #fff; background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.28); }
+.update-notice .mini-btn:hover { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.5); }
+.update-notice .mini-btn[data-a="x"] { background: transparent; border-color: transparent; font-size: 16px; padding: 0; justify-content: center; }
+.update-notice .mini-btn[data-a="x"]:hover { background: rgba(255,255,255,0.15); }
+.update-notice .mini-btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 .help-card h3 { font-size: var(--fs-label); letter-spacing: .08em; text-transform: uppercase; color: var(--section-ink); margin: 14px 0 4px; }
 
 /* ------------------------------------------------------------

@@ -7,6 +7,9 @@
   slow computer), the focus went back to the search field at the end, so what
   you had started typing in Replace landed in the search. It now stays in the
   field you are in.
+- **The update notice's buttons show their labels.** "See what's new" and the
+  close button on the "Diapo x.y.z is available" notice were white on white.
+  They now show white text on the notice's dark background.
 
 ## 1.4.2 - 2026-11-20
 
