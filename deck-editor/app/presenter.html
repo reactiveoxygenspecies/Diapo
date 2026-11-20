@@ -64,9 +64,9 @@ button.big { font-size: 20px; padding: 6px 18px; }
 </head>
 <body>
 <div id="app">
-  <div class="stage" id="curStage"><span class="tag">Current</span><iframe id="cur" title="Current slide"></iframe><div class="empty" id="curEmpty">Waiting for the editor<span class="hint">Open a deck in the editor window. Arrows here change the slide there too.</span></div></div>
+  <div class="stage" id="curStage"><span class="tag">Current</span><iframe id="cur" name="deck-presenter" title="Current slide"></iframe><div class="empty" id="curEmpty">Waiting for the editor<span class="hint">Open a deck in the editor window. Arrows here change the slide there too.</span></div></div>
   <div class="side">
-    <div class="stage"><span class="tag">Next</span><iframe id="next" title="Next slide"></iframe><div class="empty" id="nextEmpty" hidden>End of the deck</div></div>
+    <div class="stage"><span class="tag">Next</span><iframe id="next" name="deck-presenter" title="Next slide"></iframe><div class="empty" id="nextEmpty" hidden>End of the deck</div></div>
     <div class="notes-size"><button data-size="-1" title="Smaller notes">A-</button><button data-size="1" title="Larger notes">A+</button></div>
     <div class="notes" id="notes"></div>
   </div>

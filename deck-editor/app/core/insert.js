@@ -70,7 +70,7 @@ export const SHAPES = {
 export function embedUrl(url) {
     const u = String(url || '').trim();
     let m = /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{6,})/i.exec(u);
-    if (m) return `https://www.youtube.com/embed/${m[1]}`;
+    if (m) return `https://www.youtube.com/embed/${m[1]}?enablejsapi=1`;     // the API lets a deck pause it when its slide is left
     m = /vimeo\.com\/(?:video\/)?(\d+)/i.exec(u);
     if (m) return `https://player.vimeo.com/video/${m[1]}`;
     return u;

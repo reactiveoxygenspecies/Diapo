@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **Video and sound stop when their slide is left.** A hidden slide is only
+  invisible, so a video, a sound or a YouTube or Vimeo player kept playing
+  under the next slide. Now leaving a slide (or taking back the step that
+  showed it) pauses what plays there. A video or sound with autoplay starts
+  when its slide (or its step) shows, not when the deck opens. The overview's
+  thumbnails never play, and the presenter window's previews play muted.
+  YouTube players inserted from now on carry `enablejsapi=1`, so they pause
+  where they are. An older YouTube embed without it is reloaded instead, which
+  stops it. Presentation features script version 16: every template carries
+  it, and an existing deck offers the update when it is opened.
+
 ## 1.4.0 - 2026-11-19
 
 - **Find a slide while presenting.** In a saved deck, Ctrl+Shift+F (or Ctrl+K,

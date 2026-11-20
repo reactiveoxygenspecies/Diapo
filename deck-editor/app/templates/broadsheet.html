@@ -602,6 +602,9 @@ new SlidePresentation();
                                         a shape, a text box) opens the address in a
                                         new tab; data-href-target="_self" in this one
      <aside class="notes" hidden>       speaker notes
+     <video autoplay>, <audio autoplay> starts when its slide (or its step) shows;
+                                        any video, sound or YouTube / Vimeo player
+                                        pauses when its slide is left
 
    Requirements
      The deck shows slide n for location.hash "#n" and dispatches
@@ -871,7 +874,7 @@ new SlidePresentation();
         var groups = fragmentsOf(slide);
         for (var i = 0; i < groups.length; i++) {
             if (!groups[i].els[0].classList.contains('visible')) {
-                groups[i].els.forEach(function (el) { el.classList.add('visible'); if (el.hasAttribute('data-text-effect')) playTextEffect(el); });
+                groups[i].els.forEach(function (el) { el.classList.add('visible'); if (el.hasAttribute('data-text-effect')) playTextEffect(el); playMedia(el); });
                 notify();
                 return true;
             }
@@ -883,7 +886,7 @@ new SlidePresentation();
         var groups = fragmentsOf(slide);
         for (var i = groups.length - 1; i >= 0; i--) {
             if (groups[i].els[0].classList.contains('visible')) {
-                groups[i].els.forEach(function (el) { el.classList.remove('visible'); });
+                groups[i].els.forEach(function (el) { el.classList.remove('visible'); pauseMedia(el); });
                 notify();
                 return true;
             }
@@ -900,6 +903,68 @@ new SlidePresentation();
         groups.forEach(function (g) { if (g.els[0].classList.contains('visible')) shown++; });
         return { total: groups.length, shown: shown };
     }
+
+    /* ============================================================
+       MEDIA: a hidden slide is only invisible, so a video, a sound or
+       a YouTube / Vimeo player on it would play on under the next one.
+       Leaving a slide pauses what plays on it; entering one starts what
+       has the autoplay attribute (a step's media when the step shows);
+       autoplay elsewhere waits for its slide. The presenter window's
+       frames (named deck-presenter) play without sound.
+       ============================================================ */
+    var PRESENTER_FRAME = window.name === 'deck-presenter';
+    var MEDIA = 'video, audio';
+    function within(root, sel) {                                        // root itself, then what is inside
+        var out = Array.prototype.slice.call(root.querySelectorAll(sel));
+        if (root.matches && root.matches(sel)) out.unshift(root);
+        return out;
+    }
+    function mediaShown(m) {
+        var slide = m.closest('.slide');
+        if (!slide) return true;                                        // the master layer
+        if (slide !== slides()[current()]) return false;
+        var f = m.closest('[data-fragment]');
+        return !f || f.classList.contains('visible');
+    }
+    function playMedia(root) {
+        if (!root || editing()) return;
+        within(root, MEDIA).forEach(function (m) {
+            if (!m.hasAttribute('autoplay') || !m.paused || !mediaShown(m)) return;
+            var p = m.play();
+            if (p && p.catch) p.catch(function () { /* the browser wants a click first */ });
+        });
+    }
+    var PLAYER = /^(https?:)?\/\/(www\.)?(youtube(-nocookie)?\.com|player\.vimeo\.com)\//i;
+    function pauseMedia(root) {
+        if (!root) return;
+        within(root, MEDIA).forEach(function (m) { if (!m.paused) m.pause(); });
+        within(root, 'iframe').forEach(function (f) {
+            var src = f.getAttribute('src') || '';
+            if (!PLAYER.test(src)) return;                              // another page keeps its state
+            try {
+                if (/vimeo/i.test(src)) { f.contentWindow.postMessage('{"method":"pause"}', '*'); return; }
+                if (/[?&]enablejsapi=1/.test(src)) { f.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*'); return; }
+            } catch (e) { /* no window yet */ }
+            f.setAttribute('src', src);                                 // a YouTube player without its API: reloaded, which stops it
+        });
+    }
+    /* A copy (overview tile, morph ghost) never plays. */
+    function quietCopy(root) {
+        within(root, MEDIA).forEach(function (m) {
+            m.removeAttribute('autoplay'); m.muted = true; m.setAttribute('preload', 'none');
+        });
+    }
+    document.addEventListener('play', function (e) {
+        var m = e.target;
+        if (!m || !m.matches || !m.matches(MEDIA)) return;
+        if (PRESENTER_FRAME) m.muted = true;
+        if (stage.contains(m) && !mediaShown(m)) m.pause();          // autoplay on a slide not shown yet
+    }, true);
+    if (PRESENTER_FRAME) Array.prototype.forEach.call(document.querySelectorAll(MEDIA), function (m) { m.muted = true; });
+    // The browser's own autoplay can be lost on a page still waiting for a stylesheet (a font
+    // from the internet): the slide shown when the page has loaded starts its autoplay itself.
+    function startShown() { playMedia(slides()[current()]); }
+    if (document.readyState === 'complete') setTimeout(startShown, 0); else window.addEventListener('load', startShown);
 
     function next() { if (editing()) return; if (!nextFragment()) goTo(current() + 1); }
     function prev() { if (editing()) return; if (!prevFragment()) goTo(current() - 1); }
@@ -922,8 +987,10 @@ new SlidePresentation();
         var forward = i > lastIndex;
         var from = slides()[lastIndex], to = slides()[i];
         lastIndex = i;
+        pauseMedia(from);
         if (!editing()) {
             setFragments(to, !forward);
+            playMedia(to);
             var morphing = forward && from && to && from.hasAttribute('data-auto-animate');
             if (morphing) autoAnimate(from, to);
             else playTransition(to, forward, from);
@@ -1145,6 +1212,7 @@ new SlidePresentation();
         g.removeAttribute('id'); g.removeAttribute('data-id');
         Array.prototype.forEach.call(g.querySelectorAll('[id]'), function (n) { n.removeAttribute('id'); });
         g.classList.add('deck-morph-ghost');
+        quietCopy(g);
         var st = '';
         for (var p in look) if (look[p]) st += p + ':' + look[p] + ';';
         // Its box is the old element's own (unrotated) box at the old centre; the old rotation and
@@ -1312,6 +1380,7 @@ new SlidePresentation();
             Array.prototype.forEach.call(clone.querySelectorAll('[id]'), function (n) { n.removeAttribute('id'); });
             Array.prototype.forEach.call(clone.querySelectorAll('[data-fragment]'), function (n) { n.classList.add('visible'); });
             Array.prototype.forEach.call(clone.querySelectorAll('aside.notes, .notes'), function (n) { n.remove(); });
+            quietCopy(clone);
             inner.appendChild(clone);
             frame.appendChild(inner);
             tile.appendChild(frame);
@@ -1743,8 +1812,8 @@ new SlidePresentation();
         '.end{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);background:var(--bg)}.end[hidden]{display:none}'
     ].join('');
     var HTML = '<div id="app">'
-        + '<div class="stage"><span class="tag">Current</span><iframe id="cur"></iframe></div>'
-        + '<div class="side"><div class="stage"><span class="tag">Next</span><iframe id="next"></iframe><div class="end" id="end" hidden>End of the deck</div></div>'
+        + '<div class="stage"><span class="tag">Current</span><iframe id="cur" name="deck-presenter"></iframe></div>'
+        + '<div class="side"><div class="stage"><span class="tag">Next</span><iframe id="next" name="deck-presenter"></iframe><div class="end" id="end" hidden>End of the deck</div></div>'
         + '<div class="sizes"><button data-size="-1">A-</button><button data-size="1">A+</button></div><div class="notes" id="notes"></div></div>'
         + '<div class="bar"><div class="time" id="time" title="Click to reset">00:00</div><div class="slidetime" id="slidetime" title="On this slide">00:00</div><button id="reset">Reset</button><div class="clock" id="clock"></div><div class="grow"></div>'
         + '<div class="count"><b id="now">-</b> / <span id="total">-</span> <span class="hint" id="frag"></span> <span class="hint" id="name"></span></div>'
@@ -2080,7 +2149,7 @@ new SlidePresentation();
         if (e.deltaY > 0 ? nextFragment() : prevFragment()) e.stopImmediatePropagation();
     }, { capture: true, passive: true });
 
-    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, openKeys: openKeys, closeKeys: closeKeys, search: search, reveal: reveal, openSearch: openSearch, openFinder: openFinder, version: 15 };
+    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, openKeys: openKeys, closeKeys: closeKeys, search: search, reveal: reveal, openSearch: openSearch, openFinder: openFinder, version: 16 };
 })();
 </script>
 </body>

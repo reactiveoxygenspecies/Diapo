@@ -1,6 +1,6 @@
 // Presenting: the runtime in the saved deck (presenter, fragments, morph, laser, drawing, transitions, links, self-running) and its updates.
 // Run with: npx playwright test   (from the deck-editor folder)
-const { test, expect, fs, path, freshDeckEachTest, DECK, FILE, centre, drag, goTo, near, openDeck, own, readDeck, save, scale, slack, stageRect } = require('./helpers');
+const { test, expect, fs, path, freshDeckEachTest, DECK, DECK_DIR, FILE, centre, drag, goTo, near, openDeck, own, readDeck, save, scale, slack, stageRect } = require('./helpers');
 
 freshDeckEachTest();
 
@@ -593,4 +593,62 @@ test('56 runtime update: a deck with an older presentation features script offer
     await openDeck(page);
     await page.waitForTimeout(600);
     await expect(page.locator('.bar.runtime-bar')).toBeVisible();      // a fresh open asks again
+});
+
+/* ------------------------------------------------------------
+   15c. Media: what plays on a slide stops when the slide is left
+   ------------------------------------------------------------ */
+test('15c media: leaving a slide pauses its sound or video, autoplay waits for its slide or step, copies and presenter frames stay quiet', async ({ context }) => {
+    // A second of tone, and a deck (the editor's own template) with sound on slides 1 and 2, one in a step.
+    const rate = 8000, n = rate, wav = Buffer.alloc(44 + n * 2);
+    wav.write('RIFF', 0); wav.writeUInt32LE(36 + n * 2, 4); wav.write('WAVEfmt ', 8); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+    wav.writeUInt32LE(rate, 24); wav.writeUInt32LE(rate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write('data', 36); wav.writeUInt32LE(n * 2, 40);
+    for (let i = 0; i < n; i++) wav.writeInt16LE(Math.round(8000 * Math.sin(2 * Math.PI * 440 * i / rate)), 44 + i * 2);
+    fs.writeFileSync(path.join(DECK_DIR, 'tone.wav'), wav);
+    const sound = (id) => `<audio id="${id}" src="tone.wav" autoplay muted loop></audio>`;
+    const slides = `<section class="slide active">${sound('a1')}<h1>One</h1></section>\n`
+        + `<section class="slide">${sound('a2')}<div data-fragment>${sound('a3')}</div><h1>Two</h1></section>\n`
+        + `<section class="slide"><h1>Three</h1></section>\n`;
+    const blank = fs.readFileSync(path.join(__dirname, '..', 'app', 'templates', 'blank.html'), 'utf8');
+    const html = blank.replace(/(<main class="deck-stage" id="deckStage">)[\s\S]*?(<div class="deck-footer">)/, (m, a, b) => a + '\n' + slides + b);
+    expect(html).toContain('id="a3"');
+    fs.writeFileSync(path.join(DECK_DIR, 'media.html'), html);
+    // Run first in a fresh browser, the deck waits on its Google Fonts stylesheet and Chrome's own
+    // autoplay is lost; the runtime starts the shown slide's sound on load, which this checks too.
+    const deck = await context.newPage();
+    await deck.goto('/deck/sample/media.html');
+    await deck.waitForSelector('.slide.active.visible');
+    const playing = () => deck.evaluate(() => ['a1', 'a2', 'a3'].filter(id => !document.getElementById(id).paused));
+    // Autoplay runs on the slide shown; the others wait.
+    await expect.poll(playing).toEqual(['a1']);
+    await deck.waitForTimeout(400);
+    expect(await playing()).toEqual(['a1']);
+    // Next slide: slide 1's sound stops, slide 2's starts, the one in the step waits for it.
+    await deck.keyboard.press('ArrowRight');
+    await expect.poll(playing).toEqual(['a2']);
+    await deck.keyboard.press('ArrowRight');
+    await expect.poll(playing).toEqual(['a2', 'a3']);
+    // The step taken back stops its sound; the slide left stops all of it.
+    await deck.keyboard.press('ArrowLeft');
+    await expect.poll(playing).toEqual(['a2']);
+    await deck.keyboard.press('ArrowRight');
+    await deck.keyboard.press('ArrowRight');
+    await expect.poll(() => deck.evaluate(() => location.hash)).toBe('#3');
+    await expect.poll(playing).toEqual([]);
+    // Going back starts it again (every step shown).
+    await deck.keyboard.press('ArrowLeft');
+    await expect.poll(playing).toEqual(['a2', 'a3']);
+    // The overview's copies never play.
+    await deck.keyboard.press('o');
+    const copies = await deck.evaluate(() => Array.from(document.querySelectorAll('.deck-overview audio')).map(a => [a.hasAttribute('autoplay'), a.muted]));
+    expect(copies.length).toBe(3);
+    expect(copies.every(([auto, muted]) => !auto && muted)).toBe(true);
+    await deck.keyboard.press('o');
+    // The presenter window's frames are named so, and play without sound.
+    const [pop] = await Promise.all([context.waitForEvent('page'), deck.keyboard.press('p')]);
+    await pop.waitForLoadState();
+    expect(await pop.evaluate(() => ['cur', 'next'].map(id => document.getElementById(id).name))).toEqual(['deck-presenter', 'deck-presenter']);
+    await expect.poll(async () => { const f = pop.frames().find(fr => fr.name() === 'deck-presenter' && /#2$/.test(fr.url())); return f ? f.evaluate(() => !!document.getElementById('a2') && document.getElementById('a2').muted) : null; }).toBe(true);
+    await pop.close();
+    await deck.close();
 });
