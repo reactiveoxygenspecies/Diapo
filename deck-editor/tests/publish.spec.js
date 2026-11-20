@@ -11,7 +11,7 @@ test.afterEach(() => { fs.rmSync(DEFAULT_SITE, { recursive: true, force: true })
 const listing = (dir) => fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter(e => e.isFile()).map(e => path.relative(dir, path.join(e.parentPath || e.path, e.name)).replace(/\\/g, '/')).sort();
 
 test('Export > Publish... writes the folder from a typed path and walks the user to a free host', async ({ page }) => {
-    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'diapo-publish-'));
+    const out = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'diapo-publish-')));     // long names, as the server gives them (not RUNNER~1)
     const site = path.join(out, 'my-talk');
     try {
         await openDeck(page);

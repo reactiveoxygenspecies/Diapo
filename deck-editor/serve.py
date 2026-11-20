@@ -1497,7 +1497,11 @@ class Inliner:
     def __init__(self, deck_full):
         self.deck_dir = os.path.dirname(deck_full)
         # What may be inlined: files under the deck's root, the workspace or, for the tour, its own folder.
-        self.root = SAMPLES_DIR if deck_full.startswith(SAMPLES_DIR + os.sep) else WORKSPACE
+        # Both sides as the file system names them: a folder given by its short (8.3) name on
+        # Windows (C:\Users\RUNNER~1\...) is the same folder as its long name, and the files
+        # below are compared after realpath.
+        deck_real, samples = os.path.realpath(deck_full), os.path.realpath(SAMPLES_DIR)
+        self.root = samples if deck_real.startswith(samples + os.sep) else os.path.realpath(WORKSPACE)
         self.notes = []
         self.files = 0
         self.bytes = 0
@@ -1799,7 +1803,7 @@ def publish_dest(deck_full, to):
     """The folder the user asked for: absolute, or a name beside the deck's folder."""
     to = (to or "").strip().strip('"')
     if not to:
-        return publish_default_dest(deck_full)
+        return os.path.realpath(publish_default_dest(deck_full))       # as the other answers name it: long names, not 8.3
     if re.match(r"^[A-Za-z]:(?![\\/])", to):
         raise PublishError("give a full path (C:\\...) or a folder name")      # C:name: drive C's current folder
     to = os.path.expanduser(to)

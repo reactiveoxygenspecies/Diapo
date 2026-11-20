@@ -66,7 +66,7 @@ test('first run: with no deck the welcome screen is the home, with no drawer ove
 });
 
 test('an empty folder says so in plain words, on the welcome screen and in the drawer', async ({ page, request }) => {
-    const empty = fs.mkdtempSync(path.join(require('os').tmpdir(), 'diapo-empty-'));
+    const empty = fs.realpathSync.native(fs.mkdtempSync(path.join(require('os').tmpdir(), 'diapo-empty-')));     // long names, as the server gives them (not RUNNER~1)
     try {
         await home(page);
         await page.evaluate((p) => { window.prompt = () => p; }, empty);      // the test server has no folder dialog: Change folder asks for a path
@@ -84,7 +84,7 @@ test('an empty folder says so in plain words, on the welcome screen and in the d
 
 test('a recent deck from another folder still shows its first slide, served read-only from its own folder', async ({ page, request }) => {
     await request.post('/api/recent?file=' + encodeURIComponent(FILE), { headers: own });
-    const elsewhere = fs.mkdtempSync(path.join(require('os').tmpdir(), 'diapo-elsewhere-'));
+    const elsewhere = fs.realpathSync.native(fs.mkdtempSync(path.join(require('os').tmpdir(), 'diapo-elsewhere-')));
     try {
         await request.post('/api/workspace?path=' + encodeURIComponent(elsewhere), { headers: own });
         const entry = (await (await request.get('/api/status')).json()).recent.find(r => r.file === FILE && r.workspace === WS);

@@ -389,18 +389,21 @@ test('29 save as: the live deck goes under a new name or folder with its files c
     expect(clash.status()).toBe(409);
     expect(readDeck()).toBe(original);
     // Outside the workspace: the new folder becomes the workspace, like Open deck... does.
-    const outside = fs.mkdtempSync(path.join(require('os').tmpdir(), 'deck-saveas-'));
-    r = await page.evaluate((to) => window.deckEditor.saveAs({ to }), path.join(outside, 'talk.html'));
-    expect(r.ok).toBe(true);
-    expect(r.workspace.toLowerCase()).toBe(outside.toLowerCase());
-    expect(r.file).toBe('talk.html');
-    expect(fs.existsSync(path.join(outside, 'assets', 'shape.svg'))).toBe(true);
-    await page.waitForFunction(() => window.deckEditor.file === 'talk.html');
-    // Back to the test workspace for the tests that follow.
-    await request.post('/api/workspace?path=' + encodeURIComponent(WS), { headers: own });
-    fs.rmSync(outside, { recursive: true, force: true });
-    fs.rmSync(path.join(WS, 'elsewhere'), { recursive: true, force: true });
-    fs.rmSync(path.join(DECK_DIR, 'variant.html'), { force: true });
+    const outside = fs.realpathSync.native(fs.mkdtempSync(path.join(require('os').tmpdir(), 'deck-saveas-')));     // long names, as the server gives them (not RUNNER~1)
+    try {
+        r = await page.evaluate((to) => window.deckEditor.saveAs({ to }), path.join(outside, 'talk.html'));
+        expect(r.ok).toBe(true);
+        expect(r.workspace.toLowerCase()).toBe(outside.toLowerCase());
+        expect(r.file).toBe('talk.html');
+        expect(fs.existsSync(path.join(outside, 'assets', 'shape.svg'))).toBe(true);
+        await page.waitForFunction(() => window.deckEditor.file === 'talk.html');
+    } finally {
+        // Back to the test workspace for the tests that follow, whatever happened above.
+        await request.post('/api/workspace?path=' + encodeURIComponent(WS), { headers: own });
+        fs.rmSync(outside, { recursive: true, force: true });
+        fs.rmSync(path.join(WS, 'elsewhere'), { recursive: true, force: true });
+        fs.rmSync(path.join(DECK_DIR, 'variant.html'), { force: true });
+    }
 });
 
 test('39 templates: New offers the imported designs; each one opens, presents and saves byte-identical', async ({ page }) => {

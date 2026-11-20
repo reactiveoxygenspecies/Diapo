@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Folders with short Windows names.** Where a folder is reached by its
+  short name (`C:\Users\RUNNER~1\...`, the 8.3 form Windows keeps for some
+  paths), the single-file export of the tour kept its pictures as links
+  instead of embedding them, and Publish reported its default folder under the
+  short name. Both now use the folder's full name. The tests that failed for
+  the same reason on GitHub's Windows runners pass there again, and a failed
+  Save as test no longer leaves the tests after it in another folder.
+
 ## 1.4.1 - 2026-11-20
 
 - **Video and sound stop when their slide is left.** A hidden slide is only
