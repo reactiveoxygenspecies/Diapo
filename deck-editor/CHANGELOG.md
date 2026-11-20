@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.2 - 2026-11-20
 
 - **Folders with short Windows names.** Where a folder is reached by its
   short name (`C:\Users\RUNNER~1\...`, the 8.3 form Windows keeps for some
