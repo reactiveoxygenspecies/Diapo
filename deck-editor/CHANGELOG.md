@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.1 - 2026-11-20
 
 - **Video and sound stop when their slide is left.** A hidden slide is only
   invisible, so a video, a sound or a YouTube or Vimeo player kept playing
