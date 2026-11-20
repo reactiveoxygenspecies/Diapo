@@ -22,6 +22,11 @@ import { Selection } from './core/selection.js';
 import { Inspector } from './core/inspector.js';
 import { TextEditor } from './core/textedit.js';
 import { InlineMath } from './core/inlinemath.js';
+import { Sources } from './core/sources.js';
+import { CitePop } from './core/citepop.js';
+import { CitePanel, addSourcesSlide } from './core/citepanel.js';
+import { openCiteLibrary } from './core/citelib.js';
+import { creditFromUrl } from './core/credits.js';
 import { SlideStrip, slidesWord } from './core/slides.js';
 import { Inserter, ICONS } from './core/insert.js';
 import { Presenter } from './core/present.js';
@@ -1273,6 +1278,8 @@ function onKey(e) {
         if (app.layers && app.layers.cancelDrag()) return stop(e);
         if (app.palette && app.palette.open) { app.palette.close(); return stop(e); }
         if (app.inlineMath && app.inlineMath.isOpen) { app.inlineMath.close(); return stop(e); }   // the text edit goes on, as it was
+        if (app.citePop && app.citePop.isOpen) { app.citePop.close(); return stop(e); }
+        if (app.citePop && app.citePop.ac) { app.citePop.closeAc(); return stop(e); }      // the list under a typed [@
         if (app.find && app.find.open) { app.find.close(); return stop(e); }
         if (app.fontPicker && app.fontPicker.isOpen) { app.fontPicker.close(); return stop(e); }
         if (app.iconPicker && app.iconPicker.isOpen) { app.iconPicker.close(); return stop(e); }
@@ -1315,7 +1322,7 @@ function onKey(e) {
     if (k === 'F5') { stop(e); setPreview(true); return; }
     // Ctrl+F / Ctrl+H: find and replace across the deck (the browser's find does not see into it).
     // In a panel field they stay the browser's; in the find bar itself Ctrl+Z is the field's own undo.
-    if (typing && t.closest('#findBar, .mathpop') && ctrl && (k.toLowerCase() === 'z' || k.toLowerCase() === 'y')) return;
+    if (typing && t.closest('#findBar, .mathpop, .citepop, .citelib') && ctrl && (k.toLowerCase() === 'z' || k.toLowerCase() === 'y')) return;
     if (ctrl && !e.altKey && (k.toLowerCase() === 'f' || k.toLowerCase() === 'h')) {
         if (typing && !t.closest('#findBar') && !t.isContentEditable) return;
         stop(e);
@@ -1500,6 +1507,17 @@ app.inspector = new Inspector(app, $('inspectorBody'));
 keepNamed($('inspector'));
 app.textEdit = new TextEditor(app, { overlay: $('overlay'), wrap: $('stageWrap'), canvas: $('canvas') });
 app.inlineMath = new InlineMath(app);
+/* Citations and picture credits: the words, the slides' footers, the Sources slide and the
+   captions are written from the deck after every change (sources.js), and when it opens. */
+app.sources = new Sources(app);
+app.citePop = new CitePop(app);
+app.citePanel = new CitePanel(app);
+app.openCiteLibrary = (opts) => openCiteLibrary(app, opts);
+app.history.addEventListener('change', () => app.sources.schedule());
+window.addEventListener('editor:open', () => app.sources.run().then(() => { if (app.sources.missing && app.sources.missing.size) toast(`Cited but not in the deck's references: ${[...app.sources.missing].slice(0, 6).join(', ')}${app.sources.missing.size > 6 ? '...' : ''}. Insert > Citation library imports them.`, { ms: 7000 }); }));
+app.sources.addEventListener('written', () => { if (!app.selection.items.length && !app.textEdit.active) app.inspector.sync(); });
+// A picture that loads (or changes size) moves its caption.
+app.deck.onNewDocument((doc) => doc.addEventListener('load', (e) => { if (e.target && e.target.tagName === 'IMG' && app.sources.active) app.sources.schedule(100); }, true));
 // The panel's type fields follow the part of the text that is selected while editing in place.
 app.textEdit.addEventListener('selection', () => app.inspector.sync());
 app.strip = new SlideStrip(app, { list: $('stripList'), addButton: $('btnAddSlide') });
@@ -1694,6 +1712,9 @@ function paletteEntries() {
         out.push({ group: 'Insert', label: 'Equation', keywords: 'math maths latex formula tex', run: click('[data-insert="equation"]') });
         // Into the text being edited, at the caret (or the text selected on the canvas, at its end).
         if (app.textEdit.el || one) out.push({ group: 'Insert', label: 'Equation in the text', hint: 'Alt+=', keywords: 'inline math maths latex formula tex sentence', run: () => app.inlineMath.fromCaret() });
+        if (app.textEdit.el || one) out.push({ group: 'Insert', label: 'Citation in the text', hint: 'Alt+[', keywords: 'cite reference bibliography paper doi bibtex zotero', run: () => app.citePop.fromCaret() });
+        out.push({ group: 'Insert', label: 'Citation library...', keywords: 'references bibliography bibtex bib zotero mendeley csl style doi import', run: () => app.openCiteLibrary() });
+        out.push({ group: 'Insert', label: 'Sources slide', keywords: 'references bibliography credits picture image attribution', run: () => addSourcesSlide(app) });
         out.push({ group: 'Insert', label: 'Interactive chart (Plotly)...', keywords: 'plot plotly json figure graph live hover zoom', run: click('[data-insert="plot"]') });
         out.push({ group: 'Insert', label: 'Chemical structure', keywords: 'chemistry molecule smiles compound', run: click('[data-insert="structure"]') });
         out.push({ group: 'Insert', label: 'Font Awesome icon...', keywords: 'icons fa', run: (q) => { app.iconPicker.open($('btnInsert')); const words = q.replace(/\b(font awesome|icon|icons|fa)\b/gi, '').trim(); if (words && app.iconPicker.search) { app.iconPicker.search.value = words; app.iconPicker.search.dispatchEvent(new Event('input')); } } });
@@ -1814,7 +1835,10 @@ $('insertMenu').addEventListener('click', async (e) => {
         case 'plot': openPlotDialog(app); break;
         case 'master-footer': app.insert.masterFooter(); break;
         case 'image': chooseImage(null); break;
-        case 'image-url': { const url = prompt('Image address (URL):', 'https://'); if (url && url !== 'https://') app.insert.image(url.trim()); break; }
+        case 'image-url': { const url = prompt('Image address (URL):', 'https://'); if (url && url !== 'https://') creditFromUrl(app, app.insert.image(url.trim()), url.trim()); break; }
+        case 'cite': app.citePop.fromCaret(); break;
+        case 'cite-library': app.openCiteLibrary(); break;
+        case 'sources': addSourcesSlide(app); break;
         case 'placeholder': app.insert.placeholder(); break;
         case 'video': $('insertVideo').click(); break;
         case 'video-url': { const url = prompt('Video address (URL of an .mp4 or .webm file):', 'https://'); if (url && url !== 'https://') app.insert.video(url.trim()); break; }

@@ -25,11 +25,15 @@ const BAR_ITEMS = [
     ['link', '&#128279;', 'Link'], ['list', '&#8226;&#8801;', 'Bullet list'], ['olist', '1&#8801;', 'Numbered list'],
     ['left', '&#8676;', 'Align left'], ['center', '&#8596;', 'Align centre'], ['right', '&#8677;', 'Align right'],
     ['math', '&#8721;', 'Equation in the text (Alt+=)'],
+    ['cite', '&#10077;', 'Citation (Alt+[ or type [@)'],
     ['done', '&#10003;', 'Done (Esc)'],
 ];
 /* An equation inside the text (inlinemath.js). While the text is edited it is one atom
    (contenteditable=false): the caret steps over it and Backspace takes it whole. */
 const INLINE_MATH = 'span[data-math]';
+/* A citation (cite.js) is an atom the same way: written by the style, changed in its popover (citepop.js). */
+const INLINE_CITE = 'span[data-cite]';
+const ATOM = INLINE_MATH + ', ' + INLINE_CITE;
 
 /* Parts of the editor that work on the selected part of the text (the panel's Colour and Text
    sections, the font picker they open): a press there does not end the edit, and the press on
@@ -38,7 +42,7 @@ const INLINE_MATH = 'span[data-math]';
 const KEEPS_SELECTION = '#inspColour, #inspType, .fontpick';
 /* Parts of the editor a press in does not end the edit: the bar, the box over an SVG label,
    the equation popover and the command palette (which can insert an equation at the caret). */
-const KEEPS_EDIT = '.textbar, .svgtext-edit, .mathpop, .palette';
+const KEEPS_EDIT = '.textbar, .svgtext-edit, .mathpop, .citepop, .citeac, .palette';
 
 export class TextEditor extends EventTarget {
     constructor(app, { overlay, wrap, canvas }) {
@@ -124,9 +128,9 @@ export class TextEditor extends EventTarget {
         this._placeCaret(at);
         this._showBar();
         this.dispatchEvent(new CustomEvent('start', { detail: t }));
-        // A double-click on an equation in the text opens it.
+        // A double-click on an equation or a citation in the text opens it.
         const hit = at ? this._mathAt(at) : null;
-        if (hit && this.app.inlineMath) this.app.inlineMath.open({ span: hit });
+        if (hit) this._openAtom(hit);
         return true;
     }
 
@@ -134,14 +138,19 @@ export class TextEditor extends EventTarget {
        serialiser take the attribute off). */
     lockMath() {
         if (!this.el) return;
-        for (const m of this.el.querySelectorAll(INLINE_MATH)) m.setAttribute('contenteditable', 'false');
+        for (const m of this.el.querySelectorAll(ATOM)) m.setAttribute('contenteditable', 'false');
+    }
+    /* The popover of an equation or a citation in the text. */
+    _openAtom(m) {
+        if (m.matches(INLINE_CITE)) { if (this.app.citePop) this.app.citePop.open({ span: m }); }
+        else if (this.app.inlineMath) this.app.inlineMath.open({ span: m });
     }
     /* The inline equation under a point in the editor's client space, inside the edited text. */
     _mathAt(at) {
         const doc = this.deck.doc, frame = this.deck.win.frameElement;
         const r = frame ? frame.getBoundingClientRect() : { left: 0, top: 0 };
         const n = doc.elementFromPoint(at.clientX - r.left, at.clientY - r.top);
-        const m = n && n.closest ? n.closest(INLINE_MATH) : null;
+        const m = n && n.closest ? n.closest(ATOM) : null;
         return m && this.el && this.el.contains(m) ? m : null;
     }
     /* The edited text as it will be kept: no editing marks, tidied as commit() tidies it. */
@@ -171,7 +180,7 @@ export class TextEditor extends EventTarget {
             sib = dir < 0 ? node.previousSibling : node.nextSibling;
         } else sib = node.childNodes[dir < 0 ? sel.anchorOffset - 1 : sel.anchorOffset];
         while (blank(sib)) sib = dir < 0 ? sib.previousSibling : sib.nextSibling;
-        return sib && sib.nodeType === 1 && sib.matches(INLINE_MATH) ? sib : null;
+        return sib && sib.nodeType === 1 && sib.matches(ATOM) ? sib : null;
     }
     /* Take an equation out of the edited text: an undo step of its own, the caret where it was. */
     removeMath(m) {
@@ -179,9 +188,10 @@ export class TextEditor extends EventTarget {
         this.checkpoint('Edit text');
         const doc = this.deck.doc, sel = this.deck.win.getSelection(), r = doc.createRange();
         r.setStartBefore(m); r.collapse(true);
+        const cite = m.matches(INLINE_CITE);
         m.remove();
         sel.removeAllRanges(); sel.addRange(r);
-        this.checkpoint('Delete equation');
+        this.checkpoint(cite ? 'Delete citation' : 'Delete equation');
         this._positionBar();
     }
     /* Pasted HTML that holds equations, put in at the caret by hand: the browser's insertHTML
@@ -198,6 +208,7 @@ export class TextEditor extends EventTarget {
         if (last) { const r = doc.createRange(); r.setStartAfter(last); r.collapse(true); sel.removeAllRanges(); sel.addRange(r); }
         this.lockMath();
         if (this.app.inlineMath) this.app.inlineMath.drawIn(this.el);
+        if (this.app.sources) this.app.sources.schedule(50);
     }
 
     /* The Look option changed while an element is being edited. */
@@ -216,8 +227,9 @@ export class TextEditor extends EventTarget {
         this._selSrc = null;
         t.removeAttribute('contenteditable');
         t.removeAttribute('spellcheck');
-        t.querySelectorAll(INLINE_MATH).forEach(m => m.removeAttribute('contenteditable'));
+        t.querySelectorAll(ATOM).forEach(m => m.removeAttribute('contenteditable'));
         if (this.app.inlineMath) this.app.inlineMath.close({ refocus: false });
+        if (this.app.citePop) this.app.citePop.close({ refocus: false });
         tidy(t);
         if (t.matches('code[data-code]')) highlightCode(t);      // colours follow the new text
         const after = t.innerHTML;
@@ -486,6 +498,7 @@ export class TextEditor extends EventTarget {
                 break;
             }
             case 'math': if (this.app.inlineMath) this.app.inlineMath.fromCaret(); return;
+            case 'cite': if (this.app.citePop) this.app.citePop.fromCaret(); return;
             case 'done': this.commit(); return;
         }
         this._syncBar();
@@ -753,11 +766,11 @@ export class TextEditor extends EventTarget {
             // A press in the deck outside the edited element ends the edit and selects what was pressed.
             doc.addEventListener('pointerdown', (e) => {
                 if (!this.el) return;
-                // A press on an equation in the text opens it (in the popover), the caret staying where it was.
-                const m = e.target.closest ? e.target.closest(INLINE_MATH) : null;
+                // A press on an equation or a citation in the text opens it (in its popover), the caret staying where it was.
+                const m = e.target.closest ? e.target.closest(ATOM) : null;
                 if (m && this.el.contains(m)) {
                     e.preventDefault();
-                    if (this.app.inlineMath) this.app.inlineMath.open({ span: m });
+                    this._openAtom(m);
                     return;
                 }
                 if (this.el.contains(e.target)) return;
@@ -781,7 +794,7 @@ export class TextEditor extends EventTarget {
                 this._selSrc = src;
                 this.dispatchEvent(new CustomEvent('selection', { detail: src }));
             });
-            doc.addEventListener('input', () => { if (this.el) this._positionBar(); });
+            doc.addEventListener('input', () => { if (!this.el) return; this._positionBar(); if (this.app.citePop) this.app.citePop.typed(); });
             // Copy and cut of text holding equations: the browser's copy leaves out what cannot be
             // edited, so the clipboard is written here: the HTML with the equations' LaTeX (a paste
             // here draws them again), the plain text with each one as $LaTeX$ (Alt+= after it
@@ -791,10 +804,11 @@ export class TextEditor extends EventTarget {
                 if (!r || !e.clipboardData) return;
                 const box = doc.createElement('div');
                 box.appendChild(r.cloneContents());
-                if (!box.querySelector(INLINE_MATH)) return;                 // the browser's own copy
+                if (!box.querySelector(ATOM)) return;                        // the browser's own copy
                 box.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
                 const plain = box.cloneNode(true);
                 plain.querySelectorAll(INLINE_MATH).forEach(m => m.replaceWith(doc.createTextNode('$' + m.getAttribute('data-math') + '$')));
+                plain.querySelectorAll(INLINE_CITE).forEach(m => m.replaceWith(doc.createTextNode(m.getAttribute('data-cite'))));    // Pandoc's syntax: typed back in, it is a citation again
                 plain.querySelectorAll('br').forEach(b => b.replaceWith(doc.createTextNode(String.fromCharCode(10))));
                 e.preventDefault();
                 e.clipboardData.setData('text/html', box.innerHTML);
@@ -818,7 +832,7 @@ export class TextEditor extends EventTarget {
                 this._plainPaste = false;
                 if (!plainOnly) {
                     const clean = cleanPastedHtml(data.getData('text/html'), doc, this.el);
-                    if (clean && /data-math/.test(clean)) { this._insertFragment(clean); return; }
+                    if (clean && /data-math|data-cite/.test(clean)) { this._insertFragment(clean); return; }
                     if (clean) { doc.execCommand('insertHTML', false, clean); return; }
                 }
                 const text = data.getData('text/plain');
@@ -829,6 +843,8 @@ export class TextEditor extends EventTarget {
             doc.addEventListener('keydown', (e) => {
                 if (!this.el) return;
                 e.stopPropagation();       // capture phase: the deck's own key handling never sees typing
+                // The list of references under a typed [@ takes the keys it uses (citepop.js).
+                if (this.app.citePop && this.app.citePop.acKey(e)) { e.preventDefault(); return; }
                 if (e.key === 'Escape') { e.preventDefault(); this.commit(); return; }
                 if (e.key === 'Tab' && this.el.matches('td, th')) { e.preventDefault(); this.nextCell(e.shiftKey ? -1 : 1); return; }
                 // Tab in a list item makes it a sub-item (a nested list of the same kind), Shift+Tab
@@ -846,6 +862,12 @@ export class TextEditor extends EventTarget {
                 if ((e.key === 'Backspace' || e.key === 'Delete') && !e.ctrlKey && !e.metaKey && !e.altKey) {
                     const m = this._mathBeside(e.key === 'Backspace' ? -1 : 1);
                     if (m) { e.preventDefault(); this.removeMath(m); return; }
+                }
+                // Alt+[ : a citation at the caret.
+                if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === '[' || e.code === 'BracketLeft')) {
+                    e.preventDefault();
+                    if (this.app.citePop) this.app.citePop.fromCaret();
+                    return;
                 }
                 // Alt+= (Word's key for an equation): an equation at the caret, or the selected TeX made one.
                 if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === '=' || e.code === 'Equal')) {
@@ -932,7 +954,7 @@ function dropEmptyInline(el) {
         if (!n.textContent) n.remove();
     }
 }
-const KEEP_EMPTY = 'br, img, video, svg, canvas, iframe, picture, object, input, span[data-math]';
+const KEEP_EMPTY = 'br, img, video, svg, canvas, iframe, picture, object, input, span[data-math], span[data-cite]';
 
 function tidy(el) {
     // Zero-width spaces left by stepping out of a superscript / subscript.

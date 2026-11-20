@@ -3,9 +3,10 @@
 Diapo is written by Daniele Rossetto and licensed under the MIT Licence
 (`LICENSE`). It includes or uses the following work of other authors, each under
 its own licence. All of them permit commercial use; the obligations they carry
-(keeping a notice, giving attribution) are met as described here.
+(keeping a notice, giving attribution, making the source available) are met as
+described here.
 
-Last reviewed: 14 November 2026 (plotly.js added); before that 17 October 2026 (MathJax and SmilesDrawer added); before that 20 September 2026, for Diapo 0.1.2.
+Last reviewed: 19 November 2026 (citation.js, citeproc-js and the CSL styles added); before that 14 November 2026 (plotly.js added); before that 17 October 2026 (MathJax and SmilesDrawer added); before that 20 September 2026, for Diapo 0.1.2.
 
 | Component | Where | Licence | Obligation |
 |---|---|---|---|
@@ -16,6 +17,10 @@ Last reviewed: 14 November 2026 (plotly.js added); before that 17 October 2026 (
 | MathJax 4.1.3 with its STIX Two font and mhchem font extension (The MathJax Consortium; glyphs from STIX Two Math, The STIX Fonts Project) | `deck-editor/app/vendor/mathjax4/` (copied by `tools/build-vendor.js` from the npm tarballs), loaded into a frame of the editor for the STIX Two look of equations; decks hold only the SVG it draws | Apache 2.0; the STIX Two glyph outlines SIL OFL 1.1 | Ship the Apache licence (`app/vendor/LICENSE-mathjax.txt`); the OFL allows the outlines in documents (below) |
 | SmilesDrawer 2.4.1 (GDB / Reymond Research Group), with chroma.js (Gregor Aisch) inside | `deck-editor/app/vendor/smiles-drawer.min.js` (copied by `tools/build-vendor.js`), loaded into the editor to draw chemical structures; decks hold only the SVG it draws | MIT; chroma.js BSD-3-Clause, its ColorBrewer colours Apache 2.0 | Keep the copyright and permission notices (`app/vendor/LICENSE-smiles-drawer.txt`, `LICENSE-chroma-js.txt`, summarised below) |
 | plotly.js 4.3.0 (Plotly, Inc.), the full minified bundle with its dependencies inside (d3, regl, MapLibre GL JS and others) | `deck-editor/app/vendor/plotly.min.js` (copied by `tools/build-vendor.js` from the npm package `plotly.js-dist-min`, unmodified), loaded into the editor to preview interactive charts and draw their pictures, and copied beside a deck that has one as `deck-plotly.min.js` (inlined by the single-file export) | MIT; the bundled dependencies MIT, BSD and ISC, their notices kept inside the file | Keep the copyright and permission notice: `app/vendor/LICENSE-plotly.txt`, the header of the file itself (which travels with every copy in a deck), and below |
+| citation.js 0.9.0 (Lars Willighagen): `@citation-js/core`, `plugin-bibtex`, `plugin-ris`, `plugin-csl`, with moo (Tim Radvan), `@citation-js/date` and `@citation-js/name` inside | `deck-editor/app/vendor/citation.js` (bundled by `tools/build-vendor.js` with esbuild from the npm packages, not minified), loaded into the editor to read `.bib`, RIS and CSL-JSON files; decks hold only the CSL-JSON it reads | MIT (moo BSD-3-Clause) | Keep the copyright and permission notices (`app/vendor/LICENSE-citation-js.txt`; the bundle keeps the packages' own comments) |
+| citeproc-js 2.4.63 (Frank Bennett) | Inside `deck-editor/app/vendor/citation.js`, loaded into the editor to write citations and reference lists in a CSL style; decks hold only the text it writes, never its code | CPAL 1.0 (chosen of CPAL 1.0 or AGPL 3.0); no Exhibit B, so no attribution display is asked for | Ship the licence (`app/vendor/LICENSE-citeproc.txt`, its notice and the CPAL text) and make the source available: it is shipped unmodified and readable, not minified, inside `citation.js`, and is the npm package `citeproc@2.4.63` (https://github.com/Juris-M/citeproc-js) |
+| CSL styles and locales (the Citation Style Language project and each style's authors, named in its `<info>`) | `deck-editor/app/vendor/csl/` (20 independent styles and the en-GB and it-IT locales, copied by `tools/build-vendor.js`); the APA, Vancouver and Harvard styles and five locales come inside `citation.js` | CC BY-SA 3.0 | Keep each file whole, with its `<info>` (authors, licence, source); the files are not modified |
+| esbuild (Evan Wallace) | Build tool for `app/vendor/citation.js`; not shipped | MIT | None |
 | Anton (The Anton Project Authors) | `deck-editor/app/brand/anton-latin.woff2`, the face of the logo; its outlines in `logo.svg` and `logo-dark.svg` | SIL OFL 1.1 | Keep the notice below; the font is not sold on its own and is shipped unmodified |
 | Google Fonts | Referenced by URL from templates and decks; downloaded or embedded into a deck only on request | SIL OFL 1.1, Apache 2.0 or Ubuntu Font Licence, per family | None for referencing; embedding in documents is permitted; the files are not modified |
 | Python (Python Software Foundation) | Runtime of `serve.py`; bundled into `dist/deck-editor.exe` by `build-exe.py` | PSF Licence | Keep the PSF notice when the executable is shipped |
@@ -185,6 +190,38 @@ an interactive chart gets a copy beside it (`deck-plotly.min.js`), and the
 single-file export writes it into the page; in both the header is intact.
 `app/deck-plot.js`, the small script that draws those charts, is Diapo's own
 and part of the Diapo Format (MIT).
+
+## citation.js 0.9.0, citeproc-js 2.4.63 and the CSL styles
+
+https://citation.js.org - MIT License - Copyright (c) 2015-2026 Lars
+Willighagen. The bundle also holds moo (https://github.com/no-context/moo),
+BSD 3-Clause License, Copyright (c) 2017 Tim Radvan. Both texts are in
+`app/vendor/LICENSE-citation-js.txt`.
+
+https://github.com/Juris-M/citeproc-js - Copyright (c) 2009-2019 Frank
+Bennett, under the Common Public Attribution License 1.0 or the GNU Affero
+General Public License 3.0, at the user's choice. Diapo uses it under the
+CPAL 1.0, unmodified. The CPAL is a file-based licence: it covers citeproc-js's
+own files, not the program they are part of, so Diapo stays under the MIT
+Licence, and decks, which hold only the text citeproc-js writes and none of its
+code, carry no obligation. Its Exhibit B names no attribution to display. The
+source is available: `app/vendor/citation.js` is not minified, so citeproc-js
+is in it as written, and it is the npm package `citeproc@2.4.63`. The notice
+and the full CPAL text are in `app/vendor/LICENSE-citeproc.txt`.
+
+Both run in the editor only (`core/cite.js`), loaded the first time a deck
+has a citation. `app/vendor/citation.js` is built by `tools/build-vendor.js`
+with esbuild from the npm packages `@citation-js/core`, `plugin-bibtex`,
+`plugin-ris`, `plugin-csl` and `citeproc`, pinned in `package.json`; the
+banner on its first line names them and their licence files.
+
+The CSL styles in `app/vendor/csl/` and the locales there and inside
+`citation.js` are from the Citation Style Language project
+(https://citationstyles.org, https://github.com/citation-style-language),
+each under the Creative Commons Attribution-ShareAlike 3.0 licence, with its
+authors, sources and licence in the file's own `<info>` element. They are
+copied whole and unmodified. A `.csl` file a user loads is stored in that
+user's deck as it is.
 
 
 ## Anton

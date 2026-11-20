@@ -110,6 +110,8 @@ export class Inspector {
               <button class="mini-btn" data-act="slidebg-none" title="Back to the deck's default">default</button>
             </div>
           </section>
+          <section class="insp-section" id="inspSources" hidden></section>
+          <section class="insp-section" id="inspSlideRefs" hidden></section>
           <section class="insp-section">
             <h4>Speaker notes</h4>
             <textarea id="inspNotes" aria-label="Speaker notes for this slide" class="insp-notes" rows="6" placeholder="Notes for the presenter view" spellcheck="true"></textarea>
@@ -161,6 +163,7 @@ export class Inspector {
               <div class="insp-row"><label>Grayscale</label><div class="insp-field insp-range" data-prop="_grayscale"><input type="range" id="inspGray" min="0" max="100" step="5"><span id="inspGrayV" class="unit"></span><i class="insp-clear" role="button" tabindex="0" aria-label="Back to the deck's value" title="Back to the deck's value">&times;</i></div></div>
             </div>
           </section>
+          <section class="insp-section" id="inspCredit" hidden></section>
           <section class="insp-section" id="inspChart" hidden></section>
           <section class="insp-section" id="inspChartAxes" data-fold="chartaxes" hidden><h4>Chart axes</h4></section>
           <section class="insp-section" id="inspChartStyle" data-fold="chartstyle" hidden><h4>Chart style</h4></section>
@@ -1218,6 +1221,7 @@ export class Inspector {
         $('inspLoopRow').hidden = !(adv || deckAdv);
         this._summary('timing', adv ? adv + ' s' : deckAdv ? deckAdv + ' s, as all slides' : 'off');
         if (document.activeElement !== $('inspNotes')) $('inspNotes').value = Inspector.notesOf(s);
+        if (this.app.citePanel) this.app.citePanel.syncSlide(s);
     }
     _sync(el) {
         const $ = this.$, cs = css(el), st = el.style;
@@ -1265,6 +1269,7 @@ export class Inspector {
         $('inspChooseImage').hidden = !el.hasAttribute('data-placeholder');
         $('inspTable').hidden = !el.closest('table');
         this.chart.sync(el);
+        if (this.app.citePanel) this.app.citePanel.syncPicture(this.items.length === 1 && el.tagName !== 'VIDEO' ? pictureOf(el) : null);
         this.math.sync(el);
         this.chem.sync(el);
         this.plot.sync(el);

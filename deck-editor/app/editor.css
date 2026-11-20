@@ -805,6 +805,92 @@ select option { background: var(--bg-2); color: var(--ink); }
 .mathpop-err { color: var(--warn); }
 .mathpop-hint { color: var(--ink-3); font-size: var(--fs-label); line-height: 1.45; }
 .mathpop-hint code, .mathpop-hint kbd { font: 12px var(--ui-mono); }
+.textbar button[data-cmd=cite] { font: 700 18px Georgia, serif; }
+/* A citation in the text being edited (citepop.js): the popover, and the list under a typed [@ */
+.citepop { position: fixed; z-index: 85; width: 420px; max-width: calc(100vw - 16px); box-sizing: border-box; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--bg-2); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.28); font-size: var(--fs-label); }
+.citepop-q, .citepop-code { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: 13px var(--ui-font); }
+.citepop-code { font: 12px var(--ui-mono); }
+.citepop-code.bad { border-color: var(--warn); }
+.citepop-q:focus, .citepop-code:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.citepop-list { max-height: 216px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
+.citepop .citepop-item { display: grid; grid-template-columns: 18px 1fr auto; gap: 1px 6px; align-items: center; padding: 5px 8px; border: 0; border-bottom: 1px solid var(--line); background: transparent; width: 100%; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.citepop-item:last-child { border-bottom: 0; }
+.citepop-item:hover { background: var(--bg); }
+.citepop-item.active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.citepop-item input { margin: 0; accent-color: var(--accent); }
+.citepop-item .k, .citeac-item .k { font: 600 12px var(--ui-mono); }
+.citepop-item .v, .citeac-item .v { color: var(--ink-3); font-size: 11px; white-space: nowrap; }
+.citepop-item .t { grid-column: 2 / -1; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.citepop-doi { grid-template-columns: 1fr; }
+.citepop-doi span { color: var(--ink-3); }
+.citepop-empty { padding: 10px; color: var(--ink-3); line-height: 1.45; }
+.citepop-form { display: flex; height: 26px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); overflow: hidden; }
+.citepop-form button { font-size: 12px; color: var(--ink); }
+.citepop-form button:disabled { opacity: 0.4; cursor: default; }
+.citepop-preview { min-height: 26px; padding: 4px 8px; border-radius: 6px; background: var(--bg); font: 15px/1.4 Georgia, serif; overflow-x: auto; }
+.citepop-preview .none { font: var(--fs-label) var(--ui-font); color: var(--ink-3); }
+.citepop-hint { color: var(--ink-3); line-height: 1.45; }
+.citepop-hint code, .citepop-hint kbd, .citeac-foot kbd { font: 11px var(--ui-mono); }
+.citepop-acts { display: flex; gap: 6px; align-items: center; }
+.citepop-acts .spacer, .citelib .spacer { flex: 1; }
+.mini-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.citeac { position: fixed; z-index: 85; width: 400px; max-width: calc(100vw - 16px); background: var(--bg-2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.28); overflow: hidden; font-size: var(--fs-label); }
+.citeac-item { display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; padding: 5px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.citeac-item .t { grid-column: 1 / -1; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.citeac-item.active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.citeac-foot { padding: 5px 10px; color: var(--ink-3); background: var(--bg); }
+/* The deck's references (citelib.js) */
+.citelib-card { width: min(1000px, calc(100vw - 40px)); height: min(640px, calc(100vh - 60px)); max-height: none; display: grid; grid-template-rows: auto auto 1fr auto auto; padding: 0; overflow: hidden; }
+.citelib-head { display: flex; align-items: center; gap: 8px; padding: 14px 16px 10px; }
+.citelib-head h2 { margin: 0; font-size: 15px; }
+.citelib-head select { height: 28px; max-width: 300px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--bg-2); color: var(--ink); font: inherit; font-size: var(--fs-body); padding: 0 6px; }
+.citelib-lab { color: var(--ink-3); font-size: var(--fs-label); }
+.citelib-x { border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; color: var(--ink-3); padding: 0 4px; }
+.citelib .chip { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 9px; font-size: 11px; font-weight: 600; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.citelib .chip.ok { background: rgba(39, 149, 90, 0.13); color: var(--ok); }
+.citelib-tools { display: flex; gap: 8px; align-items: center; padding: 0 16px 10px; border-bottom: 1px solid var(--line); }
+.citelib-tools input { flex: 1; height: 28px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--bg-2); color: var(--ink); font: inherit; }
+.citelib-seg { height: 28px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); }
+.citelib-seg button { padding: 0 10px; font-size: var(--fs-label); color: var(--ink); white-space: nowrap; }
+.citelib-body { display: grid; grid-template-columns: 1fr 340px; min-height: 0; }
+.citelib-table { overflow: auto; border-right: 1px solid var(--line); }
+.citelib-table table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.citelib-table th { position: sticky; top: 0; background: var(--bg); text-align: left; font-weight: 600; color: var(--ink-3); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.citelib-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; cursor: pointer; }
+.citelib-table tr:hover td { background: var(--bg); }
+.citelib-table tr.sel td { background: var(--accent-soft); }
+.citelib-table tr.unused td { color: var(--ink-3); }
+.citelib-table td.t { max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.citelib-table td.mono, .citelib .mono { font: 12px var(--ui-mono); }
+.citelib-empty { padding: 16px; color: var(--ink-2); line-height: 1.5; }
+.citelib-detail { padding: 14px 16px; overflow: auto; font-size: 12.5px; }
+.citelib-detail h3 { margin: 0 0 4px; font: 600 15px/1.35 Georgia, serif; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.citelib-detail .who { color: var(--ink-2); margin-bottom: 10px; }
+.citelib-detail .kv { display: grid; grid-template-columns: 52px 1fr; gap: 6px 10px; align-items: center; margin-bottom: 10px; }
+.citelib-detail .kv > span:nth-child(odd) { color: var(--ink-3); }
+.citelib-detail .kv input { width: 100%; height: 24px; padding: 0 6px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--bg-2); color: var(--ink); font: 12px var(--ui-mono); }
+.citelib-detail a { color: var(--accent); }
+.citelib-where { display: flex; flex-wrap: wrap; gap: 4px; }
+.citelib-entry { padding: 8px 10px; border-radius: var(--radius-sm); background: var(--bg); font: 12.5px/1.5 Georgia, serif; color: var(--ink-2); }
+.citelib-entry .csl-left-margin { display: inline; margin-right: 6px; } .citelib-entry .csl-right-inline { display: inline; }
+.citelib-detail .row { display: flex; margin-top: 12px; }
+.citelib-none { color: var(--ink-3); }
+.citelib-paste { padding: 10px 16px; border-top: 1px solid var(--line); background: var(--bg); }
+.citelib-paste textarea { width: 100%; box-sizing: border-box; font: 12px var(--ui-mono); padding: 6px 8px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--bg-2); color: var(--ink); resize: vertical; }
+.citelib-paste .row, .citelib-foot { display: flex; align-items: center; gap: 6px; }
+.citelib-foot { padding: 10px 16px; border-top: 1px solid var(--line); background: var(--bg); }
+.citelib-foot input { width: 210px; height: 24px; padding: 0 6px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--bg-2); color: var(--ink); font: 12px var(--ui-mono); }
+.citelib-msg { color: var(--ink-2); font-size: var(--fs-label); }
+.citelib-msg.bad { color: var(--warn); }
+/* The panel's Credit, References and Sources parts (citepanel.js) */
+.insp-warn { margin: 6px 0; padding: 6px 8px; border-radius: var(--radius-sm); background: var(--notice-bg); border: 1px solid var(--notice-line); font-size: var(--fs-label); color: var(--ink); line-height: 1.45; }
+html[data-look="dark"] .insp-warn { color: var(--ink); }
+.insp-warn .mini-btn { height: 20px; margin-top: 4px; }
+.insp-open { width: 26px; height: 100%; flex: none; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--ink-3); cursor: pointer; }
+.insp-open:disabled { opacity: 0.35; cursor: default; }
+.theme-lab { width: 52px; flex: none; font-size: 13px; color: var(--ink-2); }
+#thCredits .insp-seg { height: 26px; }
+#thCredits output { width: 44px; text-align: right; font-size: var(--fs-label); color: var(--ink-2); }
 
 /* ------------------------------------------------------------
    Slide strip thumbnails, drag reorder, context menu

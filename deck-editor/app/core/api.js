@@ -56,6 +56,10 @@ export const api = {
     saveTheme: (name, theme) => call('POST', '/api/themes?' + q({ name }), JSON.stringify(theme), { 'Content-Type': 'application/json' }),
     deleteTheme: (name) => call('DELETE', '/api/themes?' + q({ name })),
     googleFamily: (family) => call('GET', '/api/fonts/google?' + q({ family })),
+    /* A reference by its DOI, as CSL-JSON ({item}): the server asks doi.org, only when the user adds one. */
+    citeDoi: (doi) => call('GET', '/api/cite/doi?' + q({ doi })),
+    /* Who made a picture on Wikimedia Commons and under what licence ({by, from, license, url}), from its address. */
+    commonsCredit: (url) => call('GET', '/api/credit/commons?' + q({ url })),
     uploadFonts: (file, files) => {
         const fd = new FormData();
         for (const f of files) fd.append('file', f, f.name);

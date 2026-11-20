@@ -220,21 +220,32 @@ function setAttrAt(el, name, value, index) {
     for (const [n, v] of tail) el.setAttribute(n, v);
 }
 
+/* Put a node back where it was: before `before`, or after `prev` when `before` has gone since.
+   What the editor writes outside the history (a picture's credit, the references at the foot
+   of a slide: sources.js) can be the neighbour a command remembered, and be taken out and made
+   again in between. */
+function putBack(parent, node, before, prev = null) {
+    if (before && before.parentNode !== parent) before = prev && prev.parentNode === parent ? prev.nextSibling : null;
+    parent.insertBefore(node, before);
+}
+
 export function insertCmd(node, parent, before = null, label = 'Insert') {
-    return { label, el: node, redo() { parent.insertBefore(node, before); }, undo() { node.remove(); } };
+    const prev = before ? before.previousSibling : parent.lastChild;
+    return { label, el: node, redo() { putBack(parent, node, before, prev); }, undo() { node.remove(); } };
 }
 
 export function removeCmd(node, label = 'Delete') {
-    const parent = node.parentNode, before = node.nextSibling;
-    return { label, el: node, redo() { node.remove(); }, undo() { parent.insertBefore(node, before); } };
+    const parent = node.parentNode, before = node.nextSibling, prev = node.previousSibling;
+    return { label, el: node, redo() { node.remove(); }, undo() { putBack(parent, node, before, prev); } };
 }
 
 export function moveCmd(node, toParent, toBefore = null, label = 'Move') {
-    const fromParent = node.parentNode, fromBefore = node.nextSibling;
+    const fromParent = node.parentNode, fromBefore = node.nextSibling, fromPrev = node.previousSibling;
+    const toPrev = toBefore ? toBefore.previousSibling : toParent.lastChild;
     return {
         label, el: node,
-        redo() { toParent.insertBefore(node, toBefore); },
-        undo() { fromParent.insertBefore(node, fromBefore); },
+        redo() { putBack(toParent, node, toBefore, toPrev === node ? fromPrev : toPrev); },
+        undo() { putBack(fromParent, node, fromBefore, fromPrev); },
     };
 }
 

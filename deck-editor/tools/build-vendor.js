@@ -97,3 +97,48 @@ if (fs.existsSync(path.join(SRC, 'mathjax-4.1.3.tgz')) && fs.existsSync(path.joi
     } else console.log('mathjax4: no mhchem font extension tarball, \\ce{} will not draw in STIX Two');
     console.log('mathjax4 + stix2 copied');
 } else console.log('mathjax4: tarballs not in tools/vendor-src, skipped (see the comment above)');
+
+/* Citations (core/cite.js): citation.js reads BibTeX, RIS and CSL-JSON, and citeproc-js writes
+   them in a CSL style. Bundled with esbuild from the npm packages (package.json pins them) into
+   one script that sets window.DiapoCite (tools/cite-entry.js). It is not minified: citeproc-js
+   is under the CPAL, which asks for its source to go with it, and this file is that source.
+   The CSL styles and locales beyond the ones citation.js ships are single XML files from the
+   Citation Style Language project (CC BY-SA 3.0), fetched into tools/vendor-src/ with
+       curl -o tools/vendor-src/csl/<id>.csl https://raw.githubusercontent.com/citation-style-language/styles/master/<id>.csl
+       curl -o tools/vendor-src/csl-locales/locales-<code>.xml https://raw.githubusercontent.com/citation-style-language/locales/master/locales-<code>.xml
+   and copied to app/vendor/csl/ with an index (csl/styles.json: id, title, numbered or not). */
+const CSL_SRC = path.join(SRC, 'csl'), CSL_LOC = path.join(SRC, 'csl-locales'), CSL_OUT = path.join(OUT, 'csl');
+(async () => {
+    let esbuild;
+    try { esbuild = require('esbuild'); } catch (e) { console.log('citation.js: esbuild not installed, skipped'); return; }
+    const out = path.join(OUT, 'citation.js');
+    await esbuild.build({
+        entryPoints: [path.join(__dirname, 'cite-entry.js')], bundle: true, format: 'iife', platform: 'browser',
+        target: 'es2020', minify: false, legalComments: 'inline', outfile: out, logLevel: 'warning',
+        banner: { js: `/* citation.js ${version('@citation-js/core')} (MIT, https://citation.js.org) with citeproc-js ${version('citeproc')} (CPAL-1.0, https://github.com/Juris-M/citeproc-js) - licences: LICENSE-citation-js.txt, LICENSE-citeproc.txt */` },
+    });
+    console.log('citation.js', Math.round(fs.statSync(out).size / 1024) + ' KB');
+    // citation.js's licence, and moo's (the BibTeX plugin's tokenizer, inside the bundle; BSD-3-Clause asks for its notice).
+    fs.writeFileSync(path.join(OUT, 'LICENSE-citation-js.txt'), fs.readFileSync(path.join(NM, '@citation-js', 'core', 'LICENSE.md'), 'utf8')
+        + '\n\nThe bundle includes moo ' + version('moo') + ' (https://github.com/no-context/moo):\n\n' + fs.readFileSync(path.join(NM, 'moo', 'LICENSE'), 'utf8'));
+    const cpal = path.join(SRC, 'CPAL-1.0.txt');      // https://raw.githubusercontent.com/spdx/license-list-data/main/text/CPAL-1.0.txt
+    fs.writeFileSync(path.join(OUT, 'LICENSE-citeproc.txt'), fs.readFileSync(path.join(NM, 'citeproc', 'LICENSE'), 'utf8')
+        + '\n\nDiapo uses citeproc-js under the CPAL, unmodified. Its source is the citeproc code inside citation.js\n'
+        + 'in this folder, and the npm package citeproc@' + version('citeproc') + '. The text of the licence follows.\n\n'
+        + (fs.existsSync(cpal) ? fs.readFileSync(cpal, 'utf8') : 'https://opensource.org/license/cpal_1-0\n'));
+    if (!fs.existsSync(CSL_SRC)) { console.log('csl: no styles in tools/vendor-src/csl, skipped'); return; }
+    fs.rmSync(CSL_OUT, { recursive: true, force: true });
+    fs.mkdirSync(CSL_OUT, { recursive: true });
+    const index = [];
+    for (const f of fs.readdirSync(CSL_SRC).filter(f => f.endsWith('.csl')).sort()) {
+        const xml = fs.readFileSync(path.join(CSL_SRC, f), 'utf8');
+        if (/rel="independent-parent"/.test(xml)) { console.log('csl: ' + f + ' is a dependent style, skipped'); continue; }
+        const title = ((/<title>([^<]*)<\/title>/.exec(xml) || [])[1] || f).replace(/&amp;/g, '&');
+        const numbered = /citation-format="numeric"/.test(xml);
+        fs.copyFileSync(path.join(CSL_SRC, f), path.join(CSL_OUT, f));
+        index.push({ id: f.replace(/\.csl$/, ''), title, numbered });
+    }
+    if (fs.existsSync(CSL_LOC)) for (const f of fs.readdirSync(CSL_LOC).filter(f => f.endsWith('.xml'))) fs.copyFileSync(path.join(CSL_LOC, f), path.join(CSL_OUT, f));
+    fs.writeFileSync(path.join(CSL_OUT, 'styles.json'), JSON.stringify(index, null, 1) + '\n');
+    console.log('csl:', index.length, 'styles,', fs.existsSync(CSL_LOC) ? fs.readdirSync(CSL_LOC).length : 0, 'locales');
+})().catch(err => { console.error(err); process.exitCode = 1; });

@@ -51,6 +51,10 @@ Routes
     POST /api/themes?name=       body = JSON theme; saves or replaces it
     DELETE /api/themes?name=     removes a saved theme
     GET  /api/fonts/google?family= weights and italic weights Google Fonts offers for a family
+    GET  /api/cite/doi?doi=      {item}: the reference doi.org has for a DOI, as CSL-JSON (asked
+                                 only when the user adds a reference by its DOI)
+    GET  /api/credit/commons?url= {by, from, license, url}: who made a picture on Wikimedia Commons
+                                 and its licence (asked only for a picture inserted from Commons)
     POST /api/fonts/host?file=&embed=0|1  body = JSON {urls}: downloads the fonts behind
                                  Google Fonts stylesheet URLs into <deck folder>/fonts/ (or
                                  inlines them as data URIs) and returns the @font-face CSS
@@ -1236,6 +1240,98 @@ def probe_google_family(family):
     return {"family": family, "weights": sorted(weights), "italics": sorted(italics)}
 
 
+# -- Citations and picture credits --------------------------------------
+# Two lookups the user asks for, and only then: a reference by its DOI (doi.org's content
+# negotiation answers with CSL-JSON, the format of a deck's library: app/core/cite.js) and who
+# made a picture on Wikimedia Commons and under what licence (the Commons API's extmetadata:
+# app/core/credits.js). Only the DOI or the file name goes out, with a generic User-Agent.
+LOOKUP_UA = "Diapo/" + APP_VERSION + " (https://github.com/reactiveoxygenspecies/Diapo)"
+LOOKUP_TIMEOUT = 15
+LOOKUP_MAX_BYTES = 2_000_000
+DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$")
+
+
+class LookupError_(Exception):
+    """A lookup that did not work, with a message for the user."""
+
+
+def _lookup_json(url, accept, site):
+    req = urllib.request.Request(url, headers={"Accept": accept, "User-Agent": LOOKUP_UA})
+    try:
+        with urllib.request.urlopen(req, timeout=LOOKUP_TIMEOUT) as r:
+            raw = r.read(LOOKUP_MAX_BYTES + 1)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise LookupError_(f"{site} does not know it.")
+        raise LookupError_(f"{site} answered with an error ({e.code}). Try again later.")
+    except (urllib.error.URLError, OSError, TimeoutError):
+        raise LookupError_(f"Could not reach {site}: is this computer online?")
+    if len(raw) > LOOKUP_MAX_BYTES:
+        raise LookupError_(f"{site} sent more than expected.")
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        raise LookupError_(f"{site} did not answer with a reference.")
+
+
+def lookup_doi(doi):
+    """The CSL-JSON item doi.org has for a DOI (a DOI link and a doi: prefix are taken too)."""
+    doi = re.sub(r"^(https?://(dx\.)?doi\.org/|doi:\s*)", "", (doi or "").strip(), flags=re.I)
+    if not DOI_RE.match(doi):
+        raise LookupError_("That is not a DOI (they start with 10. and a slash follows).")
+    item = _lookup_json("https://doi.org/" + urllib.parse.quote(doi, safe="/:;()._-<>[]"), "application/vnd.citationstyles.csl+json", "doi.org")
+    if not isinstance(item, dict) or not (item.get("title") or item.get("author")):
+        raise LookupError_("doi.org did not answer with a reference.")
+    item.setdefault("DOI", doi)
+    return item
+
+
+def commons_title(url):
+    """The Commons file title ("File:Name.jpg") of a picture's address on upload.wikimedia.org,
+    commons.wikimedia.org or a Wikipedia file page, or None."""
+    try:
+        p = urllib.parse.urlparse(url)
+    except ValueError:
+        return None
+    host = (p.hostname or "").lower()
+    parts = [urllib.parse.unquote(s) for s in p.path.split("/") if s]
+    if host == "upload.wikimedia.org":
+        # /wikipedia/commons/a/ab/Name.jpg or /wikipedia/commons/thumb/a/ab/Name.jpg/800px-Name.jpg
+        if "thumb" in parts and len(parts) > parts.index("thumb") + 3:
+            return "File:" + parts[parts.index("thumb") + 3]
+        return "File:" + parts[-1] if parts else None
+    if host.endswith(".wikimedia.org") or host.endswith(".wikipedia.org"):
+        title = urllib.parse.parse_qs(p.query).get("title", [""])[0] or (parts[-1] if len(parts) >= 2 and parts[0] == "wiki" else "")
+        title = urllib.parse.unquote(title)
+        m = re.match(r"^(File|Image|Datei|Fichier|Archivo|Immagine):(.+)$", title)
+        return "File:" + m.group(2) if m else None
+    return None
+
+
+def lookup_commons(url):
+    """{by, from, license, url} for a picture on Wikimedia Commons."""
+    title = commons_title(url)
+    if not title:
+        raise LookupError_("That is not the address of a file on Wikimedia Commons.")
+    api_url = "https://commons.wikimedia.org/w/api.php?" + urllib.parse.urlencode(
+        {"action": "query", "titles": title, "prop": "imageinfo", "iiprop": "extmetadata|url", "format": "json", "formatversion": "2"})
+    data = _lookup_json(api_url, "application/json", "Wikimedia Commons")
+    try:
+        page = data["query"]["pages"][0]
+    except (KeyError, IndexError, TypeError):
+        raise LookupError_("Wikimedia Commons did not answer as expected.")
+    if page.get("missing") or not page.get("imageinfo"):
+        raise LookupError_("Wikimedia Commons has no file called " + title[5:] + ".")
+    info = page["imageinfo"][0]
+    meta = info.get("extmetadata") or {}
+
+    def text(key):
+        v = str((meta.get(key) or {}).get("value") or "")
+        return re.sub(r"\s+", " ", html_text.unescape(re.sub(r"<[^>]+>", " ", v))).strip()[:300]
+    return {"by": text("Artist"), "from": "Wikimedia Commons", "license": text("LicenseShortName"),
+            "url": info.get("descriptionurl") or ""}
+
+
 def font_slug(s):
     return re.sub(r"[^A-Za-z0-9]+", "-", s).strip("-") or "font"
 
@@ -2022,6 +2118,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 if not info:
                     return self._fail(f'Google Fonts has no family called "{fam}"', 404)
                 return self._json({"ok": True, **info})
+            if route == "/api/cite/doi":
+                try:
+                    return self._json({"ok": True, "item": lookup_doi(self._query().get("doi", ""))})
+                except LookupError_ as e:
+                    return self._fail(str(e), 502)
+            if route == "/api/credit/commons":
+                try:
+                    return self._json({"ok": True, **lookup_commons(self._query().get("url", ""))})
+                except LookupError_ as e:
+                    return self._fail(str(e), 502)
             if route == "/api/draft":
                 d = draft_path(safe_path(self._query().get("file", "")))
                 if not os.path.isfile(d):

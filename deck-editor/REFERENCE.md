@@ -853,6 +853,117 @@ one is needed. A figure written with the source alone (by hand, by the
 diapo-deck skill) is drawn when the deck opens; one whose source does not draw
 is listed under Problems. A double-click on either goes to its source.
 
+### Citations and picture credits
+
+**The deck's references.** Insert > Citation library... lists them: search,
+a filter for the cited and the uncited, and for each one where it is cited
+and how the style writes it. Import a file (a `.bib` from Zotero, Mendeley or
+JabRef, BibLaTeX, RIS or CSL-JSON), paste the same, drop a `.bib` on the
+dialog, or add one by its DOI (Diapo asks doi.org for it, then and only
+then). An import adds new keys and updates the ones the deck has already; a
+reference without a key gets one from its first author and year
+(`szostak2001`). Changing a key changes the citations that use it; Remove
+unused takes out what is cited nowhere. Every change is one undo step. The
+references are kept in the deck itself, as CSL-JSON in
+`<script type="application/vnd.citationstyles.csl+json" id="deck-references">`
+on the stage, with only the fields a style reads, so the deck can be edited
+again without the file they came from.
+
+**The style** (the dialog's Style list, or the Sources slide's panel) writes
+every citation and the reference list: APA 7th (the default), Nature,
+Science, Cell, PNAS, ACS, Angewandte, RSC, AIP, APS, IEEE, AMA, BMJ, eLife,
+Nucleic Acids Research, PLOS, Annual Reviews, Chicago author-date, Elsevier
+Harvard, Cite Them Right, MLA, Vancouver, or any other independent CSL style
+loaded from a `.csl` file (kept in the deck as
+`<script type="application/vnd.citationstyles.csl+xml" id="deck-csl">`).
+It is `data-csl-style` on the stage. Numbered styles number in the order the
+deck first cites, slide by slide.
+
+**A citation in a text.** While editing text, **Alt+[**, the ❝ button of the
+text bar, Insert > Citation... or Ctrl+K > Citation in the text opens a
+popover by the caret: search the references (or paste a DOI to add one), tick
+one or more, choose the form (in brackets, in the sentence, year only) and
+see it as the style writes it; Enter puts it in, Esc leaves the text as it
+was. The field under the form is the citation in Pandoc's syntax, the one
+Pandoc, Quarto and R Markdown use: `[@key]` in brackets, `@key` in the
+sentence, `[-@key]` the year only, `[@key, p. 4]` with a page (`fig.`, `chap.`,
+`sec.`... too), `[see @a; @b]` several with a prefix; type into it to add a
+page. **Typing** works as well: `[@` (or `@` after a space) opens a list of
+the references under the caret, narrowed as you type a key, an author, title
+words or a year; Enter or Tab takes one. A citation typed out becomes one when
+its `]` is typed, and only when the deck has the key; `@key` taken from the
+list becomes one at once. Ctrl+Z gives back the typed text. In the text a
+citation is an atom, like an equation: the caret steps over it, Backspace
+takes it whole, a click opens it in the popover (none ticked, Change removes
+it). Copied as plain text it is its Pandoc text, so it can be typed back.
+It is saved as `<span data-cite="[@key, p. 4]">(Mansy et al., 2008, p. 4)</span>`:
+the words the style wrote are plain text in the deck, which needs no script
+or library to show them (a superscript number that follows a typed space
+carries the class `deck-cite-tight`, which takes the space back). A
+citation written with the key alone (by hand, by a generator) is written when
+the deck opens; one whose key the library lacks shows as typed, marked in the
+editor, and the deck says which keys are missing when it opens.
+
+**References at the foot of the slides.** A slide's panel, when the deck
+cites something, has a References part. "At the foot of each slide that
+cites" (`data-cite-foot` on the stage) lists, at the bottom of every slide,
+what that slide cites, in the order of the style's numbers: the short form
+(`Szostak et al., Nature 409, 387 (2001)`, numbered with a superscript in a
+numbered style), the style's full entry, or author and year. "Not on this
+slide" is `data-cite-foot="off"` on that slide. "No citation marks in the
+text" (`data-cite-intext="hide"`) leaves the text clean and the foot says it
+all; the editor still shows a faint ❝ where each citation is. The foot is
+`<div class="deck-slide-refs" data-slide-refs>`, written by Diapo and locked.
+
+**The Sources slide.** Insert > Sources slide (or the button in the slide's
+References part, or in Theme > Image credits) adds a slide at the end that
+lists the references the deck cites in its style and every picture's credit,
+by slide (`section.slide[data-sources="references credits"]`). Its title and
+its look are yours; the list (`div.deck-sources[data-sources-body]`, locked)
+is written by Diapo and kept current: cite something new and it appears, take
+out the last citation of a paper and it goes. Its panel chooses the style,
+what it lists (the cited references or the whole library, the references, the
+picture credits or both, the pictures without a credit as "source not given"
+or not), and whether DOIs and addresses are links. The type is the largest
+that fits, from 24 down to 15 px; a list longer than that continues on slides
+of its own (`data-sources-more`), made and removed as the list needs. "Stop
+updating it" turns it into an ordinary slide, as it is.
+
+**A picture's credit.** Picture > Credit in the panel: By, From, Licence (a
+list of the usual ones, or your own words) and a Link, saved on the `<img>` as
+`data-credit-by`, `-from`, `-license` and `-url`. "Show the credit on this
+picture" off is `data-credit-show="off"` (listed on the Sources slide only);
+"It needs no credit" (`data-credit-none`) is for a logo or a decoration. What
+Diapo can find is filled in: a picture inserted from its address (Insert >
+Image from URL) or dragged in from a page in the browser gets its site as
+From and its address as Link; one from Wikimedia Commons also gets its author
+and licence from its Commons page (Diapo asks Commons, then only). A picture
+dragged from a page without a file of its own is put in by its address, like
+Image from URL. A picture made by a deck's own script (`[data-svg]`,
+`[data-fig]`) has no credit: the save writes it back as the file had it.
+
+**How credits look** is Theme > Image credits, for the whole deck
+(`data-credits` on the stage): on the picture in a corner (which corner:
+`data-credit-corner`), along its right edge, under it, one line in the
+slide's footer, or an ⓘ that shows the credit on hover and, in the PDF, as the
+footer line. Size (`data-credit-size`) and what the line reads
+(`data-credit-format`: By · From · Licence, By and From, From, © By). Each
+caption is `<div class="deck-credit corner" data-credit-for="<the picture's
+data-id>">`, placed from the picture's box and moved with it, revealed with
+it when the picture is a fragment, and locked. It is ordinary text: the PDF,
+the PowerPoint export and the thumbnails have it.
+
+Everything Diapo writes for citations and credits (the words of the
+citations, the feet of the slides, the Sources slide's list, the captions) is
+written again from the deck after every change and when it opens, outside the
+undo history: undo and redo change what it is written from, and it follows.
+The look is a block of its own in the editor's style element,
+`/* citations and credits (managed by the deck editor) */`.
+citation.js (MIT) reads the files and citeproc-js (CPAL) writes the styles;
+both are `app/vendor/citation.js`, loaded into the editor the first time a
+deck has a citation, never into a deck. The styles beyond APA, Vancouver and
+Harvard are `app/vendor/csl/` (see `tools/build-vendor.js`).
+
 ## Animations
 
 The Animation section of the properties panel shows what an element has and lets
@@ -1475,7 +1586,7 @@ deck-editor/
     presenter.html    the presenter window, and presenter.js its script
     print/            prep.js and keeper.js, the two scripts of the printable copy (PDF)
     deck-plot.js      draws interactive charts in a deck (copied beside a deck that has one)
-    vendor/           MathJax, SmilesDrawer and plotly.js, with their licences (tools/build-vendor.js)
+    vendor/           MathJax, SmilesDrawer, plotly.js and citation.js (with citeproc-js), with their licences; csl/, the CSL styles and locales (tools/build-vendor.js)
     known-scripts.json  hashes of earlier editions of Diapo's scripts (see Scripts in decks)
     brand/            the logo: mark.svg (favicon, no word), logo.svg (the mount with DIAPO, outlined), loader.svg (the loading mark, animated), Anton, its face; icon.ico for the exe and icon-256/512.png for the page and its manifest
     editor.css
@@ -1493,7 +1604,13 @@ deck-editor/
       slides.js       slide strip, thumbnails, slide operations
       insert.js       new elements
       placement.js    where a new element lands (centre, freest grid spot, cascade)
-      filedrop.js     files dragged in from the computer (pictures, video, sound, decks to import)
+      filedrop.js     files dragged in from the computer (pictures, video, sound, decks to import), and pictures from a page
+      cite.js         citations: the deck's library, Pandoc's citation syntax, the CSL styles, writing them (citeproc)
+      citepop.js      a citation in a text: the popover (Alt+[) and the list under a typed [@
+      citelib.js      the deck's references in a dialog: import, DOI, keys, the style
+      citepanel.js    the panel's Credit, References and Sources slide parts, Theme > Image credits
+      sources.js      what is written from citations and credits: their words, the feet of the slides, the Sources slide, the captions
+      credits.js      a picture's credit from where it came from (its address, Wikimedia Commons)
       chart.js        charts: the drawing from a table, the panel's Chart section
       plot.js         interactive charts (Plotly): reading the figure, its picture, the dialog, the panel's section
       crop.js         cropping a picture by hand (the data-crop box, crop mode)
@@ -1547,10 +1664,14 @@ npm run test:py        (the Python tests: pptx_chart.py, pptx_import.py, emf_svg
                         (version comparison and stubbed GitHub answers), which
                         script files beside a deck count as Diapo's own, and the
                         file types a drop on the canvas sends matching the
-                        server's upload types, and mcp_server.py driven over stdio:
+                        server's upload types, mcp_server.py driven over stdio:
                         reading, writing, stale writes and outside paths refused,
-                        paused scripts, the checker, a render and a PDF)
+                        paused scripts, the checker, a render and a PDF, and the
+                        DOI and Wikimedia Commons lookups with stubbed answers)
 ```
+
+Citations and picture credits have `tests/citations.spec.js` (the DOI and Commons
+answers are stubbed there too, so it needs no network).
 
 The tests start `serve.py` on a throw-away workspace made from
 `tests/fixtures/sample-deck`, a small deck that exercises every hook of the

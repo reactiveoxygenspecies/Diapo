@@ -1,0 +1,102 @@
+[
+ {
+  "id": "american-chemical-society",
+  "title": "ACS Guide 2026 revision",
+  "numbered": true
+ },
+ {
+  "id": "american-institute-of-physics",
+  "title": "AIP Style Manual 4th edition",
+  "numbered": true
+ },
+ {
+  "id": "american-medical-association",
+  "title": "AMA Manual of Style 11th edition",
+  "numbered": true
+ },
+ {
+  "id": "american-physics-society",
+  "title": "American Physical Society",
+  "numbered": true
+ },
+ {
+  "id": "angewandte-chemie",
+  "title": "Angewandte Chemie International Edition",
+  "numbered": true
+ },
+ {
+  "id": "annual-reviews",
+  "title": "Annual Reviews (sorted by order of appearance)",
+  "numbered": true
+ },
+ {
+  "id": "bmj",
+  "title": "BMJ",
+  "numbered": true
+ },
+ {
+  "id": "cell",
+  "title": "Cell",
+  "numbered": true
+ },
+ {
+  "id": "chicago-author-date",
+  "title": "Chicago Manual of Style 18th edition (author-date)",
+  "numbered": false
+ },
+ {
+  "id": "elife",
+  "title": "eLife",
+  "numbered": false
+ },
+ {
+  "id": "elsevier-harvard",
+  "title": "Elsevier (author-date/Harvard, with titles)",
+  "numbered": false
+ },
+ {
+  "id": "harvard-cite-them-right",
+  "title": "Cite Them Right 12th edition (author-date/Harvard)",
+  "numbered": false
+ },
+ {
+  "id": "ieee",
+  "title": "IEEE Reference Guide version 11.29.2023",
+  "numbered": true
+ },
+ {
+  "id": "modern-language-association",
+  "title": "MLA Handbook 9th edition (in-text citations)",
+  "numbered": false
+ },
+ {
+  "id": "nature",
+  "title": "Nature",
+  "numbered": true
+ },
+ {
+  "id": "nucleic-acids-research",
+  "title": "Nucleic Acids Research",
+  "numbered": true
+ },
+ {
+  "id": "plos",
+  "title": "Public Library of Science",
+  "numbered": true
+ },
+ {
+  "id": "pnas",
+  "title": "Proceedings of the National Academy of Sciences of the United States of America",
+  "numbered": true
+ },
+ {
+  "id": "royal-society-of-chemistry",
+  "title": "Royal Society of Chemistry",
+  "numbered": true
+ },
+ {
+  "id": "science",
+  "title": "Science",
+  "numbered": true
+ }
+]

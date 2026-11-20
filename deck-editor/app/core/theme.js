@@ -136,6 +136,7 @@ export class ThemePanel {
           </div>
           <div class="insp-hint insp-state" id="thSizeHint"></div>
         </section>
+        <section class="insp-section" id="thCredits"></section>
         <section class="insp-section">
           <h4>Base text styles</h4>
           <div class="insp-hint" style="margin:0 0 8px">How each kind of text looks on every slide. Leave a field empty to keep the deck's own style; text you styled one by one keeps its own.</div>
@@ -171,6 +172,7 @@ export class ThemePanel {
         this._syncCss();
         this._renderCode();
         this._renderPresets();
+        if (this.app.citePanel) this.app.citePanel.syncTheme(this.$('thCredits'));     // Image credits (citepanel.js)
     }
 
     /* ---- Deck CSS ---------------------------------------------- */

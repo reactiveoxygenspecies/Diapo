@@ -10,6 +10,11 @@
    - A PowerPoint (.pptx) or Markdown (.md) file dropped anywhere in
      the window is offered as a new deck (the host does the asking
      and the import, as the Decks drawer's Import does).
+   - A picture dragged in from a page in the browser: when the drag
+     carries the file, it is uploaded as above; when it carries only
+     the picture's address (its <img> in the drag's HTML), the
+     picture is put in by its address, as Insert > Image from URL.
+     Either way its credit gets the site and the address (credits.js).
    - Anything else gets a toast saying what can be dropped; with no
      deck open, pictures only get a hint to open one.
    The canvas is an iframe, so the editor's document and the deck's
@@ -18,6 +23,8 @@
    to the browser, which would open it in place of the editor.
    Nothing is sent anywhere but to Diapo's own server, on the drop.
    ============================================================ */
+
+import { creditFromUrl, siteName } from './credits.js';
 
 /* What the server's /api/upload takes (UPLOAD_EXT in serve.py; tests/test_upload_ext.py keeps the
    two in step), and what /api/import turns into a deck. */
@@ -39,7 +46,19 @@ export function sortFiles(files) {
     return out;
 }
 
-const hasFiles = (e) => !!(e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files'));
+/* Files, or a picture dragged from a page in the browser (its address, and the <img> as HTML). */
+const hasFiles = (e) => !!(e.dataTransfer && Array.from(e.dataTransfer.types || []).some(t => t === 'Files' || t === 'text/uri-list'));
+const IMAGE_URL = /^https?:\/\/[^\s"<>]+\.(png|jpe?g|gif|webp|avif|svg|bmp)(\?[^\s"<>]*)?$/i;
+/* Where a dragged picture came from: its address, from the drag's HTML (<img src>) or its URL list; '' when not known. */
+export function dragSource(dt) {
+    if (!dt) return { url: '', image: '' };
+    let html = '', list = '';
+    try { html = dt.getData('text/html') || ''; list = dt.getData('text/uri-list') || dt.getData('text/x-moz-url') || ''; } catch (e) { /* not readable */ }
+    const url = list.split(/\r?\n/).map(s => s.trim()).find(s => /^https?:\/\//i.test(s)) || '';
+    const img = /<img\b[^>]*\bsrc\s*=\s*["']?(https?:\/\/[^"'\s>]+)/i.exec(html);
+    const image = img ? img[1].replace(/&amp;/g, '&') : IMAGE_URL.test(url) ? url : '';
+    return { url: image || url, image };
+}
 
 export class FileDrop {
     /* host: { canvas (the canvas element), importDecks(files) (asks, then imports), toast(msg, opts) } */
@@ -98,6 +117,7 @@ export class FileDrop {
         e.preventDefault();                  // the browser must never open the file in place of the editor
         const { onCanvas } = this._where(e, inDeck);
         const kinds = this._kinds(e.dataTransfer);
+        if (!Array.from(e.dataTransfer.types || []).includes('Files')) kinds.media = true;     // a picture from a page
         let msg = null;
         if (kinds.deck) msg = 'Drop to import as a new deck';
         else if (onCanvas) {
@@ -126,29 +146,48 @@ export class FileDrop {
         e.stopPropagation();
         this._show(null);
         const { media, decks, refused } = sortFiles(Array.from(e.dataTransfer.files || []));
+        const source = dragSource(e.dataTransfer);
         const where = this._where(e, inDeck);
         const toast = this.host.toast;
         const refusedNote = refused.length ? `Not added: ${refused.map(f => f.name).join(', ')} (a slide takes pictures, video and sound; a PowerPoint or Markdown file becomes a new deck)` : '';
-        if (media.length) {
+        const ready = () => {
             if (!this.deck.isOpen) toast('Open a deck first, then drop pictures, video or sound on a slide.', { ms: 4000 });
             else if (this.app.preview) toast('Leave the preview (Esc) to add files to a slide.', { ms: 4000 });
             else if (!where.onCanvas) toast('Drop pictures, video and sound on the slide to add them.', { ms: 4000 });
-            else await this.addToSlide(media, where.point, refusedNote);
+            else return true;
+            return false;
+        };
+        if (media.length) {
+            if (ready()) await this.addToSlide(media, where.point, refusedNote, media.length === 1 ? source.url : '');
+        } else if (!e.dataTransfer.files.length && source.image) {
+            // A picture dragged from a page with no file attached: inserted from its address, credited to it.
+            if (ready()) this.addFromUrl(source.image, where.point);
         } else if (refusedNote) toast(refusedNote, { error: true, ms: 6000 });
+        else if (!e.dataTransfer.files.length && source.url) toast('Only pictures can be dropped from a page: that was a link.', { ms: 4000 });
         if (decks.length) await this.host.importDecks(decks);
     }
 
     /* Upload and place: one undo step, the new elements selected. */
-    async addToSlide(files, point, note = '') {
+    async addToSlide(files, point, note = '', source = '') {
         const toast = this.host.toast;
         if (this.app.textEdit && this.app.textEdit.active) this.app.textEdit.commit();
         try {
             const r = await this.app.insert.upload(files, { at: point });
             const n = r.files.length;
+            // A picture dragged in from a page: its address is its credit's link (credits.js).
+            if (source && n === 1 && r.el && r.el.tagName === 'IMG') await creditFromUrl(this.app, r.el, source);
             const refused = (r.refused || []).length ? ` | not added: ${r.refused.join(', ')}` : '';
             toast((n === 1 ? '1 file added' : `${n} files added`) + ' to the slide (copied into assets/)' + refused + (note ? ' | ' + note : ''), { ms: refused || note ? 6000 : 2600 });
         } catch (err) {
             toast('Could not add the files: ' + err.message + (note ? ' | ' + note : ''), { error: true, ms: 6000 });
         }
+    }
+
+    /* A picture from a page, by its address (as Insert > Image from URL), with its credit filled in. */
+    addFromUrl(url, point) {
+        if (this.app.textEdit && this.app.textEdit.active) this.app.textEdit.commit();
+        const el = this.app.insert.image(url, '', { at: point });
+        if (el) creditFromUrl(this.app, el, url);
+        this.host.toast('Picture added from ' + (siteName(url) || 'the page') + ', linked to its address (it is not copied into assets/). Its credit is in the panel.', { ms: 5000 });
     }
 }

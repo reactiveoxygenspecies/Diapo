@@ -132,6 +132,17 @@ export function cleanPastedHtml(html, doc, target) {
             state.lineStart = false;
             return;
         }
+        // A citation keeps its Pandoc text (cite.js); its words are written again in the deck's style.
+        if (tag === 'span' && node.hasAttribute('data-cite') && !node.hasAttribute('hidden')) {
+            const c = node.getAttribute('data-cite').slice(0, 2000);
+            if (!c.trim()) return;
+            const m = src.createElement('span');
+            m.setAttribute('data-cite', c);
+            m.textContent = node.textContent || c;
+            dst.appendChild(m);
+            state.lineStart = false;
+            return;
+        }
         if (DROP.has(tag) || node.hasAttribute('hidden')) return;
         const st = node.style;
         if (st && (st.display === 'none' || st.visibility === 'hidden' || /mso-hide:\s*all/i.test(node.getAttribute('style') || ''))) return;

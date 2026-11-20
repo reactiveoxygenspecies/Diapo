@@ -138,13 +138,17 @@ html.deck-editing .deck-stage [data-fragment] { opacity: 1 !important; pointer-e
 html.deck-editing .deck-stage [data-placeholder] { display: flex !important; }
 html.deck-editing [contenteditable="true"] span[data-math] { cursor: pointer; border-radius: 3px; }
 html.deck-editing [contenteditable="true"] span[data-math]:hover { background: rgba(70, 120, 255, 0.16); }
+html.deck-editing [contenteditable="true"] span[data-cite] { cursor: pointer; border-radius: 3px; box-shadow: inset 0 -0.08em 0 rgba(70, 120, 255, 0.55); }
+html.deck-editing [contenteditable="true"] span[data-cite]:hover { background: rgba(70, 120, 255, 0.16); }
+html.deck-editing span[data-cite]:empty::before { content: '\\275D'; opacity: 0.45; font-size: 0.7em; vertical-align: super; }
+html.deck-editing span[data-cite][data-cite-missing] { background: rgba(255, 170, 0, 0.22); }
 `;
 
 /* What the stage observer watches: slide changes and every edit (see load). */
 const OBSERVE = { attributes: true, attributeFilter: ['class', 'style'], childList: true, subtree: true, characterData: true };
 /* Fields of a Deck that are the editor's, not one document's: a parked deck leaves them
    (see park). Everything else set on the object belongs to the open document. */
-const SHARED_FIELDS = new Set(['playEntrances', 'animationCssProvider', '_navToken']);
+const SHARED_FIELDS = new Set(['playEntrances', 'animationCssProvider', 'citeCssProvider', '_navToken']);
 
 export class Deck extends EventTarget {
     constructor(iframe) {
@@ -550,6 +554,7 @@ export class Deck extends EventTarget {
         root.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
         root.querySelectorAll('[spellcheck]').forEach(n => { if (n.closest('.deck-stage')) n.removeAttribute('spellcheck'); });
         root.querySelectorAll('[data-ed-ground]').forEach(n => n.removeAttribute('data-ed-ground'));
+        root.querySelectorAll('[data-cite-missing]').forEach(n => n.removeAttribute('data-cite-missing'));     // the editor's mark on a citation its library lacks
         // An interactive chart drawn live (Preview) is the library's work, never the file's: the figure and its picture are.
         root.querySelectorAll('.deck-plot-live, [data-ed-plot], [data-ed-probe], #deck-plot-style').forEach(n => n.remove());
 
@@ -759,7 +764,8 @@ export class Deck extends EventTarget {
         const master = this.doc && this.doc.querySelector('.deck-stage > .slide[data-no-master]') && !this.hasOwnMasterRule() ? MASTER_CSS : '';
         const scripts = this.doc && this.doc.querySelector('.deck-stage sup, .deck-stage sub') && !this.hasOwnRule(/(^|[\s,}])su[pb]\s*[,{]/) ? SCRIPTS_CSS : '';
         const elements = this.doc ? elementCss(this.doc) : '';
-        return overridesToCss(this.overrides, [anim, master, scripts, elements].filter(Boolean).join('\n'));
+        const sources = this.doc && this.citeCssProvider ? this.citeCssProvider() : '';     // citations and picture credits (sources.js)
+        return overridesToCss(this.overrides, [anim, master, scripts, elements, sources].filter(Boolean).join('\n'));
     }
     hasOwnMasterRule() { return this.hasOwnRule('[data-no-master]'); }
     /* Does the deck's own CSS (not the editor's blocks) contain this text or match this pattern? */

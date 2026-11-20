@@ -18,6 +18,30 @@
   after opening a deck or changing slides wait for the deck to come to rest
   instead, and the PowerPoint screenshot tool (`zz-pptx`) runs only when asked.
   `npm run test:serial` runs them one at a time.
+- **Citations.** Insert > Citation library... holds the deck's references:
+  import a `.bib` (Zotero, Mendeley, JabRef), RIS or CSL-JSON file, paste
+  some, or add one by its DOI. In a text, Alt+[ (or the ❝ button) opens a
+  popover to search them and put a citation in, and typing `[@` lists them
+  as you type, in Pandoc's syntax (`[@key]`, `@key`, `[@key, p. 4]`,
+  `[-@key]`). The deck is written in any CSL style: APA by default, and
+  Nature, Science, Cell, PNAS, ACS, RSC, IEEE, AMA, Vancouver, Chicago and
+  more, or a `.csl` file of your own. A saved deck holds the citations as
+  plain text and its references as CSL-JSON, so it needs no library to show
+  them.
+- **References at the foot of the slide**, as talks do: each slide that
+  cites lists its references at its foot, in short or in full, with or
+  without marks in the text.
+- **The Sources slide** (Insert > Sources slide): the references the deck
+  cites, in its style, and every picture's credit, kept current while you
+  edit; a long list continues on more slides.
+- **Picture credits.** Picture > Credit in the panel: who made it, where it
+  is from, its licence and a link. A picture inserted from its address or
+  dragged in from a page is credited to its site; one from Wikimedia
+  Commons gets its author and licence from Commons. Theme > Image credits
+  shows them on the slides: in a corner of the picture, along its edge,
+  under it, in the slide's footer, or an ⓘ that shows it on hover.
+- **Undo puts an element back in its place** when the one it was next to
+  has gone since (a credit taken out with its picture).
 
 ## 1.4.0 - 2026-11-19
 
