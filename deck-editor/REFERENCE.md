@@ -1705,8 +1705,10 @@ runs the same on a Windows runner: it first rebuilds the generated copies
 (`tools/build-templates.py`, which also writes `diapo-format/` and the skill's
 runtime and controller) and fails if that changes a tracked file, then runs
 `npm run test:py`; the browser tests run in three parts (`--shard=N/3`), each on
-a runner of its own, side by side. A part that fails uploads its report and
-results. Set `DIAPO_TEST_PORT` (the workflow uses
+a runner of its own, side by side. There (with `CI` set) a failed test runs once
+more and the report lists it as flaky: the runners now and then fail a test for
+reasons of their own (`net::ERR_NO_BUFFER_SPACE`). A part that fails uploads its
+report and results. Set `DIAPO_TEST_PORT` (the workflow uses
 8828) when running two sets of tests at once.
 
 ## Not yet

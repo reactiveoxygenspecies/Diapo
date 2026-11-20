@@ -18,7 +18,10 @@ module.exports = defineConfig({
     timeout: 30000,
     fullyParallel: false,
     workers: 1,
-    retries: 0,
+    // On GitHub's Windows runners a test now and then fails for the machine, not for Diapo
+    // (net::ERR_NO_BUFFER_SPACE loading editor.js): there a failed test runs once more, and the
+    // report lists it as flaky. Locally a failure is a failure.
+    retries: process.env.CI ? 1 : 0,
     reporter: [['list']],
     use: {
         baseURL: `http://127.0.0.1:${PORT}`,
