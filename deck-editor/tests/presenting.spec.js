@@ -358,6 +358,8 @@ test('16 runtime: L shows a laser dot, D draws on a layer kept per slide and nev
     await expect.poll(() => deck.evaluate(() => Array.from(document.querySelectorAll('.slide')).findIndex(x => x.classList.contains('active')))).toBe(1);
     expect(((await strokes())['1'] || []).length).toBe(0);
     await deck.keyboard.press('ArrowLeft');
+    // C clears the slide shown: wait until it is the first one again (a slow machine is still on the second).
+    await expect.poll(() => deck.evaluate(() => Array.from(document.querySelectorAll('.slide')).findIndex(x => x.classList.contains('active')))).toBe(0);
     expect((await strokes())['0'].length).toBe(1);
     await deck.keyboard.press('c');
     expect((await strokes())['0'].length).toBe(0);
