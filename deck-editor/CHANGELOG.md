@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.3 - 2026-11-20
 
 - **Find and replace keeps the focus where you type.** Typing a search moves
   the view to the first match; when that took a moment (a slide change on a
