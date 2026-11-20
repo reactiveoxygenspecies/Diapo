@@ -1,5 +1,5 @@
 // Slide strip: Delete, and Ctrl+C / X / V of whole slides, within a deck and between decks.
-const { test, expect, fs, path, freshDeckEachTest, DECK_DIR, WS, openDeck } = require('./helpers');
+const { test, expect, fs, path, freshDeckEachTest, DECK_DIR, WS, openDeck, settle } = require('./helpers');
 
 freshDeckEachTest();
 
@@ -11,7 +11,7 @@ async function openOther(page, file) {
     await page.request.post('/api/trust?file=' + encodeURIComponent(file) + '&on=1');
     await page.evaluate((f) => window.deckEditor.openDeck(f, { discard: true }), file);
     await page.waitForFunction((f) => window.deckEditor.file === f && window.deckEditor.deck.isOpen && window.deckEditor.deck.slides.length > 0, file);
-    await page.waitForTimeout(900);
+    await settle(page);
 }
 
 test('Delete in the strip removes the picked slides as one undo step', async ({ page }) => {

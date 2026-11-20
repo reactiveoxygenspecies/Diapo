@@ -5,7 +5,8 @@
   "description": "Diapo, a standalone HTML deck editor. The app has no npm dependencies; this file pulls in Playwright for the tests, Font Awesome Free for tools/build-fa.js and the libraries tools/build-vendor.js copies into app/vendor/.",
   "scripts": {
     "start": "python serve.py ../workspace 8800",
-    "test": "playwright test --project=chrome",
+    "test": "node tools/test-parallel.js",
+    "test:serial": "playwright test --project=chrome",
     "test:headed": "playwright test --project=chrome --headed",
     "test:firefox": "playwright test --project=firefox",
     "test:py": "py -3 -m unittest tests.test_pptx_chart tests.test_pptx_import tests.test_emf_svg tests.test_md_import tests.test_settings tests.test_server_files tests.test_pptx_export tests.test_update_check tests.test_deck_files tests.test_upload_ext tests.test_pptx_scatter tests.test_publish tests.test_looks tests.test_mcp_server tests.test_templates_runtime",

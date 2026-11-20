@@ -1,6 +1,6 @@
 // The acceptance tests of the brief (section 10): round trip, move, resize, text, colour, slides, insert, draft, safety, presenting.
 // Run with: npx playwright test   (from the deck-editor folder)
-const { test, expect, fs, path, freshDeckEachTest, DECK, DECK_DIR, FILE, centre, drag, goTo, near, openDeck, own, readDeck, save, scale, slack, stageRect } = require('./helpers');
+const { test, expect, fs, path, freshDeckEachTest, DECK, DECK_DIR, FILE, PORT, WS, centre, drag, goTo, near, openDeck, own, readDeck, save, scale, slack, stageRect } = require('./helpers');
 
 freshDeckEachTest();
 
@@ -310,7 +310,7 @@ test('9 safety: the save API refuses paths outside the workspace and non-deck bo
     expect((await post(`/api/saveas?file=${f}&to=${encodeURIComponent('C:notes')}`)).status()).toBe(400);
     expect((await post('/api/new?path=')).status()).toBe(400);
     expect((await post('/api/new?path=%40diapo')).status()).toBe(400);
-    expect(fs.existsSync(path.join(DECK_DIR, '..', '..', '.tmp-workspace.html'))).toBe(false);
+    expect(fs.existsSync(path.join(WS, '..', path.basename(WS) + '.html'))).toBe(false);
     expect(readDeck()).toBe(deck);
 });
 
@@ -365,7 +365,7 @@ test("9c safety: a page on another site or origin cannot load the workspace's fi
     // In a browser: a page of another origin loads a deck's script file as its own script.
     const data = path.join(DECK_DIR, 'data.js');
     fs.writeFileSync(data, 'window.leaked = "the data of the deck";');
-    const srv = require('http').createServer((q, r) => { r.writeHead(200, { 'Content-Type': 'text/html' }); r.end('<script src="http://127.0.0.1:8811/deck/sample/data.js"></script>'); });
+    const srv = require('http').createServer((q, r) => { r.writeHead(200, { 'Content-Type': 'text/html' }); r.end('<script src="http://127.0.0.1:' + PORT + '/deck/sample/data.js"></script>'); });
     await new Promise(ok => srv.listen(0, '127.0.0.1', ok));
     try {
         await page.goto('http://127.0.0.1:' + srv.address().port + '/');

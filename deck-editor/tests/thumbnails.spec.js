@@ -32,6 +32,7 @@ test('thumbnails draw although a font stylesheet from another server hangs', asy
     const srcdoc = await page.evaluate(() => window.deckEditor.strip.itemList()[0].querySelector('iframe').srcdoc);
     expect(srcdoc).not.toMatch(/<link[^>]*rel="stylesheet"[^>]*googleapis|<link[^>]*googleapis[^>]*rel="stylesheet"/);
     expect(held).toBeGreaterThan(0);
+    await page.unrouteAll({ behavior: 'ignoreErrors' });     // the held request is let go, not waited out
 });
 
 test('thumbnails: a 52-slide deck scrolled through draws every thumbnail', async ({ page }) => {

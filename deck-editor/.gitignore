@@ -1,5 +1,6 @@
 node_modules/
 tests/.tmp-workspace/
+tests/.tmp-workspace-*/
 test-results/
 playwright-report/
 ff-results.json

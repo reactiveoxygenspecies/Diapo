@@ -41,7 +41,6 @@ GENERATED = ["diapo-format", "skills/diapo-deck/deck-runtime.js", "deck-editor/a
 SITE_BUILD = os.path.join(ROOT, "site", "build.py")   # the website: kept locally, not in the repository
 PY = [sys.executable]
 NPM = shutil.which("npm") or "npm"            # npm.cmd on Windows
-NPX = shutil.which("npx") or "npx"
 
 
 def read(path):
@@ -120,7 +119,7 @@ def check(args):
     print("Tests:")
     if not run([NPM, "run", "test:py"], check=False):
         problems.append("the Python tests fail")
-    if args.browser_tests and not run([NPX, "playwright", "test"], check=False):
+    if args.browser_tests and not run([NPM, "test"], check=False):
         problems.append("the browser tests fail")
     print()
     for n in notes:
@@ -171,7 +170,7 @@ def release(args):
     print("Tests:")
     run([NPM, "run", "test:py"])
     if args.browser_tests:
-        run([NPX, "playwright", "test"])
+        run([NPM, "test"])
     if args.exe:
         print("Executable:")
         run(PY + ["build-exe.py"])

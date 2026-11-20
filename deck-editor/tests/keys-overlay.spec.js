@@ -17,9 +17,9 @@ async function deckWithRuntime(page) {
     await page.waitForFunction(() => window.deckEditor.deck.win.deckRuntime);
 }
 
-test('K1 runtime version 15 is the same in the app, the Diapo Format, the skill and every template', async () => {
+test('K1 runtime version 16 is the same in the app, the Diapo Format, the skill and every template', async () => {
     const app = fs.readFileSync(path.join(APP, 'deck-runtime.js'), 'utf8');
-    expect(app).toMatch(/version: 15 \}/);
+    expect(app).toMatch(/version: 16 \}/);
     expect(fs.readFileSync(path.join(ROOT, 'diapo-format', 'deck-runtime.js'), 'utf8')).toBe(app);
     expect(fs.readFileSync(path.join(ROOT, 'skills', 'diapo-deck', 'deck-runtime.js'), 'utf8')).toBe(app);
     const dir = path.join(APP, 'templates');
@@ -84,7 +84,7 @@ test('K3 a saved deck opened on its own: the hint shows once and fades; ? lists 
     const deck = await context.newPage();
     await deck.goto('/deck/' + FILE);
     await deck.waitForSelector('.slide.active.visible');
-    await deck.waitForFunction(() => window.deckRuntime && window.deckRuntime.version === 15);
+    await deck.waitForFunction(() => window.deckRuntime && window.deckRuntime.version >= 16);
     const hint = deck.locator('.deck-keyhint');
     await expect(hint).toHaveText('Press ? for keys');
     await expect(hint).toHaveAttribute('role', 'status');

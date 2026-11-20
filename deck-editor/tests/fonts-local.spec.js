@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'sample-deck', 'index.html');
-const DECK_DIR = path.join(__dirname, '.tmp-workspace', 'sample');
+const DECK_DIR = path.join(process.env.DIAPO_TEST_WS || path.join(__dirname, '.tmp-workspace'), 'sample');
 const FILE = 'sample/index.html';
 
 test.use({ headless: false });
@@ -26,7 +26,7 @@ test('20 fonts: an installed font is copied into the deck when picked', async ({
     test.skip(process.platform !== 'win32' || !process.env.DECK_LOCAL_FONTS, 'opt-in: set DECK_LOCAL_FONTS=1 (needs a visible Chrome and Windows fonts)');
     await openDeck(page);
     const cdp = await context.newCDPSession(page);
-    await cdp.send('Browser.grantPermissions', { permissions: ['localFonts'], origin: 'http://127.0.0.1:8811' });
+    await cdp.send('Browser.grantPermissions', { permissions: ['localFonts'], origin: 'http://127.0.0.1:' + (+process.env.DIAPO_TEST_PORT || 8811) });
     await page.evaluate(() => { const d = window.deckEditor.deck; window.deckEditor.selection.select(d.doc.querySelector('.slide.active h1')); });
     await page.click('#inspFont');
     await page.click('.fontpick-acts [data-do=local]');

@@ -1,6 +1,6 @@
 // Files: import, export, PDF, save and save as, previous versions, templates, the platform fallbacks, scripts in decks.
 // Run with: npx playwright test   (from the deck-editor folder)
-const { test, expect, fs, path, freshDeckEachTest, DECK, DECK_DIR, FIXTURE, IMPORT_DIR, WS, goTo, openDeck, own, readDeck, save, stageRect } = require('./helpers');
+const { test, expect, fs, path, freshDeckEachTest, DECK, DECK_DIR, FIXTURE, IMPORT_DIR, PORT, WS, goTo, openDeck, own, readDeck, save, stageRect } = require('./helpers');
 
 freshDeckEachTest();
 
@@ -422,12 +422,12 @@ test('39 templates: New offers the imported designs; each one opens, presents an
     expect(await page.evaluate(() => window.deckEditor.deck.slides.map(s => s.dataset.name))).toEqual(['cover', 'manifesto', 'catalogue', 'stripe', 'data', 'quote', 'cal', 'colophon']);
     // The new deck is the template with the name it was given as its title (what the Decks list shows).
     const named = (file, name) => fs.readFileSync(file, 'utf8').replace(/<title([^>]*)>[\s\S]*?<\/title>/i, (m, a) => `<title${a}>${name}</title>`);
-    expect(fs.readFileSync(path.join(__dirname, '.tmp-workspace', 'sakura-test', 'index.html'), 'utf8'))
+    expect(fs.readFileSync(path.join(WS, 'sakura-test', 'index.html'), 'utf8'))
         .toBe(named(path.join(__dirname, '..', 'app', 'templates', 'sakura-chroma.html'), 'Sakura test'));
     // Every template: the runtime is in, the reveal shows the text, a save without edits changes nothing.
     for (const slug of ['folio', 'boardroom', 'terrarium', 'console', 'sorbet', 'blueprint', 'minimal', 'bold', 'clean-dark', 'swiss', 'academic', 'pitch', 'workshop', 'portfolio', 'report', 'retro', 'notebook', 'deco', 'brutalist', 'broadsheet', 'aurora', 'sunset', 'nordic', 'neon', 'comic', 'tomorrow', 'sakura-chroma', 'neo-grid-bold', 'block-frame', 'studio', '8-bit-orbit', 'welcome']) {
         const r = await page.evaluate((slug) => window.deckEditor.api.newDeck('tpl-' + slug + '/index.html', slug), slug);
-        const file = path.join(__dirname, '.tmp-workspace', 'tpl-' + slug, 'index.html');
+        const file = path.join(WS, 'tpl-' + slug, 'index.html');
         const created = fs.readFileSync(file);
         const template = path.join(__dirname, '..', 'app', 'templates', slug + '.html');
         expect(created.toString('utf8'), slug + ' named').toBe(slug === 'welcome' ? fs.readFileSync(template, 'utf8') : named(template, 'Tpl ' + slug.replace(/-/g, ' ')));
@@ -440,9 +440,9 @@ test('39 templates: New offers the imported designs; each one opens, presents an
         expect(await page.evaluate(() => window.deckEditor.deck.doc.querySelectorAll('.deck-stage [data-page-total]').length)).toBeGreaterThan(0);
         await save(page);
         expect(Buffer.compare(fs.readFileSync(file), created), slug + ' round trip').toBe(0);
-        fs.rmSync(path.join(__dirname, '.tmp-workspace', 'tpl-' + slug), { recursive: true, force: true });
+        fs.rmSync(path.join(WS, 'tpl-' + slug), { recursive: true, force: true });
     }
-    fs.rmSync(path.join(__dirname, '.tmp-workspace', 'sakura-test'), { recursive: true, force: true });
+    fs.rmSync(path.join(WS, 'sakura-test'), { recursive: true, force: true });
 });
 
 /* ------------------------------------------------------------
@@ -521,7 +521,7 @@ test('51 handout: the PDF with notes has each slide scaled down with its notes u
 test('62 deck scripts: a deck\'s own scripts and handlers are paused, Diapo\'s run, trusting runs them, a change pauses them again', async ({ page }) => {
     // A deck made from the blank template, plus a script and an inline handler of its own that
     // would, if they ran, reach the server as if they were the editor.
-    const dir = path.join(__dirname, '.tmp-workspace', 'untrusted');
+    const dir = path.join(WS, 'untrusted');
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(dir, { recursive: true });
     const blank = fs.readFileSync(path.join(__dirname, '..', 'app', 'templates', 'blank.html'), 'utf8');
@@ -544,7 +544,7 @@ test('62 deck scripts: a deck\'s own scripts and handlers are paused, Diapo\'s r
     expect(st.handler).toBeUndefined();
     expect(st.runtime).toBe(true);                         // the presentation features are Diapo's: they run
     expect(st.trust).toMatchObject({ trusted: false, scripts: 1 });
-    expect((await (await page.request.get('/api/status')).json()).workspace).toBe(path.join(__dirname, '.tmp-workspace'));
+    expect((await (await page.request.get('/api/status')).json()).workspace).toBe(WS);
     await expect(page.locator('.bar.trust-bar')).toContainText('paused');
     // Thumbnails are copies of slides inside the editor: never scripts there.
     await expect(page.locator('.thumb-frame').first()).toHaveAttribute('sandbox', 'allow-same-origin');
@@ -651,7 +651,7 @@ test('66 framing: the editor, its pages and the decks may be shown in a frame on
     }
     // A page of another origin (a server on another port; a site on the internet is held back by
     // the browser's local network checks anyway) that frames the editor gets nothing.
-    const srv = require('http').createServer((q, r) => { r.writeHead(200, { 'Content-Type': 'text/html' }); r.end('<iframe src="http://127.0.0.1:8811/"></iframe>'); });
+    const srv = require('http').createServer((q, r) => { r.writeHead(200, { 'Content-Type': 'text/html' }); r.end('<iframe src="http://127.0.0.1:' + PORT + '/"></iframe>'); });
     await new Promise(ok => srv.listen(0, '127.0.0.1', ok));
     try {
         await page.goto('http://127.0.0.1:' + srv.address().port + '/');

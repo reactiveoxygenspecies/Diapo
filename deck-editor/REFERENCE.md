@@ -1535,7 +1535,10 @@ Windows fonts, so it only runs with `DECK_LOCAL_FONTS=1` set.
 
 ```
 npm install            (once; installs @playwright/test only)
-npm test               (the installed Chrome)
+npm test               (the installed Chrome, in parts side by side:
+                        tools/test-parallel.js; -n 4 for four parts, other
+                        arguments go to Playwright)
+npm run test:serial    (the same, one test at a time)
 npm run test:firefox   (the same specs in Firefox; once before:
                         npx playwright install firefox)
 npm run test:py        (the Python tests: pptx_chart.py, pptx_import.py, emf_svg.py,
@@ -1557,6 +1560,19 @@ specs are split by area (`acceptance`, `editing`, `theme`, `presenting`,
 keep their numbers and titles, so `npx playwright test -g "62 deck scripts"` runs
 one (in both browsers; add `--project=chrome` or `--project=firefox` for one).
 
+The suite runs one test at a time against one server and workspace, so `npm test`
+splits it with `--shard` instead of Playwright's workers: each part gets its own
+`serve.py` port (`DIAPO_TEST_PORT`), its own workspace (`DIAPO_TEST_WS`,
+`tests/.tmp-workspace-N`) and results folder, and writes its output to
+`test-results/shard-N.log`. Tests reach the workspace through `WS` and the port
+through `PORT` from the helpers, never a fixed path or port. After a change,
+`settle(page)` from the helpers waits for the deck to come to rest (no animation
+running but the looping ones) instead of a fixed pause.
+
+`tests/zz-pptx.spec.js` is a tool, not a test: it exports templates to PowerPoint
+with screenshots beside them (`tools/pptx-export/`) and runs only when asked,
+`PPTX_SHOTS=1 npx playwright test --project=chrome zz-pptx`.
+
 Firefox runs every spec but the installed-fonts one (a Chrome feature). Playwright's
 Firefox puts a synthetic mouse event up to about a pixel from where it was asked to,
 so checks of a dragged distance use `near()` with `slack()` from the helpers, which
@@ -1567,8 +1583,9 @@ GitHub Actions (`.github/workflows/tests.yml`, on push and pull request to `main
 runs the same on a Windows runner: it first rebuilds the generated copies
 (`tools/build-templates.py`, which also writes `diapo-format/` and the skill's
 runtime and controller) and fails if that changes a tracked file, then runs
-`npx playwright test --project=chrome` and `npm run test:py`. The report and
-results are uploaded when a run fails. Set `DIAPO_TEST_PORT` (the workflow uses
+`npm run test:py`; the browser tests run in three parts (`--shard=N/3`), each on
+a runner of its own, side by side. A part that fails uploads its report and
+results. Set `DIAPO_TEST_PORT` (the workflow uses
 8828) when running two sets of tests at once.
 
 ## Not yet

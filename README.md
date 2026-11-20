@@ -138,7 +138,7 @@ that copy the icon, maths and chemistry libraries into the app:
 ```
 cd deck-editor
 npm install              # Playwright, and the packages the build tools copy from
-npm test                 # browser tests in Chrome
+npm test                 # browser tests in Chrome (in parts, side by side)
 npm run test:firefox     # the same tests in Firefox (once before: npx playwright install firefox)
 npm run test:py          # Python tests (Windows; elsewhere run the same unittest command with python3)
 ```

@@ -11,6 +11,8 @@ const WORKSPACE = process.env.DIAPO_TEST_WS || path.join(__dirname, 'tests', '.t
 // The server starts before globalSetup would run, so the workspace is prepared here.
 require('./tests/global-setup.js').prepare();
 
+const TOOLS = process.env.PPTX_SHOTS ? [] : [/zz-pptx/];
+
 module.exports = defineConfig({
     testDir: './tests',
     timeout: 30000,
@@ -25,9 +27,12 @@ module.exports = defineConfig({
     },
     // `npm test` runs chrome; `npm run test:firefox` runs the same specs in Playwright's
     // Firefox (downloaded once with `npx playwright install firefox`).
+    // tests/zz-pptx.spec.js is a tool, not a test (PowerPoint exports of the templates with
+    // screenshots beside them, for tools/pptx-compare.js): it runs only when asked,
+    // PPTX_SHOTS=1 npx playwright test --project=chrome zz-pptx
     projects: [
-        { name: 'chrome', use: { browserName: 'chromium', channel: 'chrome' } },   // the installed Chrome, so no browser download is needed
-        { name: 'firefox', use: { browserName: 'firefox' }, testIgnore: /fonts-local/ },   // installed fonts are a Chrome feature
+        { name: 'chrome', use: { browserName: 'chromium', channel: 'chrome' }, testIgnore: TOOLS },   // the installed Chrome, so no browser download is needed
+        { name: 'firefox', use: { browserName: 'firefox' }, testIgnore: [/fonts-local/].concat(TOOLS) },   // installed fonts are a Chrome feature
     ],
     webServer: {
         command: `${process.platform === 'win32' ? 'py -3' : 'python3'} serve.py "${WORKSPACE}" ${PORT} --no-open --settings "${path.join(WORKSPACE, 'settings.json')}"`,

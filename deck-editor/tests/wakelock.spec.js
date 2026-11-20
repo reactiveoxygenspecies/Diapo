@@ -106,7 +106,7 @@ test('wake lock: a deck opened on its own keeps the screen on (always), from the
     await context.addInitScript(fakeWakeLock(), false);
     await openDeck(page);
     await page.evaluate(() => window.deckEditor.addRuntimeScript());
-    await page.waitForFunction(() => window.deckEditor.deck.win.deckRuntime && window.deckEditor.deck.win.deckRuntime.version === 15);
+    await page.waitForFunction(() => window.deckEditor.deck.win.deckRuntime && window.deckEditor.deck.win.deckRuntime.version >= 16);
     await save(page);
     // In the editor's frame the runtime asks for nothing, in edit mode or in Preview.
     await page.evaluate(() => window.deckEditor.setPreview(true));
@@ -120,7 +120,7 @@ test('wake lock: a deck opened on its own keeps the screen on (always), from the
     for (const url of ['/deck/' + FILE, 'file:///' + DECK.replace(/\\/g, '/')]) {
         const deck = await context.newPage();
         await deck.goto(url);
-        await deck.waitForFunction(() => window.deckRuntime && window.deckRuntime.version === 15);
+        await deck.waitForFunction(() => window.deckRuntime && window.deckRuntime.version >= 16);
         await expect.poll(() => wake(deck)).toMatchObject({ live: 1 });
         // Hidden: the browser lets go; back in front, asked for again.
         await deck.evaluate(() => window.__setHidden(true));

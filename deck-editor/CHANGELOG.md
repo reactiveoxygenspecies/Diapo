@@ -12,6 +12,12 @@
   where they are. An older YouTube embed without it is reloaded instead, which
   stops it. Presentation features script version 16: every template carries
   it, and an existing deck offers the update when it is opened.
+- Tests: `npm test` runs the browser tests in parts side by side (each with its
+  own server and workspace), and CI splits them over three runners, so a full
+  run fits again: the last two CI runs hit the 45-minute limit. The fixed pauses
+  after opening a deck or changing slides wait for the deck to come to rest
+  instead, and the PowerPoint screenshot tool (`zz-pptx`) runs only when asked.
+  `npm run test:serial` runs them one at a time.
 
 ## 1.4.0 - 2026-11-19
 

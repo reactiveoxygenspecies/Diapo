@@ -39,7 +39,19 @@ async function openDeck(page) {
     await page.goto('/?file=' + FILE);
     await page.waitForFunction(() => window.deckEditor && window.deckEditor.deck.isOpen && window.deckEditor.deck.doc.querySelector('.slide.active.visible'));
     await page.waitForFunction(() => window.deckEditor.deck.doc.fonts.status === 'loaded');
-    await page.waitForTimeout(900);     // let the reveal transitions of the first slide finish
+    await settle(page);
+}
+
+/* The deck has come to rest: a few frames for what a change starts (the controller shows a slide
+   two frames on), then no animation or transition running in it but the looping ones. Slides
+   no longer play their entrances while editing, so this is usually at once. */
+async function settle(page) {
+    await page.evaluate(() => new Promise(r => { const w = window.deckEditor.deck.win; w.requestAnimationFrame(() => w.requestAnimationFrame(() => w.requestAnimationFrame(r))); }));
+    await page.waitForFunction(() => {
+        const d = window.deckEditor.deck.doc;
+        return !!d.querySelector('.slide.active.visible') &&
+            d.getAnimations().every(a => a.playState !== 'running' || (a.effect && a.effect.getComputedTiming().iterations === Infinity));
+    });
 }
 
 /* Client coordinates of a point given in stage pixels. */
@@ -75,10 +87,11 @@ async function save(page) {
     await page.waitForFunction(() => !window.deckEditor.dirty);
 }
 const scale = (page) => page.evaluate(() => window.deckEditor.deck.scale);
-const goTo = async (page, i) => { await page.evaluate((i) => window.deckEditor.deck.goTo(i), i); await page.waitForTimeout(1000); };
+const goTo = async (page, i) => { await page.evaluate((i) => window.deckEditor.deck.goTo(i), i); await settle(page); };
 const IMPORT_DIR = path.join(__dirname, 'fixtures', 'import');
 const WS = process.env.DIAPO_TEST_WS || path.join(__dirname, '.tmp-workspace');
-const own = { Origin: 'http://127.0.0.1:' + (+process.env.DIAPO_TEST_PORT || 8811) };
+const PORT = +process.env.DIAPO_TEST_PORT || 8811;     // the test server's port (playwright.config.js)
+const own = { Origin: 'http://127.0.0.1:' + PORT };
 
 /* Every test starts from the fixture deck as it is on disk, with every panel section open
    (a new user sees some folded; test 63 checks that). */
@@ -91,4 +104,4 @@ function freshDeckEachTest() {
     });
 }
 
-module.exports = { test, expect, fs, path, freshDeckEachTest, DECK, DECK_DIR, FILE, FIXTURE, IMPORT_DIR, WS, centre, drag, goTo, near, openDeck, own, readDeck, resetDeck, save, scale, slack, stagePoint, stageRect };
+module.exports = { test, expect, fs, path, freshDeckEachTest, DECK, DECK_DIR, FILE, FIXTURE, IMPORT_DIR, PORT, WS, centre, drag, goTo, near, openDeck, own, readDeck, resetDeck, save, scale, settle, slack, stagePoint, stageRect };

@@ -34,7 +34,7 @@ async function openFindDeck(context) {
     writeDeck();
     const deck = await context.newPage();
     await deck.goto(URL);
-    await deck.waitForFunction(() => window.deckRuntime && window.deckRuntime.version === 15);
+    await deck.waitForFunction(() => window.deckRuntime && window.deckRuntime.version >= 16);
     await deck.waitForTimeout(300);
     return deck;
 }
@@ -169,12 +169,12 @@ test('F5 the editor\'s presenter window finds with the deck\'s runtime; a pick m
     await openDeck(page);
     await page.evaluate(() => window.deckEditor.inspector.applyNotes('Mention the octopus.'));
     await page.evaluate(() => window.deckEditor.addRuntimeScript());
-    await page.waitForFunction(() => window.deckEditor.deck.win.deckRuntime && window.deckEditor.deck.win.deckRuntime.version === 15);
+    await page.waitForFunction(() => window.deckEditor.deck.win.deckRuntime && window.deckEditor.deck.win.deckRuntime.version >= 16);
     await save(page);
     await page.click('#btnPresenter');
     const [presenter] = await Promise.all([context.waitForEvent('page'), page.click('#presenterMenu [data-p="open"]')]);
     await presenter.waitForLoadState();
-    await presenter.waitForFunction(() => { try { return document.getElementById('cur').contentWindow.deckRuntime.version === 15; } catch (e) { return false; } });
+    await presenter.waitForFunction(() => { try { return document.getElementById('cur').contentWindow.deckRuntime.version >= 16; } catch (e) { return false; } });
     await presenter.keyboard.press('Control+Shift+F');
     const input = presenter.locator('.deck-finder .df-input');
     await expect(input).toBeFocused();

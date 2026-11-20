@@ -1,7 +1,8 @@
-# Tests for Diapo: the browser tests (Playwright, the installed Chrome) and the
-# Python tests, on a Windows runner, which is what Diapo ships on. The generated
-# copies (diapo-format/, skills/diapo-deck/, app/templates/) are rebuilt first and
-# the job fails if that changes anything, so a copy can't drift silently.
+# Tests for Diapo on Windows runners, which is what Diapo ships on. One job rebuilds
+# the generated copies (diapo-format/, skills/diapo-deck/, app/templates/) and fails if
+# that changes anything, so a copy can't drift silently, then runs the Python tests.
+# The browser tests (Playwright, the installed Chrome) are split in three parts
+# (--shard), each on a runner of its own, side by side.
 name: Tests
 
 on:
@@ -14,17 +15,49 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Tests (Windows, Chrome)
+  checks:
+    name: Generated copies and Python tests
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1   # build-known-scripts.py (a release step) needs history; it is not in this check
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check the generated copies are current
+        # Rebuilds app/templates/*.html, diapo-format/ and the skill's runtime and
+        # controller from their sources; build-templates.py also runs build-format.py,
+        # which fails when the skill's annotated base CSS lacks a rule of the base block.
+        working-directory: deck-editor
+        run: |
+          py -3 tools/build-templates.py
+          git diff --exit-code -- app/templates ../diapo-format ../skills/diapo-deck
+
+      - name: Python tests
+        working-directory: deck-editor
+        run: npm run test:py
+
+  browser:
+    name: Browser tests ${{ matrix.shard }}/3 (Windows, Chrome)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
       DIAPO_TEST_PORT: '8828'   # Playwright's server port; set for every run, as in RELEASING.md
     steps:
       - name: Check out
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1   # build-known-scripts.py (a release step) needs history; it is not in this check
+          fetch-depth: 1
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -42,28 +75,15 @@ jobs:
         working-directory: deck-editor
         run: npm ci
 
-      - name: Check the generated copies are current
-        # Rebuilds app/templates/*.html, diapo-format/ and the skill's runtime and
-        # controller from their sources; build-templates.py also runs build-format.py,
-        # which fails when the skill's annotated base CSS lacks a rule of the base block.
+      - name: Browser tests (Playwright, installed Chrome), part ${{ matrix.shard }} of 3
         working-directory: deck-editor
-        run: |
-          py -3 tools/build-templates.py
-          git diff --exit-code -- app/templates ../diapo-format ../skills/diapo-deck
-
-      - name: Browser tests (Playwright, installed Chrome)
-        working-directory: deck-editor
-        run: npx playwright test --project=chrome
-
-      - name: Python tests
-        working-directory: deck-editor
-        run: npm run test:py
+        run: npx playwright test --project=chrome --shard=${{ matrix.shard }}/3
 
       - name: Upload Playwright report and test results on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-results
+          name: playwright-results-${{ matrix.shard }}
           path: |
             deck-editor/playwright-report/
             deck-editor/test-results/

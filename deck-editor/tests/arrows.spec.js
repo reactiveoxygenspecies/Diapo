@@ -1,6 +1,6 @@
 // Lines and arrows: draw, end and bend handles, the panel, undo, save, copy and paste, older arrows.
 // Run with: npx playwright test tests/arrows.spec.js   (from the deck-editor folder)
-const { test, expect, freshDeckEachTest, openDeck, readDeck, save, stagePoint, goTo } = require('./helpers');
+const { test, expect, freshDeckEachTest, openDeck, readDeck, save, settle, stagePoint, goTo } = require('./helpers');
 
 freshDeckEachTest();
 
@@ -164,7 +164,7 @@ test('arrow: saved, reopened, copied and pasted keeps its geometry', async ({ pa
     expect(readDeck()).toContain('data-curve="');
     await page.reload();
     await page.waitForFunction(() => window.deckEditor && window.deckEditor.deck.isOpen && window.deckEditor.deck.doc.querySelector('.slide.active.visible'));
-    await page.waitForTimeout(900);
+    await settle(page);
     const m1 = await model(page);
     expect(m1.line).toEqual(m0.line);
     expect(m1.curve).toEqual(m0.curve);

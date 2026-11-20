@@ -1,4 +1,6 @@
-// Temporary: export templates to PowerPoint and screenshot Diapo's slides beside them; delete after use.
+// A tool, not a test: exports templates to PowerPoint and screenshots Diapo's slides beside them
+// (tools/pptx-export/). Left out of the suite; run it with
+//   PPTX_SHOTS=1 npx playwright test --project=chrome zz-pptx      (PPTX_SLUGS=folio,... for some)
 const { test, fs, path, WS } = require('./helpers');
 const OUT = path.join(__dirname, '..', 'tools', 'pptx-export');
 const SLUGS = (process.env.PPTX_SLUGS || 'folio,boardroom,terrarium,console,sorbet,blueprint,minimal,academic,welcome').split(',');

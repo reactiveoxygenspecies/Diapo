@@ -1,6 +1,6 @@
 // Editing on the canvas and in the panel: selection, insert, lists and tables, text, pictures, charts, guides, the palette, the panel itself.
 // Run with: npx playwright test   (from the deck-editor folder)
-const { test, expect, fs, path, freshDeckEachTest, DECK, DECK_DIR, centre, drag, goTo, near, openDeck, own, readDeck, save, scale, slack, stagePoint, stageRect } = require('./helpers');
+const { test, expect, fs, path, freshDeckEachTest, DECK, DECK_DIR, WS, centre, drag, goTo, near, openDeck, own, readDeck, save, scale, settle, slack, stagePoint, stageRect } = require('./helpers');
 
 freshDeckEachTest();
 
@@ -164,7 +164,7 @@ test('22 insert: lists edit as a whole, tables cell by cell with Tab, code keeps
     });
     expect(rest.star.replace(/ (style="[^"]*") (data-id="[^"]*")/, ' $2 $1'))   // Firefox writes style first
         .toMatch(/<svg viewBox="0 0 100 100" preserveAspectRatio="none" data-id="el-\d+" style="[^"]*color: var\(--accent\)[^"]*"><path d="[^"]+" fill="currentColor" vector-effect="non-scaling-stroke"><\/path><\/svg>/);   // every insert has a data-id (auto-animate)
-    expect(rest.embed).toBe('https://www.youtube.com/embed/dQw4w9WgXcQ');
+    expect(rest.embed).toBe('https://www.youtube.com/embed/dQw4w9WgXcQ?enablejsapi=1');   // the API lets the deck pause it
     expect(rest.video).toMatch(/<video src="assets\/clip.mp4" controls="" playsinline="" preload="metadata"/);
 
     // Everything survives a save with no editor residue.
@@ -174,7 +174,7 @@ test('22 insert: lists edit as a whole, tables cell by cell with Tab, code keeps
     expect(saved).toMatch(/<table data-group data-id="el-\d+" style="[^"]*"><tr><th data-edit style="[^"]*">Column 1<\/th>/);
     expect(saved).toMatch(/<pre data-group data-id="el-\d+" style="[^"]*"><code data-edit data-code>/);
     expect(saved).toContain('<video src="assets/clip.mp4" controls playsinline preload="metadata"');
-    expect(saved).toContain('src="https://www.youtube.com/embed/dQw4w9WgXcQ"');
+    expect(saved).toContain('src="https://www.youtube.com/embed/dQw4w9WgXcQ?enablejsapi=1"');
 });
 
 /* ------------------------------------------------------------
@@ -434,7 +434,7 @@ test('33 copies in flow: Alt+drag, Ctrl+D and paste of a flex-column heading lea
     const k = await scale(page);
     const c = await centre(page, 'h1');
     await drag(page, c, { x: c.x + 300 * k, y: c.y + 120 * k }, { alt: true });
-    await page.waitForTimeout(900);
+    await settle(page);
     const copies = () => page.evaluate(() => { const d = window.deckEditor.deck; return Array.from(d.doc.querySelectorAll('h1')).map(h => { const r = d.stageRect(h); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), pos: d.win.getComputedStyle(h).position }; }); });
     let hs = await copies();
     expect(hs.length).toBe(2);
@@ -450,7 +450,7 @@ test('33 copies in flow: Alt+drag, Ctrl+D and paste of a flex-column heading lea
     // Ctrl+D: the copy sits 24px down and right of the original, the original and the subtitle stay.
     await page.evaluate(() => window.deckEditor.selection.select(window.deckEditor.deck.doc.querySelector('h1')));
     await page.keyboard.press('Control+d');
-    await page.waitForTimeout(900);
+    await settle(page);
     hs = await copies();
     expect(hs[0]).toEqual({ ...h1, pos: 'static' });
     expect(hs[1]).toEqual({ x: h1.x + 24, y: h1.y + 24, w: h1.w, pos: 'absolute' });
@@ -461,7 +461,7 @@ test('33 copies in flow: Alt+drag, Ctrl+D and paste of a flex-column heading lea
     await page.keyboard.press('Control+c');
     await goTo(page, 2);
     await page.keyboard.press('Control+v');
-    await page.waitForTimeout(900);
+    await settle(page);
     const pasted = await page.evaluate(() => { const d = window.deckEditor.deck; const p = d.selection ? null : window.deckEditor.selection.primary; const r = d.stageRect(p); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), parent: p.parentElement.classList.contains('slide') }; });
     expect(pasted).toEqual({ x: h1.x, y: h1.y, w: h1.w, parent: true });
 });
@@ -620,7 +620,7 @@ test('42 text formatting: superscript, subscript, strikethrough and code from th
     const s2 = await page.evaluate(() => { const d = window.deckEditor.deck, h = d.doc.querySelector('h1'); const f = (el) => parseFloat(d.win.getComputedStyle(el).fontSize); return { ratio: f(h.querySelector('sup')) / f(h), managed: d.overridesText().includes('superscript and subscript') }; });
     expect(s2.ratio).toBeCloseTo(0.65, 2);
     expect(s2.managed).toBe(false);
-    fs.rmSync(path.join(__dirname, '.tmp-workspace', 'scripts-test'), { recursive: true, force: true });
+    fs.rmSync(path.join(WS, 'scripts-test'), { recursive: true, force: true });
 });
 
 /* ------------------------------------------------------------
@@ -1698,14 +1698,14 @@ test('63 panel and names: secondary sections fold with a summary, only fitting s
     // The Decks drawer and the title bar name a deck by its title; New writes the name in.
     const r = await page.request.post('/api/new?path=' + encodeURIComponent('quarterly-review/index.html'));
     expect((await r.json()).ok).toBe(true);
-    const made = fs.readFileSync(path.join(__dirname, '.tmp-workspace', 'quarterly-review', 'index.html'), 'utf8');
+    const made = fs.readFileSync(path.join(WS, 'quarterly-review', 'index.html'), 'utf8');
     expect(made).toContain('<title>Quarterly review</title>');
     await page.keyboard.press('Escape');
     await page.keyboard.press('Control+o');
     await expect(page.locator('#drawerList .drawer-file .name', { hasText: 'Quarterly review' })).toBeVisible();
     await expect(page.locator('#drawerList .deck-thumb.filled iframe').first()).toHaveAttribute('sandbox', 'allow-same-origin');
     await expect(page.locator('#fileName')).not.toHaveText(/index\.html/);
-    fs.rmSync(path.join(__dirname, '.tmp-workspace', 'quarterly-review'), { recursive: true, force: true });
+    fs.rmSync(path.join(WS, 'quarterly-review'), { recursive: true, force: true });
 });
 test('67 keyboard: decks open from the list, swatches and the panel\'s marks are buttons, a focused control keeps Enter, arrows and Delete', async ({ page }) => {
     await page.request.post('/api/trust?file=' + encodeURIComponent('sample/index.html') + '&on=1');
@@ -1726,7 +1726,7 @@ test('67 keyboard: decks open from the list, swatches and the panel\'s marks are
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => window.deckEditor.deck.isOpen && window.deckEditor.file === 'sample/index.html');
     await expect(page.locator('#btnInsert')).toBeEnabled();
-    await page.waitForTimeout(900);
+    await settle(page);
 
     // Swatches: buttons named for people, not CSS variables.
     const h1 = await centre(page, 'h1');

@@ -66,8 +66,8 @@ Then, by hand:
 
 - **CI.** The repository lives on GitHub (github.com/reactiveoxygenspecies/Diapo).
   `.github/workflows/tests.yml` runs on every push and pull request to `main`
-  on a Windows runner: the generated copies must be current, then
-  `npx playwright test --project=chrome` and `npm run test:py`. It does not
+  on Windows runners: the generated copies must be current, `npm run test:py`,
+  and the browser tests in three parts side by side (`--shard`). It does not
   replace `tools/release.py check`, which also checks the version and the
   known-scripts hashes (`build-known-scripts.py` needs the full history, so it
   stays out of CI); the release is still gated by that command.
