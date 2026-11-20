@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Find and replace keeps the focus where you type.** Typing a search moves
+  the view to the first match; when that took a moment (a slide change on a
+  slow computer), the focus went back to the search field at the end, so what
+  you had started typing in Replace landed in the search. It now stays in the
+  field you are in.
+
 ## 1.4.2 - 2026-11-20
 
 - **Folders with short Windows names.** Where a folder is reached by its

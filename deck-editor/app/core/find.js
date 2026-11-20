@@ -241,7 +241,7 @@ export class FindBar {
         if (!m) return;
         const tok = ++this._tok;
         this.cur = i; this.pos = m.key;
-        const field = this.el && this.el.contains(document.activeElement) ? document.activeElement : null;
+        let field = this.el && this.el.contains(document.activeElement) ? document.activeElement : null;
         const d = this.deck, sel = this.app.selection;
         if (m.slide < d.slides.length && d.current !== m.slide) {
             d.goTo(m.slide);
@@ -249,6 +249,11 @@ export class FindBar {
             await sleep(30);
             if (tok !== this._tok || !this.el) return;
         }
+        // The field to give the focus back to is the one in use now, not when the search began: while
+        // the view was moving to the match (a slide change takes a moment), the user may have gone on
+        // to the Replace field, and what they type there must stay there.
+        const now = this.el && this.el.contains(document.activeElement) ? document.activeElement : null;
+        if (now) field = now;
         const node = m.startNode;
         if (m.notes || m.hidden) sel.clear();
         else {
