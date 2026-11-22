@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.4 - 2026-11-22
 
 - **References at the foot of a slide stay clear of the footer.** They sat
   2.6% from the bottom of the slide whatever was there, so on a deck with a

@@ -275,8 +275,8 @@ def settings_change():
 SETTINGS = load_settings()
 
 # The build: bump APP_VERSION and APP_RELEASED with every release (tools/release.py does).
-APP_VERSION = "1.4.3"
-APP_RELEASED = "2026-11-20"
+APP_VERSION = "1.4.4"
+APP_RELEASED = "2026-11-22"
 
 
 # -- Checking for a new release -------------------------------------------------
