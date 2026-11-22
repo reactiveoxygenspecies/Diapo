@@ -2,7 +2,7 @@
   <img src="deck-editor/app/brand/logo.svg" alt="Diapo" width="160">
 </p>
 
-<p align="center"><b>Brilliant slides. Forever.</b><br>
+<p align="center"><b>Brilliant slides.</b><br>
 Edit HTML presentations the way you edit slides.</p>
 
 ![The Diapo editor with two decks open in tabs: the slide strip on the left, the welcome deck's cover in the middle, the slide's settings and speaker notes on the right](docs/editor-tabs.webp)
