@@ -124,6 +124,64 @@ test('citations: library, popover, typed keys, styles, foot of the slide, Source
     expect(await cites(page)).toEqual([['@szostak2001', 'Szostak et al.<sup>1</sup>'], ['[@hanczyc2003, p. 620]', '<sup>2</sup>']]);
 });
 
+test('citations: the foot of a slide stays above the footer, and keeps its place in the overview', async ({ page, context }) => {
+    test.setTimeout(120000);
+    await openDeck(page);
+    await importBib(page);
+    await editEnd(page, 'p.sub');
+    await page.keyboard.type(' [@hanczyc2003]');
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => { const ed = window.deckEditor; ed.history.attr(ed.deck.stage, 'data-cite-foot', '', 'References at the foot'); });
+    await pass(page);
+    const foot = () => page.evaluate(() => {
+        const d = window.deckEditor.deck, f = d.doc.querySelector('.slide[data-name="title"] > [data-slide-refs]');
+        const m = d.masterElements[0];
+        return { style: f.getAttribute('style'), bottom: Math.round(d.stageRect(f).y + d.stageRect(f).h), masterTop: m ? Math.round(d.stageRect(m).y) : null };
+    });
+    // No master layer: the references keep their place, 2.6% from the bottom, with no style of their own.
+    expect((await foot()).style).toBeNull();
+
+    // A footer on every slide: the references move up, clear of it.
+    await page.locator('#btnInsert').click();
+    await page.locator('[data-insert="master-footer"]').click();
+    await pass(page);
+    const over = await foot();
+    expect(over.style).toMatch(/^bottom: \d+px;$/);
+    expect(over.masterTop).not.toBeNull();
+    expect(over.bottom).toBeLessThanOrEqual(over.masterTop);
+    // A slide that hides the master layer puts them back at the bottom; showing it again lifts them.
+    await page.evaluate(() => { const ed = window.deckEditor; ed.history.attr(ed.deck.doc.querySelector('.slide[data-name="title"]'), 'data-no-master', '', 'Hide master on slide'); });
+    await pass(page);
+    expect((await foot()).style).toBeNull();
+    await page.keyboard.press('Control+z');
+    await pass(page);
+    expect((await foot()).style).toBe(over.style);
+
+    // The saved deck's overview (O): its copies of the slides are outside the stage, and the
+    // references and the Sources slide's list keep their places there.
+    await page.locator('#btnInsert').click();
+    await page.locator('[data-insert="sources"]').click();
+    await expect.poll(() => page.evaluate(() => { const s = window.deckEditor.deck.doc.querySelector('.slide[data-sources]'); return s ? s.querySelectorAll('.csl-entry').length : -1; })).toBe(1);
+    await page.evaluate(() => window.deckEditor.addRuntimeScript());
+    await save(page);
+    expect(readDeck()).toContain(':is(.deck-stage, .deck-overview) .deck-slide-refs');
+    const deck = await context.newPage();
+    await deck.goto('/deck/' + 'sample/index.html');
+    await deck.waitForSelector('.slide.active.visible');
+    await deck.waitForFunction(() => window.deckRuntime);
+    await deck.keyboard.press('o');
+    await expect(deck.locator('.deck-overview .ov-tile')).toHaveCount(4);
+    const places = await deck.evaluate(() => {
+        const tiles = Array.from(document.querySelectorAll('.deck-overview .ov-tile'));
+        const at = (tile, sel) => { const fr = tile.querySelector('.ov-frame').getBoundingClientRect(), r = tile.querySelector(sel).getBoundingClientRect(); return { top: (r.top - fr.top) / fr.height, bottom: (r.bottom - fr.top) / fr.height }; };
+        const src = tiles[3];
+        return { refs: at(tiles[0], '[data-slide-refs]'), refsPos: getComputedStyle(tiles[0].querySelector('[data-slide-refs]')).position, title: at(src, 'h1, h2'), list: at(src, '[data-sources-body]') };
+    });
+    expect(places.refsPos).toBe('absolute');
+    expect(places.refs.top).toBeGreaterThan(0.8);                  // at the foot of the slide, not over its title
+    expect(places.list.top).toBeGreaterThanOrEqual(places.title.bottom);
+});
+
 test('citations: a key the library lacks shows as typed; a DOI adds a reference; renaming a key follows the text', async ({ page }) => {
     await page.route('**/api/cite/doi?**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, item: {
         type: 'article-journal', title: 'Synthesis of activated pyrimidine ribonucleotides in prebiotically plausible conditions', DOI: '10.1038/nature08013',

@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- **References at the foot of a slide stay clear of the footer.** They sat
+  2.6% from the bottom of the slide whatever was there, so on a deck with a
+  footer or a page number (Nordic's, or one from Insert > Footer on every
+  slide) the two were written over each other. They now sit just above what
+  the master layer shows along the bottom of that slide, and go back to their
+  place on a slide that hides it.
+- **References and the Sources slide keep their places in the overview.** In
+  a saved deck, the overview (O, or Ctrl+Shift+F to find a slide) showed each
+  slide's references at the top left of its picture, over the title, and the
+  Sources slide's list over its heading: their look applied to the slides in
+  the stage only, and the overview's copies sit outside it. The look now
+  covers both; a deck gets it the next time it is saved in Diapo. Picture
+  credits beside the pictures had the same fault and the same fix.
+
 ## 1.4.3 - 2026-11-20
 
 - **Find and replace keeps the focus where you type.** Typing a search moves

@@ -60,16 +60,19 @@ export function sourcesCss(stage) {
     const any = doc.querySelector('.deck-stage .deck-slide-refs, .deck-stage .deck-sources, .deck-stage .deck-credit, .deck-stage .deck-cite-tight');
     if (!any) return '';
     const size = Math.max(8, Math.min(60, parseFloat(stage.getAttribute('data-credit-size')) || 18));
+    // The slides in the stage, and their copies in the presentation's overview (O, find a slide),
+    // which the runtime puts outside the stage.
+    const IN = ':is(.deck-stage, .deck-overview)';
     return [MARK_START,
-        '.deck-stage .deck-cite-tight { margin-left: -0.26em; }',
-        '.deck-stage .deck-slide-refs { position: absolute; left: 6%; right: 6%; bottom: 2.6%; font-size: 18px; line-height: 1.35; opacity: 0.78; z-index: 4; }',
+        `${IN} .deck-cite-tight { margin-left: -0.26em; }`,
+        `${IN} .deck-slide-refs { position: absolute; left: 6%; right: 6%; bottom: 2.6%; font-size: 18px; line-height: 1.35; opacity: 0.78; z-index: 4; }`,
         '.deck-slide-refs ol { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 48px; }',
         '.deck-slide-refs ol.one { columns: 1; }',
         '.deck-slide-refs li { break-inside: avoid; margin: 0 0 2px; }',
         '.deck-slide-refs li > sup:first-child { margin-right: 4px; }',
         '.deck-slide-refs .csl-left-margin { display: inline; margin-right: 6px; } .deck-slide-refs .csl-right-inline, .deck-slide-refs .csl-entry { display: inline; }',
         '.deck-slide-refs .deck-slide-credits { margin-top: 2px; }',
-        '.deck-stage .deck-sources { position: absolute; font-size: 24px; line-height: 1.38; overflow: hidden; }',
+        `${IN} .deck-sources { position: absolute; font-size: 24px; line-height: 1.38; overflow: hidden; }`,
         '.deck-sources.both { display: grid; grid-template-columns: 1.4fr 1fr; gap: 4%; align-content: start; }',
         '.deck-sources h3 { margin: 0 0 0.6em; font-size: 0.8em; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.7; }',
         '.deck-sources .csl-entry { margin: 0 0 0.55em; }',
@@ -79,7 +82,7 @@ export function sourcesCss(stage) {
         '.deck-sources a { color: inherit; text-decoration: none; opacity: 0.75; overflow-wrap: anywhere; }',
         '.deck-sources ul { list-style: none; margin: 0; padding: 0; } .deck-sources li { margin: 0 0 0.55em; }',
         '.deck-sources .deck-sources-none { opacity: 0.55; }',
-        `.deck-stage .deck-credit { position: absolute; z-index: 5; font-size: ${size}px; line-height: 1.25; pointer-events: auto; }`,
+        `${IN} .deck-credit { position: absolute; z-index: 5; font-size: ${size}px; line-height: 1.25; pointer-events: auto; }`,
         '.deck-credit.corner { padding: 0.25em 0.6em; border-radius: 0.3em; background: rgba(0, 0, 0, 0.55); color: #fff; white-space: nowrap; }',
         '.deck-credit.edge { transform-origin: 0 0; transform: rotate(-90deg); white-space: nowrap; opacity: 0.7; }',
         '.deck-credit.under { opacity: 0.75; }',
@@ -104,6 +107,25 @@ function boxIn(el, within) {
     }
     if (n !== within || !el.offsetWidth) return null;
     return { x: Math.round(x), y: Math.round(y), w: Math.round(el.offsetWidth), h: Math.round(el.offsetHeight) };
+}
+/* How far from the bottom of a slide (in stage px) its references must sit to stay clear of what
+   the master layer shows along the bottom (a footer, a page number, a logo), or null when nothing
+   is in their way and the default place (2.6% from the bottom, see sourcesCss) will do. A slide
+   with data-no-master shows none of it. Only elements low on the slide count: a background
+   or a header in the master layer is not in the way. */
+export function footClearance(slide, stage, masters, W, H) {
+    if (!slide || slide.hasAttribute('data-no-master')) return null;
+    let top = Infinity;
+    for (const m of masters) {
+        const b = boxIn(m, stage);
+        if (!b || !b.h) continue;
+        if (b.y < H * 0.7 || b.h > H * 0.25) continue;
+        if (b.x >= W * 0.94 || b.x + b.w <= W * 0.06) continue;      // beside the references, not under them
+        top = Math.min(top, b.y);
+    }
+    if (!isFinite(top)) return null;
+    const need = Math.round(H - top + 12);
+    return need > H * 0.026 ? need : null;
 }
 /* Set an element's HTML only when it says something else (no mutation, no thumbnail redraw, when nothing changed). */
 function setHtml(el, html) {
@@ -213,6 +235,8 @@ export class Sources extends EventTarget {
         const numbered = written && written.numbered;
         const number = new Map(written ? written.bib.ids.map((id, i) => [id, i + 1]) : []);
         const form = stage.getAttribute('data-cite-foot-form') || 'short';
+        const masters = deck.masterElements;
+        const stageW = stage.offsetWidth || deck.stageW, stageH = stage.offsetHeight || deck.stageH;
         for (const slide of slides()) {
             if (slide.hasAttribute('data-sources') || slide.hasAttribute('data-sources-more')) { slide.querySelectorAll(':scope > [data-slide-refs]').forEach(n => { n.remove(); changed = true; }); continue; }
             let html = '';
@@ -246,6 +270,9 @@ export class Sources extends EventTarget {
                 changed = true;
             }
             changed = setHtml(foot, html) || changed;
+            // Above the slide's footer and page number, when they would be under the references.
+            const lift = footClearance(slide, stage, masters, stageW, stageH);
+            changed = setAttr(foot, 'style', lift == null ? null : `bottom: ${lift}px;`) || changed;
         }
 
         // 4. Captions beside the pictures.

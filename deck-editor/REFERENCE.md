@@ -914,6 +914,12 @@ slide" is `data-cite-foot="off"` on that slide. "No citation marks in the
 text" (`data-cite-intext="hide"`) leaves the text clean and the foot says it
 all; the editor still shows a faint ❝ where each citation is. The foot is
 `<div class="deck-slide-refs" data-slide-refs>`, written by Diapo and locked.
+It sits 2.6% from the bottom of the slide, or, when the master layer shows
+something along the bottom of that slide (a footer, a page number, a logo),
+just above it, as an inline `bottom` in stage pixels. Its look (and the
+Sources slide's and the picture credits') is written for
+`:is(.deck-stage, .deck-overview)`, so the presentation's overview, whose
+copies of the slides are outside the stage, shows them in place too.
 
 **The Sources slide.** Insert > Sources slide (or the button in the slide's
 References part, or in Theme > Image credits) adds a slide at the end that
