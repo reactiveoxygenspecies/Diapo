@@ -30,6 +30,10 @@ import_pptx):
     the table style's header and banding), charts (bar / column, line,
     pie / doughnut, area, scatter drawn as inline SVG), SmartArt (from the drawing
     PowerPoint saves beside it), speaker notes, hidden slides (data-skip);
+  - equations (Office Math, written as LaTeX by omml_latex.py): a text box holding
+    display equations only as a figure[data-math], an equation in text as a
+    span[data-math], both drawn by the editor when the deck opens; one with no
+    faithful LaTeX as the picture PowerPoint keeps of it (with a note);
   - hyperlinks on text.
 
 Not carried over: effects beyond a simple shadow, 3-D, WordArt text fills,
@@ -47,6 +51,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 import zlib
 
+import omml_latex
 from import_deck import attr, build_deck, esc, section, slug
 
 NS = {
@@ -59,6 +64,8 @@ NS = {
     "dgm": "http://schemas.openxmlformats.org/drawingml/2006/diagram",
     "asvg": "http://schemas.microsoft.com/office/drawing/2016/SVG/main",
     "mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+    "a14": "http://schemas.microsoft.com/office/drawing/2010/main",
+    "m": "http://schemas.openxmlformats.org/officeDocument/2006/math",
 }
 METAFILES = (".emf", ".wmf", ".emz", ".wmz")
 # How large a part of the file may be once unpacked. A .pptx from someone else can declare
@@ -847,12 +854,11 @@ class Pptx:
         return styles, px, tags
 
     # -- text body ---------------------------------------------------------------
-    def body_html(self, sp, tx_body, ctx, kind, font_ref_colour, box_h_px, inherited_body_pr=None):
-        """(inner HTML, css for the container) for a text body."""
-        theme = ctx["theme"]
-        chain = self.text_chain(sp, ctx, kind)
+    def body_props(self, sp, tx_body, ctx):
+        """(getter of a bodyPr attribute, anchor, insets in px, font scale, line spacing
+        reduction) of a text body. bodyPr inherits too (anchor, insets, autofit) from the
+        layout / master placeholder."""
         body_pr = tx_body.find("a:bodyPr", NS)
-        # bodyPr inherits too (anchor, insets, autofit) from the layout / master placeholder
         bprs = [body_pr] if body_pr is not None else []
         for node, part in self.inherit_chain(sp, ctx)[1:]:
             bp = node.find("p:txBody/a:bodyPr", NS)
@@ -865,7 +871,6 @@ class Pptx:
                     return bp.get(attr)
             return default
 
-        anchor = bget("anchor", "t")
         ins = {k: fnum(bget(k), d) * self.k for k, d in (("lIns", 91440), ("tIns", 45720), ("rIns", 91440), ("bIns", 45720))}
         scale = 1.0
         lnsp_red = 0.0
@@ -877,6 +882,13 @@ class Pptx:
                 break
             if bp.find("a:spAutoFit", NS) is not None or bp.find("a:noAutofit", NS) is not None:
                 break
+        return bget, bget("anchor", "t"), ins, scale, lnsp_red
+
+    def body_html(self, sp, tx_body, ctx, kind, font_ref_colour, box_h_px, inherited_body_pr=None):
+        """(inner HTML, css for the container) for a text body."""
+        theme = ctx["theme"]
+        chain = self.text_chain(sp, ctx, kind)
+        bget, anchor, ins, scale, lnsp_red = self.body_props(sp, tx_body, ctx)
         wrap_none = bget("wrap") == "none"
         vert = bget("vert")
         default_px = round(18 * self.pt * scale, 1)
@@ -920,6 +932,15 @@ class Pptx:
                     runs.append(f'<span style="{"; ".join(styles)};">{html_text}</span>' if styles else html_text)
                 elif tag == "br":
                     runs.append("<br>")
+                elif self.math_of(node) is not None:
+                    # an equation in the text: the editor's own, drawn when the deck opens
+                    m = self.math_of(node)
+                    html_m, px, jc = self.math_inline(m, defaults, theme, font_ref_colour, scale, kind, default_px)
+                    has_text = True
+                    para_px = max(para_px or 0, px)
+                    runs.append(html_m)
+                    if jc:
+                        props["algn"] = {"left": "l", "right": "r"}.get(jc, "ctr")
             text = "".join(runs)
             if not has_text and not runs:
                 # an empty paragraph keeps its height (a blank line), at the end-of-paragraph size
@@ -1122,7 +1143,7 @@ class Pptx:
                     break
         g = self.transformed(g, tf)
         tx = sp.find("p:txBody", NS)
-        has_text = tx is not None and any((t.text or "").strip() for t in tx.iter(q("a:t")))
+        has_text = tx is not None and (any((t.text or "").strip() for t in tx.iter(q("a:t"))) or tx.find(".//m:t", NS) is not None)
         if from_layout and ph is not None:
             return ""                                       # a layout's placeholder is a prompt, not content
         # fill: the shape's own, else the style reference's
@@ -1139,12 +1160,18 @@ class Pptx:
             g = {"x": 0, "y": 0, "w": self.cx, "h": self.cy, "rot": 0}
         if shape == "line":
             return self.line_html(g, line, theme)
+        # a text box holding display equations only: an equation figure of the editor's own,
+        # over the shape's fill and outline if it has any
+        display = self.display_math(tx) if has_text else None
+        figure = self.math_figure(sp, tx, ctx, kind, ref_font, g, display) if display else ""
+        if figure:
+            has_text = False
         shadow = self.effect_css(sp_pr, theme)
         box = self.place(g)
         visible_fill = fill is not None
         visible_line = line is not None and not line.get("none") and line.get("color")
         if not has_text and not visible_fill and not visible_line:
-            return ""
+            return figure
         # the shape body: a box (rect / round / ellipse) or an SVG path
         body_css = ""
         svg = ""
@@ -1179,8 +1206,10 @@ class Pptx:
                 path = shape if shape not in ("custom",) else self.custom_path(sp_pr, g)
                 stroke = f' stroke="{line["color"]}" stroke-width="{css_px(max(1.0, line["w"]))}" vector-effect="non-scaling-stroke"' if visible_line else ""
                 fill_attr = self.svg_fill(fill, fkind, g) if fkind != "solid" else ("", "currentColor" if col else "none")
-                return f'<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="{st}{self.drop_shadow(shadow)}">{fill_attr[0]}<path d="{path}" fill="{fill_attr[1]}"{stroke}/></svg>'
-            return f'<div style="{box}{body_css}"></div>'
+                bare = f'<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="{st}{self.drop_shadow(shadow)}">{fill_attr[0]}<path d="{path}" fill="{fill_attr[1]}"{stroke}/></svg>'
+            else:
+                bare = f'<div style="{box}{body_css}"></div>'
+            return bare + ("\n" + figure if figure else "")
         inner, container = self.body_html(sp, tx, ctx, kind, ref_font, g["h"] * self.k)
         if svg:
             return f'<div style="{box}{body_css} isolation:isolate; {container}">\n{svg}\n{inner}\n</div>'
@@ -1571,13 +1600,127 @@ class Pptx:
             return self.shape_html(node, ctx, tf, from_layout)
         if tag == q("mc:AlternateContent"):
             # newer content (ink, equations...) with what PowerPoint saves for older readers,
-            # most often a picture of it
+            # most often a picture of it. Equations come over as the editor's own when every
+            # one in the shape converts to LaTeX; otherwise as that picture.
+            for choice in node.findall("mc:Choice", NS):
+                if not any(el.tag in (q("a14:m"), q("m:oMath")) for el in choice.iter()):
+                    continue
+                problem = self.math_problem(choice)
+                if problem is None:
+                    out = [self.node_html(child, ctx, tf, from_layout) for child in choice]
+                    return "\n".join(o for o in out if o)
+                self.notes.append(f"an equation came in as PowerPoint's picture of it, not as an equation you can edit ({problem})")
+                break
             branch = node.find("mc:Fallback", NS)
             if branch is None:
                 return ""
             out = [self.node_html(child, ctx, tf, from_layout) for child in branch]
             return "\n".join(o for o in out if o)
         return ""
+
+    # -- equations (Office Math) ---------------------------------------------------------------
+    @staticmethod
+    def math_of(node):
+        """The m:oMathPara (a display equation) or m:oMath (one in the text) a paragraph
+        holds at `node` (PowerPoint wraps it in an a14:m), or None."""
+        if node.tag == q("a14:m"):
+            for c in node:
+                if c.tag in (q("m:oMathPara"), q("m:oMath")):
+                    return c
+            return None
+        return node if node.tag in (q("m:oMathPara"), q("m:oMath")) else None
+
+    @staticmethod
+    def math_latex(m):
+        """(LaTeX, justification or None) of an equation; raises omml_latex.Unsupported."""
+        if m.tag == q("m:oMathPara"):
+            return omml_latex.para_latex(m)
+        return omml_latex.to_latex(m), None
+
+    def math_problem(self, root):
+        """What keeps an equation under `root` from converting, in a few words, or None."""
+        for para in root.iter(q("a:p")):
+            for node in para:
+                m = self.math_of(node)
+                if m is None:
+                    continue
+                try:
+                    self.math_latex(m)
+                except omml_latex.Unsupported as e:
+                    return str(e)
+        return None
+
+    @staticmethod
+    def math_rpr(m):
+        """The run properties the equation is drawn with: its first run's (colour, size)."""
+        for r in m.iter(q("m:r")):
+            rpr = r.find("a:rPr", NS)
+            if rpr is not None:
+                return rpr
+        return m.find(".//m:ctrlPr/a:rPr", NS)
+
+    def math_inline(self, m, defaults, theme, font_ref_colour, scale, kind, default_px):
+        """(HTML, size px, justification) of an equation in a paragraph: a span[data-math]
+        the editor draws when the deck opens, in the colour and size of the equation's runs.
+        A display equation sharing its text box with text is drawn in the display style."""
+        styles, px, _ = self.run_style(self.math_rpr(m), defaults, theme, font_ref_colour, scale, kind)
+        px = px or default_px
+        keep = [s for s in styles if s.startswith("color:")]
+        if px != default_px:
+            keep.insert(0, f"font-size:{css_px(px)}px")
+        try:
+            tex, jc = self.math_latex(m)
+        except omml_latex.Unsupported as e:
+            # no picture of it in the file (the shape had no fallback): its characters at least
+            self.notes.append(f"an equation came in as its plain text, not as an equation you can edit ({e})")
+            text = esc(omml_latex.plain_text(m))
+            return (f'<span style="{"; ".join(keep)};">{text}</span>' if keep else text), px, None
+        if m.tag == q("m:oMathPara"):
+            tex = "\\displaystyle " + tex
+        span = f'<span data-math="{attr(tex)}"></span>'
+        return (f'<span style="{"; ".join(keep)};">{span}</span>' if keep else span), px, jc
+
+    def display_math(self, tx):
+        """[(paragraph, m:oMathPara)] when every paragraph of a text body with something in it
+        is a display equation alone, else None."""
+        found = []
+        for para in tx.findall("a:p", NS):
+            for node in para:
+                m = self.math_of(node)
+                if m is not None:
+                    if m.tag != q("m:oMathPara"):
+                        return None
+                    found.append((para, m))
+                elif node.tag in (q("a:r"), q("a:fld")):
+                    t = node.find("a:t", NS)
+                    if t is not None and (t.text or "").strip():
+                        return None
+        return found or None
+
+    def math_figure(self, sp, tx, ctx, kind, font_ref_colour, g, display):
+        """A figure[data-math] for the display equations of a text box, at the box's text
+        origin, in the colour and size of the first equation's runs; '' when one does not
+        convert (the text box then comes in as it is)."""
+        try:
+            parts = [self.math_latex(m) for _, m in display]
+        except omml_latex.Unsupported:
+            return ""
+        tex = omml_latex.stack([t for t, _ in parts if t], parts[0][1] or "centerGroup")
+        if not tex:
+            return ""
+        _, _, ins, scale, _ = self.body_props(sp, tx, ctx)
+        para, m = display[0]
+        ppr = para.find("a:pPr", NS)
+        lvl = int(ppr.get("lvl", "0")) if ppr is not None else 0
+        _, defaults = self.resolve_para(ppr, self.text_chain(sp, ctx, kind), lvl)
+        styles, px, _ = self.run_style(self.math_rpr(m), defaults, ctx["theme"], font_ref_colour, scale, kind)
+        px = px or round(18 * self.pt * scale, 1)
+        css = (f"position:absolute; left:{css_px(g['x'] * self.k + ins['lIns'])}px; top:{css_px(g['y'] * self.k + ins['tIns'])}px;"
+               f" margin:0; font-size:{css_px(px)}px;")
+        css += "".join(f" {s};" for s in styles if s.startswith("color:"))
+        if g.get("rot"):
+            css += f" rotate:{round(g['rot'], 1):g}deg;"
+        return f'<figure data-math="{attr(tex)}" style="{css}"></figure>'
 
     def ole_html(self, frame, ctx, tf=None):
         """An embedded object (an Excel sheet, a ChemDraw drawing...) as the picture PowerPoint

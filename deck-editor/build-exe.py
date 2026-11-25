@@ -44,7 +44,7 @@ def main():
         "--name", "diapo",
         "--add-data", "app" + sep + "app",
         "--hidden-import", "tkinter", "--hidden-import", "tkinter.filedialog",   # the picker imports them at run time
-        "--hidden-import", "pptx_import", "--hidden-import", "pptx_chart", "--hidden-import", "emf_svg",
+        "--hidden-import", "pptx_import", "--hidden-import", "pptx_chart", "--hidden-import", "emf_svg", "--hidden-import", "omml_latex",
         "--hidden-import", "pptx_export", "--hidden-import", "pptx_chart_export",  # imported inside functions
         "--windowed",                     # no console: the app window is the program; output goes to ~/.deck-editor.log
     ]

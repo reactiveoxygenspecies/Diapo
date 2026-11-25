@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **Equations in a PowerPoint file come in as equations you can edit.** An
+  equation made with PowerPoint's Insert > Equation used to arrive as a
+  picture of it, or not at all. The import now writes its LaTeX, so it is
+  drawn by Diapo as any equation inserted here, and a double-click opens it
+  for editing. An equation in a text box of its own becomes an equation on the
+  slide, in its place, size and colour; one inside a sentence stays in its
+  sentence. Fractions, roots, powers and indices, sums and integrals with
+  their limits, brackets, matrices, function names, accents, braces, boxes,
+  lines of aligned equations, Greek letters and the usual symbols all come
+  over. An equation with something Diapo's equations cannot show (a surface
+  integral, a line break inside it) keeps PowerPoint's picture, and the import
+  says so.
+
 ## 1.4.4 - 2026-11-22
 
 - **References at the foot of a slide stay clear of the footer.** They sat

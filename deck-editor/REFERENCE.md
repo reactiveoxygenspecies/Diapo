@@ -186,8 +186,35 @@ file named by a Markdown file from someone else) is left out and listed.
   figures, series colours, title and options (a percent format's fractions
   as percentages, a currency sign as the unit). PowerPoint's drawing stays
   until the chart is changed; the editor then draws it from the figures.
-  SmartArt comes over as the shapes PowerPoint saves beside it. Speaker
-  notes, hyperlinks and hidden slides (`data-skip`) are kept. Not carried
+  SmartArt comes over as the shapes PowerPoint saves beside it. Equations
+  (PowerPoint's Insert > Equation) come over as the editor's own, their
+  LaTeX written from the file's Office Math (`omml_latex.py`): a text box
+  holding only a display equation becomes an equation figure
+  (`figure[data-math]`) at the box's place, in the size and colour of its
+  runs; an equation inside a sentence, or a display one sharing its box with
+  text, becomes an equation in the text (`span[data-math]`, the display one in
+  the display style, its paragraph aligned as the equation was). Both are drawn
+  by MathJax when the deck opens, then edited like any other (Equations and
+  chemical structures). Covered: letters in their styles (italic, upright, bold,
+  script, double-struck, fraktur, sans-serif, monospace, the Unicode maths
+  letters PowerPoint stores), normal text, Greek, operators, relations and
+  arrows, fractions (stacked, skewed, linear, without a bar), sub- and
+  superscripts and prescripts, roots, sums, products, integrals and the other
+  big operators with their limits above and below or beside, brackets of every
+  usual kind (with separators, one side empty, or a fixed size), function names
+  (`\sin`, `\lim` with its limit under it, any other as an operator name),
+  accents, bars, braces over and under with their labels, arrows with text over
+  them, boxes (a full border as `\boxed`, a struck-out term as `\cancel`, other
+  borders with MathJax's `\enclose`), matrices (in parentheses, brackets or bars
+  as `pmatrix`, `bmatrix`, `vmatrix`; columns aligned left or right as an
+  `array`), equation arrays (`aligned` on their alignment points, else
+  `gathered`), several lines in one display equation, phantoms and smashes.
+  What has no faithful LaTeX (a surface or volume integral, a line break inside
+  an equation, a lowercase script letter, a symbol with no TeX command) keeps
+  the picture PowerPoint saves of the equation, with a note saying so; an
+  equation the file has no picture of then comes over as its plain text.
+  Equations made with the old Equation Editor 3.0 (embedded objects) stay
+  pictures. Speaker notes, hyperlinks and hidden slides (`data-skip`) are kept. Not carried
   over: effects beyond a simple shadow, 3-D, WordArt fills, animations and
   transitions, video and audio (the poster picture stays), embedded objects
   and radar, bubble or surface charts (a note says so).
@@ -1631,6 +1658,7 @@ deck-editor/
   import_deck.py      Markdown -> deck, the deck builder, the .pptx dispatch (used by serve.py)
   pptx_import.py      PowerPoint -> deck: theme, masters and layouts, text inheritance, shapes, pictures, tables, SmartArt
   pptx_chart.py       PowerPoint charts -> inline SVG
+  omml_latex.py       PowerPoint equations (Office Math) -> LaTeX, for pptx_import.py
   start-diapo.sh, Start Diapo.command   Linux / macOS launchers
   build-exe.py        PyInstaller build of a single-file executable
       font-catalog.js popular Google families with their weights
@@ -1665,7 +1693,8 @@ npm run test:serial    (the same, one test at a time)
 npm run test:firefox   (the same specs in Firefox; once before:
                         npx playwright install firefox)
 npm run test:py        (the Python tests: pptx_chart.py, pptx_import.py, emf_svg.py,
-                        which files a Markdown import may copy, the
+                        omml_latex.py (every equation construct of
+                        tests/fixtures/import/make_math_pptx.py), which files a Markdown import may copy, the
                         settings file written whole or not at all, the update check
                         (version comparison and stubbed GitHub answers), which
                         script files beside a deck count as Diapo's own, and the
