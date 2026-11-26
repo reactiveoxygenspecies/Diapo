@@ -7,6 +7,10 @@
      from screen pixels into stage pixels through the canvas zoom,
      the first file is centred on it and the next ones step down
      and right from it. One undo step.
+   - A chemical structure file (.mol, .sdf, .cdxml) dropped on the
+     canvas becomes a structure where it was dropped (chem.js): read
+     in the browser and kept in the figure, nothing uploaded. A
+     binary ChemDraw .cdx gets a toast asking for CDXML.
    - A PowerPoint (.pptx) or Markdown (.md) file dropped anywhere in
      the window is offered as a new deck (the host does the asking
      and the import, as the Decks drawer's Import does).
@@ -25,6 +29,7 @@
    ============================================================ */
 
 import { creditFromUrl, siteName } from './credits.js';
+import { CHEM_EXT } from './chemfile.js';
 
 /* What the server's /api/upload takes (UPLOAD_EXT in serve.py; tests/test_upload_ext.py keeps the
    two in step), and what /api/import turns into a deck. */
@@ -36,11 +41,12 @@ const extOf = (name) => { const m = /\.([^.\\/]+)$/.exec(name || ''); return m ?
 
 /* Dropped files sorted by what can be done with them. */
 export function sortFiles(files) {
-    const out = { media: [], decks: [], refused: [] };
+    const out = { media: [], decks: [], chem: [], refused: [] };
     for (const f of files) {
         const ext = extOf(f.name);
         if (MEDIA_EXT.includes(ext)) out.media.push(f);
         else if (DECK_EXT.includes(ext)) out.decks.push(f);
+        else if (CHEM_EXT[ext]) out.chem.push(f);
         else out.refused.push(f);
     }
     return out;
@@ -145,11 +151,12 @@ export class FileDrop {
         e.preventDefault();
         e.stopPropagation();
         this._show(null);
-        const { media, decks, refused } = sortFiles(Array.from(e.dataTransfer.files || []));
+        const { media, decks, chem, refused } = sortFiles(Array.from(e.dataTransfer.files || []));
         const source = dragSource(e.dataTransfer);
         const where = this._where(e, inDeck);
         const toast = this.host.toast;
-        const refusedNote = refused.length ? `Not added: ${refused.map(f => f.name).join(', ')} (a slide takes pictures, video and sound; a PowerPoint or Markdown file becomes a new deck)` : '';
+        const cdx = refused.some(f => extOf(f.name) === 'cdx') ? '; a ChemDraw .cdx needs saving as CDXML (.cdxml) first' : '';
+        const refusedNote = refused.length ? `Not added: ${refused.map(f => f.name).join(', ')} (a slide takes pictures, video, sound and structure files (.mol, .sdf, .cdxml); a PowerPoint or Markdown file becomes a new deck${cdx})` : '';
         const ready = () => {
             if (!this.deck.isOpen) toast('Open a deck first, then drop pictures, video or sound on a slide.', { ms: 4000 });
             else if (this.app.preview) toast('Leave the preview (Esc) to add files to a slide.', { ms: 4000 });
@@ -157,8 +164,11 @@ export class FileDrop {
             else return true;
             return false;
         };
+        if (chem.length && ready()) await this.addStructures(chem, where.point, media.length ? '' : refusedNote);
         if (media.length) {
             if (ready()) await this.addToSlide(media, where.point, refusedNote, media.length === 1 ? source.url : '');
+        } else if (chem.length) {
+            /* said with the structures */
         } else if (!e.dataTransfer.files.length && source.image) {
             // A picture dragged from a page with no file attached: inserted from its address, credited to it.
             if (ready()) this.addFromUrl(source.image, where.point);
@@ -181,6 +191,22 @@ export class FileDrop {
         } catch (err) {
             toast('Could not add the files: ' + err.message + (note ? ' | ' + note : ''), { error: true, ms: 6000 });
         }
+    }
+
+    /* Structure files as structures, the first centred on the point and the next ones stepping
+       down and right from it; each one its own undo step. */
+    async addStructures(files, point, note = '') {
+        const toast = this.host.toast;
+        if (this.app.textEdit && this.app.textEdit.active) this.app.textEdit.commit();
+        let n = 0;
+        const failed = [];
+        for (const f of files) {
+            const at = point ? { x: point.x + 40 * n, y: point.y + 40 * n } : null;
+            try { if (await this.app.insert.structureFromFile(f, { at })) n++; }
+            catch (err) { failed.push(`${f.name}: ${err.message}`); }
+        }
+        if (failed.length) toast('Could not draw ' + failed.join('; ') + (note ? ' | ' + note : ''), { error: true, ms: 7000 });
+        else toast((n === 1 ? 'Structure added' : `${n} structures added`) + ' to the slide; its file is in the Structure section of the panel' + (note ? ' | ' + note : ''), { ms: note ? 6000 : 3000 });
     }
 
     /* A picture from a page, by its address (as Insert > Image from URL), with its credit filled in. */

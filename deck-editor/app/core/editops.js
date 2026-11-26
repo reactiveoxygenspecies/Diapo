@@ -7,8 +7,9 @@
    memory too. A paste comes in through the browser's own paste
    event (which carries the data without any permission prompt):
    our markup is re-inserted on the current slide; image files from
-   the clipboard are uploaded and inserted; other text becomes a
-   text box. Pasting onto the slide the copy came from offsets the
+   the clipboard are uploaded and inserted; a Molfile, an SDF or a
+   CDXML (as text, or a .mol / .sdf / .cdxml file) becomes a chemical
+   structure (chem.js); other text becomes a text box. Pasting onto the slide the copy came from offsets the
    copies a little so they do not hide the originals.
 
    Layer order works with z-index among siblings: front / back go
@@ -20,6 +21,7 @@
    ============================================================ */
 import { getOffset, setOffset, afterResize } from './transform.js';
 import { css, isMaster, MASTER_SELECTOR, ensureUniqueIds, isShape } from './dom.js';
+import { CHEM_EXT, sniff } from './chemfile.js';
 
 const MARK = 'data-deck-editor-clip';
 /* The look copy style carries (the properties the panel's Colour, Text and Box sections set). */
@@ -178,7 +180,16 @@ export class EditOps {
             // Not ours: images from the clipboard become uploads, a URL an image or embed, text a text box.
             const files = data ? Array.from(data.files || []).filter(f => /^(image|video)\//.test(f.type)) : [];
             if (files.length) { this.app.insert.upload(files).then(r => this.app.toast(`${r.files.length} file(s) pasted into assets/`)).catch(err => this.app.toast('Paste failed: ' + err.message, { error: true })); return true; }
-            const text = data ? (data.getData('text/plain') || '').trim() : '';
+            // A structure: a file copied in the file manager, or a Molfile / CDXML as text (a chemistry program's export).
+            const chem = data ? Array.from(data.files || []).find(f => CHEM_EXT[(/\.([^.]+)$/.exec(f.name || '') || [])[1]?.toLowerCase()]) : null;
+            const raw = data ? data.getData('text/plain') || '' : '';
+            const kind = chem ? 'file' : sniff(raw);
+            if (kind !== 'smiles') {
+                const done = chem ? this.app.insert.structureFromFile(chem) : this.app.insert.structure(raw, { format: kind });
+                done.catch(err => this.app.toast('Could not draw the structure: ' + err.message, { error: true, ms: 6000 }));
+                return true;
+            }
+            const text = raw.trim();
             if (text) {
                 if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|avif)(\?\S*)?$/i.test(text)) this.app.insert.image(text);
                 else if (/^https?:\/\/\S+$/i.test(text) && /youtube\.com|youtu\.be|vimeo\.com/i.test(text)) this.app.insert.embed(text);

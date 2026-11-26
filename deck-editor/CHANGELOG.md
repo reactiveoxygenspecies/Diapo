@@ -31,6 +31,23 @@
   are using (Firefox: Save to PDF, Margins None, Print backgrounds on;
   Chrome and Edge: Save as PDF, Margins None, Background graphics on;
   Safari: Print backgrounds, and Save as PDF from the PDF menu).
+- **Chemical structures from Molfile, SDF and ChemDraw CDXML files.** Paste a
+  Molfile (V2000 or V3000), an SDF or ChemDraw's CDXML into the Structure
+  field or onto the slide, drop a `.mol`, `.sdf` or `.cdxml` file on the
+  slide, or use Insert > Chemical structure from file... The structure is
+  drawn from the file's own 2D coordinates, so it keeps the chemist's
+  layout, in the same style as a SMILES: wedge and hashed bonds, atom labels
+  with their hydrogens, charges and isotopes, atom colours or one colour,
+  aromatic rings with alternating double bonds or circles. A CDXML page may
+  hold several molecules; abbreviations such as OMe or Boc are drawn as their
+  label, and reaction arrows and captions are drawn too. The panel shows the
+  file in a box of its own, with the molecular formula and a SMILES; editing
+  it redraws the structure, one undo step. The file is kept in the deck with
+  the drawing, so it can be edited again after saving, and goes to
+  PowerPoint as a picture like any other structure. A file with no 2D
+  coordinates is laid out from its SMILES, and one that does not read is
+  listed under Problems. A binary ChemDraw `.cdx` needs saving as CDXML
+  first.
 
 ## 1.4.4 - 2026-11-22
 

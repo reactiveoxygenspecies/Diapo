@@ -9,7 +9,7 @@ import { api } from './core/api.js';
 import { fitText } from './core/transform.js';
 import { refreshCharts } from './core/chart.js';
 import { refreshMath } from './core/math.js';
-import { refreshChem, uprightLabels } from './core/chem.js';
+import { refreshChem, uprightLabels, chemLabel } from './core/chem.js';
 import { PLOT, refreshPlots, openPlotDialog, ensureDeckPlots } from './core/plot.js';
 import { LAYOUTS } from './core/layouts.js';
 import { Cropper, canCrop, cropBoxOf } from './core/crop.js';
@@ -176,7 +176,7 @@ window.addEventListener('editor:open', async () => {
     if (app.deck.doc !== doc) return;
     for (const b of bad) {
         const math = b.el.hasAttribute('data-math');
-        app.problems.add({ kind: 'drawn', what: math ? 'equation' : 'structure', message: b.message, url: b.el.getAttribute(math ? 'data-math' : 'data-chem'), el: b.el });
+        app.problems.add({ kind: 'drawn', what: math ? 'equation' : 'structure', message: b.message, url: math ? b.el.getAttribute('data-math') : chemLabel(b.el), el: b.el });
     }
     uprightLabels(app.deck.currentSlide);
     app.selection.refresh();
@@ -1753,6 +1753,7 @@ function paletteEntries() {
         out.push({ group: 'Insert', label: 'Sources slide', keywords: 'references bibliography credits picture image attribution', run: () => addSourcesSlide(app) });
         out.push({ group: 'Insert', label: 'Interactive chart (Plotly)...', keywords: 'plot plotly json figure graph live hover zoom', run: click('[data-insert="plot"]') });
         out.push({ group: 'Insert', label: 'Chemical structure', keywords: 'chemistry molecule smiles compound', run: click('[data-insert="structure"]') });
+        out.push({ group: 'Insert', label: 'Chemical structure from file...', keywords: 'chemistry molecule molfile mol sdf cdxml chemdraw compound', run: click('[data-insert="structure-file"]') });
         out.push({ group: 'Insert', label: 'Font Awesome icon...', keywords: 'icons fa', run: (q) => { app.iconPicker.open($('btnInsert')); const words = q.replace(/\b(font awesome|icon|icons|fa)\b/gi, '').trim(); if (words && app.iconPicker.search) { app.iconPicker.search.value = words; app.iconPicker.search.dispatchEvent(new Event('input')); } } });
         out.push(...iconEntries(app));
         if (has) {
@@ -1868,6 +1869,7 @@ $('insertMenu').addEventListener('click', async (e) => {
         case 'code': app.insert.code(); break;
         case 'equation': drawnInsert(() => app.insert.equation(), 'equation'); break;
         case 'structure': drawnInsert(() => app.insert.structure(), 'structure'); break;
+        case 'structure-file': $('insertChem').click(); break;
         case 'plot': openPlotDialog(app); break;
         case 'master-footer': app.insert.masterFooter(); break;
         case 'image': chooseImage(null); break;
@@ -1910,6 +1912,10 @@ $('insertFile').addEventListener('change', async () => {
         toast(r.files.length + ' image(s) uploaded to assets/' + (r.refused.length ? ' | not an image: ' + r.refused.join(', ') : ''), { ms: r.refused.length ? 5000 : 2600 });
     }
     catch (err) { toast('Upload failed: ' + err.message, { error: true }); }
+});
+$('insertChem').addEventListener('change', () => {
+    const file = $('insertChem').files[0]; $('insertChem').value = '';
+    if (file) drawnInsert(() => app.insert.structureFromFile(file), 'structure');
 });
 $('insertVideo').addEventListener('change', async () => {
     const files = Array.from($('insertVideo').files); $('insertVideo').value = '';

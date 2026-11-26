@@ -396,7 +396,14 @@ def outline_blocks(node, deck_dir, out):
             out.append({"type": "equation", "tex": a["data-math"]})
             continue
         if "data-chem" in a:
-            out.append({"type": "structure", "source": a["data-chem"]})
+            item = {"type": "structure", "source": a["data-chem"]}
+            if a.get("data-chem-format"):
+                # A Molfile or CDXML kept in the figure (chem.js): its kind, and its text in a data block.
+                item["format"] = a["data-chem-format"]
+                holder = first(k for k in c.elements() if k.tag == "script" and "data-chem-source" in k.attrs)
+                if holder:
+                    item["source"] = "".join(k for k in holder.children if isinstance(k, str)).strip("\n")
+            out.append(item)
             continue
         if "data-plot" in a:
             item = {"type": "plotly-figure" if a.get("data-plot") == "plotly" else "plot", "library": a.get("data-plot") or ""}

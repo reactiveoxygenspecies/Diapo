@@ -271,7 +271,7 @@ export function describe(el) {
         : el.hasAttribute('data-group') ? 'group'
         : isTextLike(el) || (el.hasAttribute('data-edit') && hasOwnText(el)) ? 'text' : 'box';
     const text = el.hasAttribute('data-math') ? el.getAttribute('data-math').slice(0, 70)
-        : el.hasAttribute('data-chem') ? el.getAttribute('data-chem').slice(0, 70)
+        : el.hasAttribute('data-chem') ? (el.getAttribute('data-chem') || (el.querySelector(':scope > svg[aria-label]') || el).getAttribute('aria-label') || '').slice(0, 70)
         : el.hasAttribute('data-plot') ? ((el.querySelector('[data-plot-snapshot]') || el).getAttribute('alt') || '').slice(0, 70)
         : el.dataset.fig || el.hasAttribute('data-chart') ? '' : readableText(el).slice(0, 70);
     const name = (el.getAttribute('data-name') || '').trim();

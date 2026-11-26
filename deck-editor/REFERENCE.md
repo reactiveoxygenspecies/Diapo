@@ -492,7 +492,10 @@ Optional hooks, used when present and tolerated when absent:
 - `figure[data-math]` (LaTeX) and `figure[data-chem]` (SMILES) are an equation and a
   chemical structure the editor drew (see Equations and chemical structures): the
   source in the attribute and one drawn `<svg>` inside. Selected as a whole; a
-  figure with the attribute alone is drawn when the deck opens.
+  figure with the attribute alone is drawn when the deck opens. A structure from
+  a file has `data-chem=""`, `data-chem-format="molfile"` or `"cdxml"`, and the
+  file after its drawing in `<script type="chemical/x-mdl-molfile" data-chem-source>`
+  (`chemical/x-cdxml` for CDXML), a data block the browser never runs.
 - `figure[data-plot="plotly"]` is an interactive chart (see Interactive charts): the
   figure as JSON in `<script type="application/json" data-plot-figure>` and a picture
   of it in `<img data-plot-snapshot>`. Selected as a whole; the editor keeps the
@@ -626,7 +629,9 @@ selected. A picture is 640 px wide (narrower when tall, to fit the slide's
 height); a sound becomes an `<audio controls>` player. An overlay says what a
 drop will do while files are held over the window. A PowerPoint (.pptx) or
 Markdown (.md) file dropped anywhere is offered as a new deck (the drawer's
-Import, the file uploaded), which opens in a tab of its own. Other files are
+Import, the file uploaded), which opens in a tab of its own. A structure file
+(.mol, .sdf, .cdxml) becomes a chemical structure where it was dropped (see
+Equations and chemical structures). Other files are
 refused with a note saying what can be dropped; with no deck open, a picture
 only brings a hint. A file dropped where nothing takes it is never opened by
 the browser in place of the editor.
@@ -882,6 +887,45 @@ bonds and carbon take the text colour, atom labels the text font (the deck's, or
 Font field's). The structure scales into its box. Rotated,
 its bonds turn and its atom labels stay level (each label is turned back about its
 own centre, kept in the file as `data-upright` on the drawing).
+
+**Structures from files.** A Molfile (V2000 or V3000), an SDF (its first record;
+the others and its data items are kept in the file but not drawn) or ChemDraw's
+CDXML (the XML format; save a binary `.cdx` as CDXML first) becomes a structure
+drawn from the file's own 2D coordinates, so the chemist's layout is kept. Paste
+one into the Structure field (it takes the SMILES's place at once, one undo step)
+or onto the slide (Ctrl+V with nothing being edited), drop a `.mol`, `.mdl`,
+`.sdf`, `.sd` or `.cdxml` file on the slide (it lands where it was dropped), or use
+Insert > Chemical structure from file... (Ctrl+K: "molfile", "cdxml"). Nothing is
+uploaded: the file goes into the figure. The panel then shows the file in a box of
+its own (drawn as you type; Ctrl+Enter or leaving the box is one undo step; a
+SMILES typed there makes it a SMILES structure again), the molecular formula and
+a SMILES without stereo. It is drawn as SmilesDrawer draws a SMILES, with its
+numbers: the file's median bond scaled to SmilesDrawer's length, the same bond
+width, double and triple bond spacing (the second line of a ring bond inside the
+ring, of a chain bond on the side of its substituents, a bond to a chain end
+centred), wedges (solid and hollow), hashed wedges, wavy, bold and dashed bonds,
+atom labels with implicit hydrogens, charges, isotopes and radicals (carbon
+unlabelled unless charged, labelled or alone), atom colours with bonds fading into
+them, or one colour; Atom colours and Aromatic rings as circles work as for a
+SMILES (a ring is aromatic when its bonds are given as aromatic, or six atoms with
+alternating double bonds; aromatic bonds are given their Kekulé form). Implicit
+hydrogens follow the usual valences unless the file says (a V2000 valence, V3000
+`VAL=`, CDXML `NumHydrogens`). Molfile charges, isotopes and radicals are read
+from the atom block and the `M  CHG`, `M  ISO`, `M  RAD` lines; atom aliases
+(`A` lines) are drawn as their text. In CDXML every fragment on the page is drawn,
+so a page with several molecules is one figure; an abbreviation node (OMe, Ph,
+Boc, an R group) is drawn as its label where ChemDraw put it, and for the formula
+and the SMILES it is expanded from the atoms ChemDraw keeps inside it, else from a
+short table of common groups (an R group or an unknown label leaves the formula
+unknown). Reaction arrows (full and half heads, equilibrium arrows) and text
+captions on the page are drawn; other graphics (brackets, shapes, curves, orbitals)
+are left out. Not read: query features (atom lists, query bond types are drawn as
+single bonds), Sgroups (an abbreviation a Molfile keeps as a superatom group is
+drawn expanded), stereo flags beyond the bond display, reactions (RXN). A file
+whose atoms have no 2D coordinates (all at one point, or in 3D) is laid out by
+SmilesDrawer from its SMILES, without stereo, and the panel says so. A file that
+does not read keeps the last drawing that worked, says what is wrong, and is
+listed under Problems when the deck opens.
 
 **Maths inside a sentence** ("the rate constant k_obs rises with...") is an
 equation in the text itself. While editing text, **Alt+=** (Word's key), the ∑
@@ -1687,7 +1731,7 @@ deck-editor/
       slides.js       slide strip, thumbnails, slide operations
       insert.js       new elements
       placement.js    where a new element lands (centre, freest grid spot, cascade)
-      filedrop.js     files dragged in from the computer (pictures, video, sound, decks to import), and pictures from a page
+      filedrop.js     files dragged in from the computer (pictures, video, sound, structure files, decks to import), and pictures from a page
       cite.js         citations: the deck's library, Pandoc's citation syntax, the CSL styles, writing them (citeproc)
       citepop.js      a citation in a text: the popover (Alt+[) and the list under a typed [@
       citelib.js      the deck's references in a dialog: import, DOI, keys, the style
@@ -1757,7 +1801,9 @@ npm run test:py        (the Python tests: pptx_chart.py, pptx_import.py, emf_svg
 ```
 
 Citations and picture credits have `tests/citations.spec.js` (the DOI and Commons
-answers are stubbed there too, so it needs no network).
+answers are stubbed there too, so it needs no network). Structures from Molfile,
+SDF and CDXML files have `tests/chem-files.spec.js`, with its files in
+`tests/fixtures/chem/`.
 
 The tests start `serve.py` on a throw-away workspace made from
 `tests/fixtures/sample-deck`, a small deck that exercises every hook of the

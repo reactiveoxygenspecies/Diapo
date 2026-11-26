@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE CDXML SYSTEM "http://www.cambridgesoft.com/xml/cdxml.dtd" >
+<CDXML CreationProgram="Diapo test fixture" BondLength="14.4" LabelFont="3" LabelSize="10" CaptionFont="3" CaptionSize="10">
+<fonttable><font id="3" charset="iso-8859-1" name="Arial"/></fonttable>
+<page id="1" BoundingBox="0 0 540 720">
+<fragment id="2">
+<n id="10" p="200 135.6"/>
+<n id="11" p="212.47 142.8"/>
+<n id="12" p="212.47 157.2"/>
+<n id="13" p="200 164.4"/>
+<n id="14" p="187.53 157.2"/>
+<n id="15" p="187.53 142.8"/>
+<n id="20" p="200 121.2" NodeType="Fragment">
+<fragment id="21">
+<n id="22" p="200 121.2" Element="8"/>
+<n id="23" p="212.47 114"/>
+<n id="24" p="200 135.6" NodeType="ExternalConnectionPoint"/>
+<b id="25" B="24" E="22"/>
+<b id="26" B="22" E="23"/>
+</fragment>
+<t p="196.1 124.7" LabelJustification="Left"><s font="3" size="10" face="96">OMe</s></t>
+</n>
+<n id="30" p="200 178.8"/>
+<n id="31" p="212.47 186"/>
+<n id="32" p="187.53 186" Element="8" NumHydrogens="1"><t p="191.4 189.5" Justification="Right" LabelJustification="Right"><s font="3" size="10" face="96">HO</s></t></n>
+<b id="40" B="10" E="11" Order="2"/>
+<b id="41" B="11" E="12"/>
+<b id="42" B="12" E="13" Order="2"/>
+<b id="43" B="13" E="14"/>
+<b id="44" B="14" E="15" Order="2"/>
+<b id="45" B="15" E="10"/>
+<b id="46" B="10" E="20"/>
+<b id="47" B="13" E="30"/>
+<b id="48" B="30" E="31" Display="WedgeBegin"/>
+<b id="49" B="30" E="32" Display="WedgedHashBegin"/>
+</fragment>
+<graphic id="60" SupersededBy="61" BoundingBox="290 150 240 150" GraphicType="Line" ArrowType="FullHead"/>
+<arrow id="61" Head3D="290 150 0" Tail3D="240 150 0" ArrowheadHead="Full" ArrowheadType="Solid"/>
+<t id="62" p="252 143" Justification="Left"><s font="3" size="10" face="0">H</s><s font="3" size="10" face="32">2</s><s font="3" size="10" face="0">, Pd/C</s></t>
+</page>
+</CDXML>

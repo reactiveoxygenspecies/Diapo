@@ -19,7 +19,8 @@ import { getOffset, setOffset } from './transform.js';
 import { imagePlaceholder } from './layouts.js';
 import { sampleChart, deckPalette, writeChart } from './chart.js';
 import { texToSvg, lastMathFont } from './math.js';
-import { smilesToSvg } from './chem.js';
+import { structureToSvg, chemHtml } from './chem.js';
+import { CHEM_EXT, sniff } from './chemfile.js';
 import { createLine, KINDS } from './lines.js';
 import { choosePlace, centreOn, obstaclesOn } from './placement.js';
 
@@ -329,21 +330,39 @@ export class Inserter {
     }
 
     /* A chemical structure (see chem.js): a figure with the SMILES and its drawing, scaled into
-       its box. SmilesDrawer loads on the first one. */
-    async structure(smiles = 'CC(=O)Oc1ccccc1C(=O)O') {
+       its box. SmilesDrawer loads on the first one. A Molfile, an SDF or a CDXML (format) is drawn
+       from its own coordinates, the file kept in the figure; its box takes the drawing's
+       proportions. `at` centres it on a point (a drop). */
+    async structure(source = 'CC(=O)Oc1ccccc1C(=O)O', { format = 'smiles', at = null } = {}) {
         const d = this.defaults(), doc = this.deck.doc;
-        const { svg } = await smilesToSvg(smiles);
+        const r = await structureToSvg(source, format);
         if (!this.deck.currentSlide) return null;
         const fig = doc.createElement('figure');
-        fig.setAttribute('data-chem', smiles);
-        this.place(fig, 520, 400);
+        fig.setAttribute('data-chem', format === 'smiles' ? source : '');
+        if (format !== 'smiles') fig.setAttribute('data-chem-format', format);
+        let w = 520, h = 400;
+        if (r.box && r.box.w > 0 && r.box.h > 0) {
+            // About the size SmilesDrawer's drawings get for a molecule of that size, kept on the slide.
+            const k = Math.min(3.2, 1200 / r.box.w, 760 / r.box.h);
+            w = Math.max(160, Math.round(r.box.w * k)); h = Math.max(120, Math.round(r.box.h * k));
+        }
+        this.place(fig, w, h, { at });
         fig.style.cssText += `margin:0; color:${d.color};`;
-        fig.innerHTML = svg;
+        fig.innerHTML = chemHtml(r.svg, format, source);
         this.history.begin('Insert structure');
         this.add(fig, 'Insert structure');
         this.history.end();
         this.selection.select(fig);
         return fig;
+    }
+
+    /* A structure from a .mol, .sdf or .cdxml file (read here; nothing is uploaded: the file goes into the figure). */
+    async structureFromFile(file, { at = null } = {}) {
+        const m = /\.([^.\/]+)$/.exec(file.name || ''), ext = m ? m[1].toLowerCase() : '';
+        if (!CHEM_EXT[ext]) throw new Error(`${file.name} is not a Molfile, SDF or CDXML file`);
+        const text = await file.text();
+        const kind = sniff(text);
+        return this.structure(text, { format: kind === 'smiles' ? CHEM_EXT[ext] : kind, at });
     }
 
     code(sample ='def greet(name):\n    # say hello\n    return f"Hello, {name}!"\n\nprint(greet("world"))') {
