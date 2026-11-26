@@ -20,6 +20,7 @@
 import { deckRevealClasses } from './animate.js';
 import { Inspector } from './inspector.js';
 import { PptxCollector } from './pptx.js';
+import { askPrint, printGuide } from './printguide.js';
 
 const PRINT_ID = 'deck-editor-print';
 
@@ -178,8 +179,10 @@ ${revealSel} { opacity: 1 !important; visibility: visible !important; filter: no
             } catch (err) {
                 if (!(err.data && err.data.reason === 'no-chrome')) throw err;
                 this.app.status('');
-                this.app.toast('No Chrome or Edge found: the print dialog opens instead. Choose "Save as PDF" there.', { ms: 6000 });
-                await this.printDialog();
+                // Say which options to pick in this browser's print dialog, then open it.
+                if (!(await askPrint(printGuide(navigator.userAgent)))) return { cancelled: true };
+                this.app.status('Opening the print dialog...', { busy: true });
+                try { await this.printDialog(); } finally { this.app.status(''); }
                 return { printed: true };
             }
             this.app.status('');

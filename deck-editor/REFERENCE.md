@@ -20,7 +20,8 @@ presentations; this file is the reference.
 You need Python 3.8 or newer. Chrome or Edge is recommended: Diapo uses it for
 its own window and to print PDFs, and without it Diapo runs in a tab of the
 default browser (Firefox included) and PDFs go through the browser's print
-dialog. Nothing else is installed.
+dialog. You can also choose the default browser on purpose (see below).
+Nothing else is installed.
 
 - **Windows**: double-click `Start Diapo.bat`.
 - **macOS**: double-click `Start Diapo.command` (the first time, right-click >
@@ -31,8 +32,9 @@ Diapo opens in its own window: Chrome or Edge in app mode, with no tabs or
 address bar, a profile of its own (`~/.deck-editor-window-<port>`, so it never
 mixes with your browsing and remembers the window size) and the mark as its
 icon. Closing the window quits Diapo (on macOS, where Chrome stays open after
-its last window, Cmd+Q does). Without Chrome or Edge it opens a tab in the
-default browser instead and runs until Ctrl+C. Each launcher reopens the folder
+its last window, Cmd+Q does). Without Chrome or Edge, or when **About Diapo >
+Open Diapo in** says **my default browser**, it opens a tab in the default
+browser instead; see "Stopping Diapo" below. Each launcher reopens the folder
 you used last time (the first time: `workspace/`, next to `deck-editor`); drop or
 pass a folder to start with that one. Or from a terminal:
 
@@ -65,10 +67,50 @@ default name. Setting `DECK_EDITOR_NO_DIALOG=1` forces that behaviour.
 - If the port is already Diapo's (a second double-click), a window on the
   running one is opened and nothing else starts; if another program has it,
   the next free port is used.
-- `--tab` opens a normal browser tab instead of the app window (and the server
-  then runs until Ctrl+C); `--no-open` opens nothing; `--settings` uses another settings file
+- `--tab` opens a normal browser tab instead of the app window, whatever the
+  "Open Diapo in" setting says (the server then stops when the last tab closes,
+  or on Ctrl+C); `--no-open` opens nothing and never stops by itself (the tests
+  and the MCP server start it so); `--settings` uses another settings file
   (the tests do this so they never touch yours). `--backups N` sets how many
   previous versions are kept per deck (default 10; remembered in the settings).
+
+### Where Diapo opens, and stopping it
+
+**About Diapo > Open Diapo in** chooses between **its own window (Edge /
+Chrome)**, the default, and **my default browser**. It is the `open_in` entry of
+the settings file (`"window"` or `"browser"`; anything else counts as
+`"window"`), set by `POST /api/open-settings?in=window|browser`, read by
+`/api/status` (`open_in`, and `has_chrome`: whether an Edge or Chrome was
+found), and applies the next time Diapo starts. `--tab` wins over it, and with
+"own window" chosen but no Chrome or Edge on the computer Diapo opens in the
+default browser, as it always did.
+
+**Stopping Diapo** (`QuitWatch` in `serve.py`). An app window stops the server
+when its browser process exits. In a browser tab (the setting, `--tab`, or no
+Chrome / Edge) there is no such window, so every Diapo page (the editor and the
+presenter view) calls `POST /api/heartbeat?id=<page>` every 5 seconds, and
+sends `bye=1` with `navigator.sendBeacon` from `pagehide`. Each page has a
+deadline at its last call plus 3 minutes, long enough for a hidden tab, whose
+timers a browser may run only once a minute; a page that says goodbye has its
+deadline cut to 15 seconds from then, which a reload or a link to another Diapo
+page beats with its first call. The server stops when no page has a deadline
+left. It does not stop before the first call ever arrives, nor while any other
+request is being answered (an export, an import, a publish), and never with
+`--no-open`. The watcher looks every 2 seconds on a monotonic clock; when it
+finds it was not run for more than 20 seconds the computer was asleep, and
+every deadline moves on by that gap, so each page keeps the time it had left
+and its own next call after waking is what counts. If the server is gone when
+a page wakes, the page shows a bar saying Diapo is not running any more, with
+a button to reload (it goes by itself if the server comes back). A browser that
+discards a background tab to save memory also stops its calls; the tab then
+finds the server stopped when the user returns, and says so. The console
+window of the Windows build still stops Diapo when closed.
+
+**File > Quit Diapo** (`POST /api/quit`) stops the server whatever the
+mode. If any deck has unsaved changes it asks "Save your changes and stop
+Diapo?", saves each one, and stays running when a save does not go through (a
+conflict, an error); then the page shows "Diapo has stopped" and the tab can be
+closed.
 
 ## Opening decks
 
@@ -83,7 +125,8 @@ slide; **All N decks in this folder...** opens the drawer.
 **The File menu** (top left) holds the rest: **New deck...**, **Open...**
 (Ctrl+O: the Decks drawer), **Open a file...**, **Import...**, **Save**,
 **Save as...**, **Previous versions...**, **Rename...** and **Duplicate...**
-(the open deck), and **Change folder...**, with the folder's name at its foot.
+(the open deck), **Change folder...**, with the folder's name at its foot, and
+**Quit Diapo** (see "Where Diapo opens, and stopping it").
 
 The Decks drawer (Ctrl+O, File > Open...) is the deck list while you work:
 
@@ -1300,7 +1343,14 @@ unsaved edits included; the deck file itself is not touched.
   rendered. It is printed by the Chrome or Edge installed on this computer
   (found automatically; set `DECK_EDITOR_CHROME` to a browser executable to
   use another). Without one, the browser's own print dialog opens on the same
-  printable copy: choose "Save as PDF" there. Chrome and Edge need about a
+  printable copy, after a note that lists the options to choose there for the
+  browser in use (found from its user agent, `core/printguide.js`): Firefox
+  Destination "Save to PDF", Margins "None", "Print backgrounds" on; Chrome
+  "Save as PDF", Margins "None", "Background graphics" on (Edge: Printer
+  "Save as PDF"); Safari "Print backgrounds" under Show Details and "Save as
+  PDF" in the PDF menu. The print CSS is the same one Chrome prints (`@page`
+  with the stage's size and no margin, forced colours); Firefox lays the copy
+  out the same way. Chrome and Edge need about a
   third of a second per slide. Things outside the slides (a deck's own page
   counter or footer on the stage) cannot be per page and are left out.
 - **Single HTML file...**: everything the deck loads from its folder (scripts,
@@ -1437,7 +1487,7 @@ use the address can be replaced by the environment variable `DIAPO_UPDATE_URL`
 ## The settings file
 
 `~/.deck-editor.json` holds the last workspace, the recent decks, the trusted
-decks, the saved themes and the update-check setting. It is never half-written: each change goes to a
+decks, the saved themes, the update-check setting and `open_in` (where Diapo opens). It is never half-written: each change goes to a
 temporary file that then takes its place, one at a time. A file that is not
 valid JSON is moved aside as `.deck-editor.json.broken-<time>`, and one that
 cannot be opened at start is left alone for that session rather than
@@ -1702,7 +1752,8 @@ npm run test:py        (the Python tests: pptx_chart.py, pptx_import.py, emf_svg
                         server's upload types, mcp_server.py driven over stdio:
                         reading, writing, stale writes and outside paths refused,
                         paused scripts, the checker, a render and a PDF, and the
-                        DOI and Wikimedia Commons lookups with stubbed answers)
+                        DOI and Wikimedia Commons lookups with stubbed answers, and
+                        the stop-when-the-tab-closes watcher with a fake clock)
 ```
 
 Citations and picture credits have `tests/citations.spec.js` (the DOI and Commons

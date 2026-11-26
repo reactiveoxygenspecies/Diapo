@@ -14,6 +14,23 @@
   over. An equation with something Diapo's equations cannot show (a surface
   integral, a line break inside it) keeps PowerPoint's picture, and the import
   says so.
+- **Diapo can open in your default browser, and stops when you close its
+  tab.** About Diapo has a new choice, **Open Diapo in: its own window (Edge /
+  Chrome) or my default browser**; it applies the next time Diapo starts, and
+  `--tab` still opens a tab whatever it says. In a browser tab, Diapo used to
+  keep running after the tab was closed. It now stops by itself a few seconds
+  after the last Diapo tab closes (a reload or a second tab does not stop
+  it, a tab left in the background does not either, and nothing stops while
+  an export or an import is running). If Diapo has stopped while a page is
+  still open, the page says so instead of failing button by button. The new
+  **File > Quit Diapo** stops it on purpose: it asks to save unsaved changes
+  first, then shows "Diapo has stopped, you can close this tab".
+- **PDF without Chrome or Edge says what to choose.** When Diapo cannot make
+  the PDF itself, it opens your browser's print dialog; before it does, a
+  short note now lists the options that give a good PDF in the browser you
+  are using (Firefox: Save to PDF, Margins None, Print backgrounds on;
+  Chrome and Edge: Save as PDF, Margins None, Background graphics on;
+  Safari: Print backgrounds, and Save as PDF from the PDF menu).
 
 ## 1.4.4 - 2026-11-22
 

@@ -521,13 +521,13 @@ html[data-look="ink"] .canvas-loading .loader, html[data-look="slate"] .canvas-l
 }
 #barStack > .bar { position: static; transform: none; }
 #barStack > .bar + .bar { border-radius: 10px; border-top: 1px solid var(--notice-line); }
-.bar.trust-bar, .bar.conflict-bar { flex-wrap: wrap; line-height: 1.45; }
+.bar.trust-bar, .bar.conflict-bar, .bar.gone-bar { flex-wrap: wrap; line-height: 1.45; }
 .bar button { height: 24px; padding: 0 10px; border-radius: var(--radius-sm); border: 1px solid var(--notice-btn-line); background: var(--bg-2); cursor: pointer; font-size: var(--fs-label); font-weight: 600; }
 
 /* ------------------------------------------------------------
    Help overlay
    ------------------------------------------------------------ */
-.help { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(20,20,24,0.45); }
+.help, .print-guide { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(20,20,24,0.45); }
 .help-card { width: 620px; max-height: 80vh; overflow: auto; background: var(--bg-2); border-radius: 12px; padding: 20px 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
 .help-card h2 { margin: 0 0 12px; font-size: 16px; }
 .help-card table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); }
@@ -562,6 +562,12 @@ html[data-look="ink"] .canvas-loading .loader, html[data-look="slate"] .canvas-l
 .about-notes { max-height: 160px; overflow: auto; margin: 8px 0; padding: 8px 10px; white-space: pre-wrap; font: 12px/1.45 var(--ui-mono); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
 .about-auto { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; }
 .about-note { font-size: var(--fs-label); margin: 6px 0; }
+.about-open { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; }
+.about-open select { font: inherit; padding: 3px 6px; }
+.print-steps { margin: 10px 0 14px; padding-left: 22px; line-height: 1.7; }
+.print-guide .help-card { width: 460px; max-width: calc(100vw - 32px); }
+.print-guide .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.print-guide .spacer { flex: 1; }
 .update-notice { position: fixed; right: 16px; bottom: 44px; z-index: 85; display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-radius: 10px; background: var(--chrome); color: #fff; font-size: var(--fs-body); box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
 /* On the dark chrome: white text, not the light .mini-btn fill (which left white on white). */
 .update-notice .mini-btn { color: #fff; background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.28); }

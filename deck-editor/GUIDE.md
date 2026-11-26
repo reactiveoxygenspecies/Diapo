@@ -8,7 +8,10 @@ covered in more detail in the [reference](REFERENCE.md).
 Double-click **Start Diapo** (`Start Diapo.bat` on Windows, `Start Diapo.command`
 on a Mac). With Chrome or Edge on the computer, Diapo opens in a window of its
 own and closing it quits Diapo; without them it opens in a tab of your usual
-browser.
+browser, and closing the last tab quits Diapo a few seconds later. To use your
+usual browser even when Chrome or Edge is there, choose **my default browser**
+under **Open Diapo in** in **? > About Diapo** (it applies the next time Diapo
+starts). **File > Quit Diapo** stops Diapo on purpose, after saving.
 
 Diapo opens on its welcome screen: **New deck**, **Open**, **Import** and **Try
 the sample deck**, the folder your decks are in (with **Change folder...**), and
@@ -97,7 +100,9 @@ any browser, without Diapo, and presents on its own.
 - Unsaved changes are kept aside as you work; if the window closes, Diapo
   offers them back the next time the deck opens.
 - **Export > PDF** (Ctrl+P) prints one page per slide; **PDF with notes** adds
-  your speaker notes under each slide.
+  your speaker notes under each slide. Without Chrome or Edge on the computer,
+  Diapo opens your browser's print dialog instead and first says which options
+  to choose in it (a PDF as the destination, no margins, backgrounds on).
 - **Export > Single HTML file** puts everything (pictures, fonts) into one file
   to send by email or put online.
 - **Export > Publish** is for "a link" after a talk. Diapo hosts nothing: it

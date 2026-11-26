@@ -13,12 +13,18 @@ Routes
     GET  /<app file>             editor.css, editor.js, core/*.js, templates/*
     GET  /deck/<path>            any file inside the workspace (the iframe loads decks here); a deck
                                  comes with X-Diapo-Version, a hash of the file (see /api/save)
-    GET  /api/status             {ok, workspace, app, released, update_auto}
+    GET  /api/status             {ok, workspace, app, released, update_auto, open_in, has_chrome}
     POST /api/update-check[?auto=1]  asks GitHub for the latest release (the one request Diapo makes
                                  about itself) -> {current, latest, newer, url, published, notes};
                                  auto=1 is the start-up check: {skipped} unless the setting is on and
                                  the last check is over a day old
     POST /api/update-settings?auto=0|1  "check for updates when Diapo starts" (on by default)
+    POST /api/open-settings?in=window|browser  "open Diapo in its own window (Edge / Chrome) or my default
+                                 browser"; applies at the next start (--tab still forces a tab)
+    POST /api/heartbeat?id=<page>[&bye=1]  every Diapo page (editor, presenter) calls this every few
+                                 seconds; bye=1 says the page is closing. A Diapo that opened in a
+                                 browser tab quits when no page has called for a while (QuitWatch)
+    POST /api/quit               stops the server (File > Quit Diapo, after the editor has saved)
     POST /api/open-link?page=release|releases|guide|changelog[&tag=1.3.0]  opens a fixed
                                  github.com/reactiveoxygenspecies/Diapo page in the normal browser
     GET  /api/list?dir=<path>    *.html files under the workspace, recursive, each with its title and
@@ -277,6 +283,111 @@ SETTINGS = load_settings()
 # The build: bump APP_VERSION and APP_RELEASED with every release (tools/release.py does).
 APP_VERSION = "1.4.4"
 APP_RELEASED = "2026-11-22"
+
+
+# -- Stopping when the last tab closes ---------------------------------------------
+class QuitWatch:
+    """Diapo in a normal browser tab has no window of its own whose closing could stop it, so
+    the pages (the editor, the presenter view) tell the server every few seconds that they are
+    open, and the server quits once none has for a while.
+
+    Each page has a deadline: its last call + `idle`. A page that says it is closing (`bye`,
+    sent from pagehide) has its deadline cut to `grace` from now, long enough for a reload or
+    a link to the next page to announce itself, short enough that closing the tab stops Diapo
+    at once. `idle` is longer than a minute because a browser lets a hidden tab run its timers
+    only once a minute. Nothing quits before the first call (the browser may be slow to open),
+    nor while a request that may run long (export, import, publish) is being answered.
+
+    A computer that sleeps must not look like a closed tab. Time is read from a monotonic
+    clock, and when the watcher itself was not run for `skip` seconds the computer was asleep
+    (whether that clock counted the sleep depends on the system): every deadline moves on by
+    the gap, so each page keeps the time it had left when the lid closed, and its own call
+    after waking is what counts."""
+
+    def __init__(self, on_quit, idle=180.0, grace=15.0, skip=20.0, tick=2.0, clock=time.monotonic):
+        self.on_quit, self.idle, self.grace, self.skip, self.tick, self.clock = on_quit, idle, grace, skip, tick, clock
+        self.enabled = False                     # off unless Diapo opened itself in a tab
+        self.pages = {}                          # page id -> deadline
+        self.seen = False
+        self.busy = 0
+        self.fired = False
+        self.last_check = clock()
+        self.lock = threading.Lock()
+
+    def beat(self, page):
+        with self.lock:
+            self.pages[page] = self.clock() + self.idle
+            self.seen = True
+
+    def bye(self, page):
+        with self.lock:
+            if page in self.pages:
+                self.pages[page] = min(self.pages[page], self.clock() + self.grace)
+
+    @contextlib.contextmanager
+    def working(self):
+        """A request that must finish before Diapo may quit."""
+        with self.lock:
+            self.busy += 1
+        try:
+            yield
+        finally:
+            with self.lock:
+                self.busy -= 1
+
+    def check(self):
+        """One look at the pages; calls on_quit (once) and returns True when it is time to stop."""
+        now = self.clock()
+        with self.lock:
+            gap = now - self.last_check
+            self.last_check = now
+            if gap > self.skip:
+                self.pages = {k: d + gap for k, d in self.pages.items()}
+            self.pages = {k: d for k, d in self.pages.items() if d > now}
+            due = self.enabled and self.seen and not self.pages and not self.busy and not self.fired
+            if due:
+                self.fired = True
+        if due:
+            self.on_quit()
+        return due
+
+    def start(self):
+        def loop():
+            while not self.fired:
+                time.sleep(self.tick)
+                self.check()
+        threading.Thread(target=loop, daemon=True).start()
+
+
+SERVER = None
+
+
+def stop_server(delay=0.0):
+    """Ends serve_forever from another thread, after `delay` so a reply in flight gets out."""
+    def go():
+        time.sleep(delay)
+        if SERVER is not None:
+            SERVER.shutdown()
+    threading.Thread(target=go, daemon=True).start()
+
+
+QUIT_WATCH = QuitWatch(stop_server)
+
+
+_has_chrome = []
+
+
+def has_chrome():
+    """Whether an Edge or Chrome was found; looked for once (the search reads PATH and the disk)."""
+    if not _has_chrome:
+        _has_chrome.append(bool(find_chrome()))
+    return _has_chrome[0]
+
+
+def open_in_setting():
+    """Where Diapo opens itself: "window" (an Edge / Chrome app window, the default) or "browser"."""
+    with SETTINGS_LOCK:
+        return "browser" if SETTINGS.get("open_in") == "browser" else "window"
 
 
 # -- Checking for a new release -------------------------------------------------
@@ -1971,6 +2082,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         # Keep the console quiet except for writes and errors.
         msg = fmt % args
+        if "/api/heartbeat" in msg and " 200 " in msg:
+            return                                  # every few seconds, from every open page: not worth a log line
         if "POST" in msg or " 4" in msg or " 5" in msg:
             super().log_message(fmt, *args)
 
@@ -2102,7 +2215,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return self._json({"ok": True, "themes": themes})
             if route == "/api/status":
                 return self._json({"ok": True, "workspace": WORKSPACE, "recent": recent_decks(), "version": 1, "app": APP_VERSION, "released": APP_RELEASED,
-                                   "update_auto": update_auto()})
+                                   "update_auto": update_auto(), "open_in": open_in_setting(), "has_chrome": has_chrome()})
             if route == "/api/list":
                 d = safe_path(self._query().get("dir", ""))
                 if not os.path.isdir(d):
@@ -2177,6 +2290,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     # -- POST --------------------------------------------------------
     def do_POST(self):
+        # A running request keeps Diapo from quitting for lack of tabs (QuitWatch); the
+        # heartbeat itself is not one.
+        if urllib.parse.urlparse(self.path).path == "/api/heartbeat":
+            return self._post()
+        with QUIT_WATCH.working():
+            return self._post()
+
+    def _post(self):
         route = urllib.parse.urlparse(self.path).path
         q = self._query()
         self._request_body = b""
@@ -2211,6 +2332,24 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 with settings_change() as s:
                     s.setdefault("update_check", {})["auto"] = on
                 return self._json({"ok": True, "update_auto": on})
+            if route == "/api/open-settings":
+                where = q.get("in", "")
+                if where not in ("window", "browser"):
+                    return self._fail("in= is window or browser")
+                with settings_change() as s:
+                    s["open_in"] = where
+                return self._json({"ok": True, "open_in": where})
+            if route == "/api/heartbeat":
+                page = re.sub(r"[^\w.-]", "", q.get("id", ""))[:64] or "page"
+                if q.get("bye") == "1":
+                    QUIT_WATCH.bye(page)
+                else:
+                    QUIT_WATCH.beat(page)
+                return self._json({"ok": True})
+            if route == "/api/quit":
+                print("Stopped from the editor.")
+                stop_server(0.4)
+                return self._json({"ok": True})
             if route == "/api/open-link":
                 url = link_url(q.get("page", ""), q.get("tag", ""))
                 if not os.environ.get("DECK_EDITOR_NO_DIALOG"):      # the tests never open a window
@@ -2837,7 +2976,8 @@ def show_console(url):
         with open("CONOUT$", "w", encoding="utf-8") as con:
             con.write(f"Diapo is running in your browser at\n\n    {url}\n\n"
                       "Keep this window open while you work.\n"
-                      "Close it to stop Diapo (save your deck first).\n")
+                      "Closing the Diapo tab stops Diapo a few seconds later; closing this\n"
+                      "window stops it at once (save your deck first).\n")
     except Exception as e:  # noqa: BLE001 - the tab still works without it
         print(f"Could not open the console window ({e}).")
 
@@ -2850,9 +2990,10 @@ def open_window(url, port, console=True):
         if console:
             show_console(url)                            # first, so the browser comes up in front of it
         webbrowser.open(url)
-    chrome = None if "--tab" in sys.argv else find_chrome()
+    own_window = "--tab" not in sys.argv and open_in_setting() == "window"      # --tab wins over the setting
+    chrome = find_chrome() if own_window else None
     if not chrome:
-        if "--tab" not in sys.argv:
+        if own_window:
             print("No Chrome or Edge found: opening a browser tab instead (set DECK_EDITOR_CHROME to the browser's path).")
         tab()
         return None
@@ -2880,7 +3021,9 @@ def main():
         print(note)
     if not os.path.isdir(WORKSPACE):
         fail(f"Folder not found: {WORKSPACE}")
+    global SERVER
     server, port = bind_server()
+    SERVER = server
     url = f"http://127.0.0.1:{port}/"
     if server is None:                                  # Diapo is already running there: show it, do not start a second one
         print(f"Diapo is already running at {url}; opening a window on it.")
@@ -2895,6 +3038,12 @@ def main():
     if window is not None:
         print("Running in its own window; closing the window stops Diapo.")
         threading.Thread(target=lambda: (window.wait(), server.shutdown()), daemon=True).start()
+    elif OPEN_BROWSER:
+        # A browser tab: Diapo stops a little after the last Diapo page closes (QuitWatch). Not with
+        # --no-open (the tests, the MCP server): whoever started the server stops it.
+        print("Running in a browser tab; Diapo stops when the last Diapo tab is closed.")
+        QUIT_WATCH.enabled = True
+        QUIT_WATCH.start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

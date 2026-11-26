@@ -22,6 +22,10 @@ export const api = {
     /* The one request Diapo makes about itself (see serve.py); auto: the start-up check, which the
        server skips unless the setting is on and a day has passed. */
     updateCheck: ({ auto = false } = {}) => call('POST', '/api/update-check' + (auto ? '?auto=1' : '')),
+    /* Where Diapo opens itself at its next start: 'window' (Edge / Chrome) or 'browser' (the default one). */
+    openIn: (where) => call('POST', '/api/open-settings?in=' + where),
+    /* File > Quit Diapo: stops the server. */
+    quit: () => call('POST', '/api/quit'),
     updateAuto: (on) => call('POST', '/api/update-settings?auto=' + (on ? 1 : 0)),
     /* Opens a fixed Diapo page on GitHub in the user's normal browser (page: release, releases, guide, changelog). */
     openLink: (page, tag = '') => call('POST', '/api/open-link?' + q({ page, ...(tag ? { tag } : {}) })),

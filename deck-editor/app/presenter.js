@@ -78,6 +78,13 @@ channel.postMessage({ type: 'hello' });
 setInterval(() => { if (!lastHeard) channel.postMessage({ type: 'hello' }); }, 2000);
 window.addEventListener('focus', () => channel.postMessage({ type: 'hello' }));
 
+/* Tells serve.py this window is open, so Diapo (in a browser tab) does not stop in the middle
+   of a talk while the editor's own tab sits hidden; see core/heartbeat.js, which does the same. */
+const pageId = 'presenter' + Math.random().toString(36).slice(2, 10);
+const beat = () => fetch('/api/heartbeat?id=' + pageId, { method: 'POST', cache: 'no-store', keepalive: true }).catch(() => {});
+beat(); setInterval(beat, 5000);
+window.addEventListener('pagehide', () => { try { navigator.sendBeacon('/api/heartbeat?id=' + pageId + '&bye=1'); } catch (e) { /* the server's timeout covers it */ } });
+
 /* ------------------------------------------------------------
    Navigation requests
    ------------------------------------------------------------ */

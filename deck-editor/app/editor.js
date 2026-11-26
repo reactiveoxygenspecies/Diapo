@@ -46,6 +46,7 @@ import { DeckTabs } from './core/tabs.js';
 import { FileDrop } from './core/filedrop.js';
 import { keepNamed } from './core/a11y.js';
 import { WakeLock } from './core/wakelock.js';
+import { startHeartbeat, showStopped } from './core/heartbeat.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -1041,8 +1042,34 @@ $('fileMenu').addEventListener('click', async (e) => {
         case 'rename': await renameDeck(app.file); break;
         case 'duplicate': await duplicateDeck(app.file); break;
         case 'folder': await changeFolder(); break;
+        case 'quit': await quitDiapo(); break;
     }
 });
+
+/* File > Quit Diapo: stops the server (the program), not only this page. Unsaved work is saved
+   first, after asking; if any save does not go through, Diapo keeps running. */
+export async function quitDiapo() {
+    window.dispatchEvent(new CustomEvent('editor:before-save'));     // an open text edit counts
+    const dirty = () => tabs.tabs.filter(t => t.active ? app.dirty : t.dirty);
+    if (dirty().length) {
+        const n = dirty().length;
+        if (!confirm(n === 1 ? 'Save your changes and stop Diapo?' : `Save the changes in ${n} decks and stop Diapo?`)) return false;
+        for (const t of dirty()) {
+            if (!t.active && !(await tabs.activate(t))) return stayRunning();
+            await saveDeck();
+            if (app.dirty) return stayRunning();
+        }
+    }
+    try { await api.quit(); }
+    catch (err) { toast('Could not stop Diapo: ' + err.message, { error: true, ms: 5000 }); return false; }
+    app.dirty = false;                                                // no "leave this page?" question on the way out
+    showStopped();
+    return true;
+}
+function stayRunning() {
+    toast('Diapo was not stopped: a deck could not be saved. Save it, or choose Discard in its tab, and try again.', { error: true, ms: 6000 });
+    return false;
+}
 $('btnEmptyNew').addEventListener('click', () => newDeck());
 $('btnEmptyOpen').addEventListener('click', pickDeckFile);
 $('btnEmptyImport').addEventListener('click', importDeck);
@@ -1135,6 +1162,12 @@ function showHelp(on, tab) {
         if (g) openLink('release', g.dataset.tag);
     });
     h.addEventListener('change', async (e) => {
+        if (e.target.id === 'aboutOpenIn') {
+            const was = app.openIn;
+            try { app.openIn = (await api.openIn(e.target.value)).open_in; }
+            catch (err) { e.target.value = was; toast('Could not save that setting: ' + err.message, { error: true }); }
+            return;
+        }
         if (e.target.id !== 'aboutAuto') return;
         try { app.updateAuto = (await api.updateAuto(e.target.checked)).update_auto; }
         catch (err) { e.target.checked = !e.target.checked; toast('Could not save that setting: ' + err.message, { error: true }); }
@@ -1148,7 +1181,7 @@ function showHelp(on, tab) {
    "Check for updates" (the server asks GitHub for the latest release) and, unless the user
    switched it off, once a day at start.
    ------------------------------------------------------------ */
-app.version = ''; app.released = ''; app.updateAuto = true;
+app.version = ''; app.released = ''; app.updateAuto = true; app.openIn = 'window'; app.hasChrome = true;
 app.updateResult = null;                     // the last answer: {current, latest, newer, url, published, notes}, {busy} or {error}
 const niceDate = (iso) => { const d = new Date(iso + 'T12:00:00'); return isNaN(d) ? iso : d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }); };
 const openLink = (page, tag = '') => api.openLink(page, tag).catch(err => toast('Could not open the browser: ' + err.message, { error: true }));
@@ -1160,7 +1193,10 @@ function aboutHtml() {
             <button class="mini-btn" data-link="guide">Guide</button><button class="mini-btn" data-link="changelog">Changelog</button></div>
         <div id="aboutResult" class="about-result" role="status" aria-live="polite"></div>
         <label class="about-auto"><input type="checkbox" id="aboutAuto" ${app.updateAuto ? 'checked' : ''}> Check for updates when Diapo starts</label>
-        <p class="muted about-note">On by default. Diapo asks GitHub for the latest release and sends nothing about you or your decks. A click on the button does the same, once.</p>`;
+        <p class="muted about-note">On by default. Diapo asks GitHub for the latest release and sends nothing about you or your decks. A click on the button does the same, once.</p>
+        <div class="about-open"><label for="aboutOpenIn">Open Diapo in</label>
+            <select id="aboutOpenIn"><option value="window"${app.openIn === 'window' ? ' selected' : ''}>its own window (Edge / Chrome)</option><option value="browser"${app.openIn === 'browser' ? ' selected' : ''}>my default browser</option></select></div>
+        <p class="muted about-note">Takes effect the next time Diapo starts.${app.openIn === 'window' && !app.hasChrome ? ' No Edge or Chrome was found on this computer, so Diapo opens in your default browser.' : ''} In a browser tab, Diapo stops by itself a few seconds after you close its last tab; File > Quit Diapo stops it too.</p>`;
 }
 
 /* Fills the result area of the About tab from app.updateResult. */
@@ -2047,7 +2083,10 @@ async function boot() {
         const s = await api.status();
         app.workspace = s.workspace;
         if (s.app) $('brandVersion').textContent = 'v' + s.app;      // the margin print carries the build number
-        app.version = s.app || ''; app.released = s.released || ''; app.updateAuto = !!s.update_auto;
+        app.version = s.app || ''; app.released = s.released || ''; app.updateAuto = !!s.update_auto; app.openIn = s.open_in === 'browser' ? 'browser' : 'window'; app.hasChrome = s.has_chrome !== false;
+        startHeartbeat();
+        const about = document.getElementById("helpAbout");          // opened before the answer came: show the real settings
+        if (about && !about.hidden) { about.innerHTML = aboutHtml(); showUpdateResult(); }
         autoUpdateCheck();
         showStatusFolder();
     } catch (err) {
