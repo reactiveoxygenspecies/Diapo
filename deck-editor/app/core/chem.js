@@ -56,7 +56,10 @@ export function sourceOf(el) {
     return s ? fromScript(s.textContent) : '';
 }
 // The file as a script's text: a line break round it, and nothing that would end the block early.
-const toScript = (src) => '\n' + String(src).replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--') + '\n';
+// Line ends as LF: what the HTML parser gives back when the deck opens again (a Windows clipboard has
+// CR LF), so the drawing's key, made from the same text, still matches then.
+export const fileText = (src) => String(src).replace(/\r\n?/g, '\n');
+const toScript = (src) => '\n' + fileText(src).replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--') + '\n';
 const fromScript = (t) => String(t).replace(/^\n/, '').replace(/\n$/, '').replace(/<\\\/(script)/gi, '</$1').replace(/<\\!--/g, '<!--');
 /* The figure's content: the drawing, and for a file the file after it. */
 export function chemHtml(svg, format, source) {
@@ -144,6 +147,7 @@ function readable(err) {
    for it (no stereo), '' when it cannot; note says when the file had no 2D coordinates. */
 export async function structureToSvg(source, format = 'smiles', opts = {}) {
     if (format === 'smiles') { const r = await smilesToSvg(source, opts); return { ...r, smiles: source, note: '' }; }
+    source = fileText(source);
     if (!FORMATS[format]) throw new Error(`"${format}" is not a structure format Diapo reads (Molfile, SDF, CDXML or SMILES)`);
     if (!String(source || '').trim()) throw new Error('the ' + FORMATS[format].name + ' is empty');
     const { colours = true, circles = false } = opts;

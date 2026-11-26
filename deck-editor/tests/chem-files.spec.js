@@ -23,16 +23,40 @@ const info = (page) => page.evaluate(() => {
     };
 });
 
-/* A paste on the canvas (not in a text box), with the clipboard's text or files. */
-async function pasteOnCanvas(page, { text = '', file = null } = {}) {
-    await page.evaluate(([text, file]) => {
+const firefox = () => test.info().project.name === 'firefox';
+
+/* Text on the clipboard pasted where the focus is (`target`: a selector, or null for the canvas with
+   nothing selected). Chrome takes a made-up paste event with its own clipboardData; Firefox empties
+   that, so there the text is copied and pasted for real (Ctrl+C from a scratch box, then Ctrl+V). */
+async function pasteText(page, text, target = null) {
+    const focus = () => target ? page.focus(target)
+        : page.evaluate(() => { const ed = window.deckEditor; ed.selection.set([]); if (document.activeElement) document.activeElement.blur(); });
+    if (firefox()) {
+        await page.evaluate((t) => { const a = document.createElement('textarea'); a.id = 'pasteSrc'; a.value = t; document.body.appendChild(a); a.select(); }, text);
+        await page.keyboard.press('Control+c');
+        await page.evaluate(() => document.getElementById('pasteSrc').remove());
+        await focus();
+        await page.keyboard.press('Control+v');
+        return;
+    }
+    await focus();
+    await page.evaluate(([text, target]) => {
+        const dt = new DataTransfer(); dt.setData('text/plain', text);
+        const at = target ? document.querySelector(target) : window.deckEditor.deck.doc.body;
+        at.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    }, [text, target]);
+}
+/* A file on the clipboard (copied in the file manager) pasted on the canvas. Firefox gives a made-up
+   paste event no files and the system clipboard cannot be given one, so there its text is pasted. */
+async function pasteFile(page, name, text) {
+    if (firefox()) return pasteText(page, text);
+    await page.evaluate(([name, text]) => {
         const ed = window.deckEditor;
         ed.selection.set([]);
         const dt = new DataTransfer();
-        if (text) dt.setData('text/plain', text);
-        if (file) dt.items.add(new File([file[1]], file[0], { type: '' }));
+        dt.items.add(new File([text], name, { type: '' }));
         ed.deck.doc.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-    }, [text, file]);
+    }, [name, text]);
 }
 
 test('chem 1 Molfile V2000 pasted into the SMILES field: drawn from its coordinates, the file kept in the figure, one undo step; edited in its box', async ({ page }) => {
@@ -45,11 +69,7 @@ test('chem 1 Molfile V2000 pasted into the SMILES field: drawn from its coordina
     expect(aspirin).toMatchObject({ chem: 'CC(=O)Oc1ccccc1C(=O)O', format: null, type: null });
     // The SMILES field takes a pasted Molfile whole (a one-line field would run its lines together).
     const mol = fixture('caffeine.mol');
-    await page.focus('#chemSmiles');
-    await page.evaluate((mol) => {
-        const dt = new DataTransfer(); dt.setData('text/plain', mol);
-        document.getElementById('chemSmiles').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-    }, mol);
+    await pasteText(page, mol, '#chemSmiles');
     await page.waitForFunction(() => window.deckEditor.deck.doc.querySelector('figure[data-chem]').getAttribute('data-chem-format') === 'molfile');
     let c = await info(page);
     expect(c).toMatchObject({ chem: '', format: 'molfile', type: 'chemical/x-mdl-molfile', red: true });
@@ -100,7 +120,7 @@ test('chem 2 V3000 and SDF pasted on the canvas, an SDF read from Insert > Chemi
     test.setTimeout(60000);
     await openDeck(page);
     // L-alanine in V3000, pasted as text on the slide: a structure of its own, its methyl hashed.
-    await pasteOnCanvas(page, { text: fixture('alanine-v3000.mol') });
+    await pasteText(page, fixture('alanine-v3000.mol'));
     await page.waitForFunction(() => window.deckEditor.deck.currentSlide.querySelector('figure[data-chem-format="molfile"] > svg'));
     let c = await info(page);
     expect(c.label).toContain('L-alanine, C3H7NO2');
@@ -109,7 +129,7 @@ test('chem 2 V3000 and SDF pasted on the canvas, an SDF read from Insert > Chemi
     expect(c.lines).toBeGreaterThanOrEqual(5 + 2 + 4);                            // bonds, the C=O pair, the hash's lines
     await expect(page.locator('#chemFormula')).toHaveText('Formula: C3H7NO2');
     // Benzene from an SDF of two records: the first one only (no ammonium), alternating double bonds.
-    await pasteOnCanvas(page, { text: fixture('benzene.sdf') });
+    await pasteText(page, fixture('benzene.sdf'));
     await page.waitForFunction(() => window.deckEditor.deck.currentSlide.querySelectorAll('figure[data-chem-format="molfile"] > svg').length === 2);
     c = await info(page);
     expect(c.label).toContain('benzene, C6H6');
@@ -140,7 +160,7 @@ test('chem 2 V3000 and SDF pasted on the canvas, an SDF read from Insert > Chemi
     // A Molfile with no 2D coordinates (every atom at 0, 0) is laid out by SmilesDrawer from its SMILES, and says so.
     const flat = fixture('caffeine.mol').replace(/^( *-?\d+\.\d{4}){3}(?= [A-Z])/gm, '    0.0000    0.0000    0.0000');
     expect(flat).not.toContain('11.1159');
-    await pasteOnCanvas(page, { text: flat });
+    await pasteText(page, flat);
     await page.waitForFunction(() => window.deckEditor.deck.currentSlide.querySelectorAll('figure[data-chem-format="molfile"]').length === 4);
     c = await info(page);
     expect(c.label).toContain('C8H10N4O2');
@@ -193,9 +213,10 @@ test('chem 3 ChemDraw CDXML dropped on the slide: wedge and hash bonds, an abbre
 test('chem 4 saved and opened again: the file stays in the figure, nothing redrawn; single-file export, PowerPoint export; a source that does not read is a problem', async ({ page }) => {
     test.setTimeout(90000);
     await openDeck(page);
-    await pasteOnCanvas(page, { text: fixture('methoxyphenylethanol.cdxml') });
+    // With Windows line ends, as a clipboard on Windows gives them: kept as LF, so the file opens again as saved.
+    await pasteText(page, fixture('methoxyphenylethanol.cdxml').replace(/\n/g, '\r\n'));
     await page.waitForFunction(() => window.deckEditor.deck.currentSlide.querySelector('figure[data-chem-format="cdxml"] > svg'));
-    await pasteOnCanvas(page, { file: ['alanine-v3000.mol', fixture('alanine-v3000.mol')] });
+    await pasteFile(page, 'alanine-v3000.mol', fixture('alanine-v3000.mol'));
     await page.waitForFunction(() => window.deckEditor.deck.currentSlide.querySelector('figure[data-chem-format="molfile"] > svg'));
     // An existing SMILES structure beside them is saved as before: no format, no data block.
     await page.evaluate(() => window.deckEditor.insert.structure('Oc1ccccc1'));
