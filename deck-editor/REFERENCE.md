@@ -502,6 +502,12 @@ Optional hooks, used when present and tolerated when absent:
   picture up to date, and a figure with the JSON alone gets its picture when the
   deck opens. What the deck's renderer draws when presenting (`.deck-plot-live`) is
   never saved.
+- `figure[data-mol3d]` is a 3D structure (see 3D structures): the structure file in
+  a `<script type="chemical/x-...">` that never runs (or naming a file in
+  `assets/`), its settings and view in `data-mol3d-settings` and a picture of the
+  view in `<img data-mol3d-picture>`. Selected as a whole; the editor keeps the
+  picture up to date. What `deck-mol3d.js` draws when presenting
+  (`.deck-mol3d-live`) is never saved.
 - `[data-svg]` hosts inline an SVG file at load. On save the host goes back to its
   original `<img>` unless a shape inside it was edited (then the inlined SVG is kept).
 - `svg.dots` and `[data-generated]` contents are regenerated at load; they are
@@ -631,7 +637,8 @@ drop will do while files are held over the window. A PowerPoint (.pptx) or
 Markdown (.md) file dropped anywhere is offered as a new deck (the drawer's
 Import, the file uploaded), which opens in a tab of its own. A structure file
 (.mol, .sdf, .cdxml) becomes a chemical structure where it was dropped (see
-Equations and chemical structures). Other files are
+Equations and chemical structures), and a 3D structure file (`.pdb`, `.cif`,
+`.mmcif`, `.mol2`, `.xyz`, `.pqr`) a 3D structure (see 3D structures). Other files are
 refused with a note saying what can be dropped; with no deck open, a picture
 only brings a hint. A file dropped where nothing takes it is never opened by
 the browser in place of the editor.
@@ -649,6 +656,9 @@ The kinds of element:
   table (see Charts below).
 - Interactive chart (Plotly)...: a Plotly figure pasted as JSON or read from a
   file, live when the deck is presented (see Interactive charts below).
+- 3D structure...: a protein or a molecule by its ID (Protein Data Bank,
+  AlphaFold, PubChem) or from a file, which can turn while the deck is
+  presented (see 3D structures below).
 - Media: image from file or URL, image placeholder, video from file
   (mp4, webm, mov, uploaded to `assets/`) or URL, embedded web page
   (YouTube and Vimeo links become their players).
@@ -856,6 +866,115 @@ file, so it plays anywhere on its own (about 5 MB more).
 (Vega-Lite, Chart.js) can come in as another value with the same two
 children. Charts a deck draws with a script of its own (`[data-fig]`) stay
 the deck's, and still need its trust.
+
+### 3D structures
+
+**Insert > 3D structure...** (and the palette) opens a dialog with three ways in:
+
+- **From an ID**: a PDB ID from the Protein Data Bank (`1FDN`; the mmCIF file
+  from `files.rcsb.org`), a UniProt ID from the AlphaFold database (`P00195`;
+  `alphafold.ebi.ac.uk` names the file in its API, and only a file on that site is
+  fetched), or a name or CID from PubChem (`caffeine`, `2519`; its computed 3D
+  conformer as SDF). Nothing goes out until **Fetch** is pressed; the dialog says
+  which site it asks. The server does the fetch (`GET /api/structure`), sending the
+  ID and a generic User-Agent, nothing else; a file over 50 MB is refused. Offline,
+  the dialog says so and suggests downloading the file and using the next tab.
+- **From a file**: `.cif` / `.mmcif`, `.pdb`, `.pqr`, `.sdf` / `.mol` (with 3D
+  coordinates; a flat, 2D Molfile is refused with a note), `.mol2`, `.xyz`
+  (what ORCA, Gaussian, xtb or CREST write).
+- **Paste**: the text of any of those files (the format is read from it).
+
+The preview turns slowly; drag it to turn it (the view it is left in is the one
+the structure starts with). Under it: what the file holds, read from the file
+itself (its ID and title, the organism, chains, residues and named ligands;
+for a small molecule its formula and number of atoms), and **Start as**
+(Cartoon or Ball and stick, Sticks, Surface).
+
+**A structure file dropped on a slide** (`.pdb`, `.cif`, `.mmcif`, `.mol2`,
+`.xyz`, `.pqr`) is inserted at once, where it lands, with the same defaults.
+A `.mol` or `.sdf` dropped on a slide is a 2D chemical structure; for its 3D
+coordinates, use the dialog.
+
+On the slide it is a picture you move and size like any other. The panel's
+**3D structure** section has:
+
+- What the file holds, and where it is kept; **Replace...** (another file in the
+  same box: the place, size and way of presenting stay) and **Save the file...**.
+- **Style**: Cartoon, Sticks, Spheres or Surface (a small molecule: Ball and
+  stick, Sticks, Spheres or Surface).
+- **Colour**: by chain, rainbow from start to end, helices and sheets, by
+  element, or the deck's colours (its accent colours by chain; for a small
+  molecule, carbon in the deck's first accent).
+- **Show**: each ligand and metal by its name (from the file, or the usual one:
+  haem, [4Fe-4S] cluster, zinc ion), water, hydrogens. Sulfate, glycerol and
+  the other things crystals are grown in start hidden.
+- **Pick out**: residues as sticks: the ones round the ligands, or one kind
+  (the kinds that hold the ligands are offered first: the cysteines of an
+  iron-sulfur cluster, the histidines of a haem, which start picked out).
+- **View**: **Turn it...** or a double-click on the structure turns it: a live
+  viewer over it with a dashed outline and a bar (drag to turn, the wheel to
+  zoom, Ctrl+drag to move, **Fit**, **Done**). Done, Enter, Esc or a click
+  outside ends it, and that view becomes the picture; **Fit** in the panel
+  centres the whole structure. **See-through background** leaves the structure
+  on the slide with no ground of its own (by default it has the slide's colour,
+  which every browser draws; one that draws nothing on a see-through
+  background keeps the colour and says so).
+- **While presenting**: **Still** (the picture: no script in the deck),
+  **Turns slowly** (with its speed), or **Drag to turn** (turn and zoom it with
+  the mouse; the wheel over it zooms it and does not step the slide).
+
+Every change is one undo step: the settings and the picture together. The
+structure is saved as
+
+```html
+<figure data-mol3d="pdb" data-mol3d-settings='{"style":"cartoon","colour":"chain","ligands":{"hidden":["SO4"]},
+        "water":false,"hydrogens":false,"pick":"CYS","present":"still","speed":0.4,"view":[...],"bg":"slide",
+        "source":"Protein Data Bank 1FDN"}' style="position:absolute; ...">
+  <img data-mol3d-picture data-key="..." src="data:image/webp;base64,..." alt="3D structure: 1FDN · ...">
+  <script type="chemical/x-pdb" data-mol3d-source>
+HEADER    ELECTRON TRANSPORT ...
+  </script>
+</figure>
+```
+
+`data-mol3d` is the file's format (`pdb`, `cif`, `sdf`, `mol`, `mol2`, `xyz`,
+`pqr`) and the holder's type says the same (`chemical/x-pdb`,
+`chemical/x-mmcif`, `chemical/x-mdl-sdfile`, `chemical/x-mdl-molfile`,
+`chemical/x-mol2`, `chemical/x-xyz`, `chemical/x-pqr`): a script block of a type
+that is not JavaScript never runs, so it is data, and the trust check and the
+problems list leave it alone (in the text, `</script` and `<!--` are written
+`<\/script` and `<\!--`). A file over 1 MB (a ribosome, a virus) is kept in
+`assets/` instead, and the holder names it: `<script type="chemical/x-mmcif"
+data-mol3d-source src="assets/4v9d.cif"></script>` (the browser does not load it;
+the structure's own script reads it). Either way the deck works offline.
+`view` is 3Dmol's `getView()` (eight numbers: the position, the zoom and a
+quaternion); `null` means fitted. A list of views (for click steps) can come
+later beside it. The picture is the view at twice the box's size, WebP
+(PNG where the browser cannot write WebP), on the slide's colour unless the
+background is see-through; it is drawn again when the box, the file or the
+settings change, and it is what the slide strip, the PDF and the handout,
+PowerPoint (as a PNG), a deck whose scripts are paused and a computer without
+WebGL show.
+
+A deck with a structure set to turn or to be dragged ends with two script tags
+(written on save, taken out when no structure needs them):
+
+```html
+<script src="deck-3dmol.min.js" data-deck-mol3d="library"></script>
+<script src="deck-mol3d.js" data-deck-mol3d="renderer"></script>
+```
+
+`deck-3dmol.min.js` is 3Dmol.js 2.5.5 (`app/vendor/3Dmol-min.js`, the npm
+package `3dmol` byte for byte, copied in by `node tools/build-vendor.js`) and
+`deck-mol3d.js` is Diapo's (`app/deck-mol3d.js`). As for the Plotly files, the
+server copies both beside the deck on save, they run without "Trust this deck",
+Preview gets them as inline scripts, and **Export > Single HTML file** writes
+both and the structure files from `assets/` into the page. The live viewer is
+made only for the slide on show (and never while the deck is edited) and is
+stopped a moment after the slide is left; "Turns slowly" stays still for a
+viewer who asked the system for reduced motion. Where WebGL or the library is
+missing, or the file cannot be read (a deck opened from the disk cannot read
+a file in `assets/` in Chrome), the picture stays.
 
 ### Equations and chemical structures
 
@@ -1411,8 +1530,8 @@ unsaved edits included; the deck file itself is not touched.
   (default `<deck folder name>-site` beside the deck's folder; "Choose folder..." opens the
   native dialog, and without one the path is typed) and writes the deck as `index.html` with
   every local file it uses at the same relative paths: pictures, video, fonts, the deck's own
-  scripts and styles (and what those styles load), and, for an interactive chart, the Plotly
-  files (Diapo's current edition when the deck folder has none or an older one). Left behind:
+  scripts and styles (and what those styles load), a 3D structure's file in `assets/`, and, for
+  an interactive chart or a turning 3D structure, the Plotly or 3Dmol files (Diapo's current edition when the deck folder has none or an older one). Left behind:
   anything in a dot-folder (`.deck-editor`, `.git`), `.bak` and `.~draft` files, and files that
   leave the deck folder (by `..` or a link); the dialog's notes name them. The deck's scripts are
   kept as written, because a host serves them without Diapo's script pausing: the dialog warns
@@ -1578,7 +1697,8 @@ So a deck's own scripts are paused until the user trusts the deck:
   by `py -3 tools/build-known-scripts.py` (`tools/release.py` runs it). An edition
   pasted in with other blank lines round it counts too. Two of Diapo's
   scripts are files beside the deck, not text in it: the library and the
-  renderer of an interactive chart (`deck-plotly.min.js`, `deck-plot.js`). A
+  renderer of an interactive chart (`deck-plotly.min.js`, `deck-plot.js`) and
+  of a 3D structure that turns (`deck-3dmol.min.js`, `deck-mol3d.js`). A
   deck page may load one of them for as long as the file's bytes are an
   edition of Diapo's (SHA-256 of the file, checked each time the page is
   served; earlier editions under `files` in `known-scripts.json`): the policy

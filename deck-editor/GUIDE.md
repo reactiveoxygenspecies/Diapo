@@ -47,6 +47,11 @@ any browser, without Diapo, and presents on its own.
   `fig.to_json()` gives, or choose the file `fig.write_html()` saved): on the
   slide it is a picture you move and size like any other, and when you present
   (F5, or the saved deck) it is live: hover, zoom, click the legend.
+  **3D structure...** fetches a protein or a molecule by its ID (Protein Data
+  Bank, AlphaFold, PubChem; only when you press Fetch) or reads a `.pdb`,
+  `.cif`, `.sdf`, `.mol2` or `.xyz` file (or drop one on the slide). Double-click
+  it to turn it; the view you leave it in is its picture, and it can turn by
+  itself, or under the mouse, while you present.
 - **Maths in a sentence**: while typing, **Alt+=** (or the ∑ button over the
   text) opens a small box for LaTeX with a preview; Enter puts the equation in
   the text, in its size and colour. Type `\(k_{obs}\)` and press Alt+= to turn

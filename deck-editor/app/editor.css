@@ -787,6 +787,15 @@ select option { background: var(--bg-2); color: var(--ink); }
 .crop-h[data-h="n"], .crop-h[data-h="s"] { cursor: ns-resize; }
 .crop-h[data-h="e"], .crop-h[data-h="w"] { cursor: ew-resize; }
 .crop-tip { position: absolute; padding: 4px 9px; border-radius: 6px; background: rgba(12, 14, 22, 0.85); color: #fff; font-size: var(--fs-label); white-space: nowrap; pointer-events: none; }
+/* Turning a 3D structure (mol3d.js): a live viewer over its box, a dashed outline, a bar over the canvas. */
+#overlay.mol3d-turning .ov-main, #overlay.mol3d-turning .ov-boxes, #overlay.mol3d-turning .ov-hover { display: none; }
+.mol3d-turn-layer { position: absolute; inset: 0; pointer-events: auto; }
+.mol3d-turn-host { position: absolute; outline: 2px dashed var(--accent); outline-offset: 2px; cursor: grab; touch-action: none; }
+.mol3d-turn-host:active { cursor: grabbing; }
+.mol3d-turn-bar { position: fixed; z-index: 46; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; background: var(--chrome); color: #fff; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); font-size: var(--fs-label); white-space: nowrap; }
+.mol3d-turn-bar kbd { font: 11px var(--ui-mono); padding: 0 4px; border: 1px solid rgba(255,255,255,0.3); border-radius: 3px; background: rgba(255,255,255,0.1); }
+.mol3d-turn-bar button { height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.mol3d-turn-bar button.mol3d-ghost { background: rgba(255,255,255,0.14); font-weight: 400; }
 #overlay.editing .ov-main { outline-style: dashed; }
 #overlay.editing .ov-h, #overlay.editing .ov-rot, #overlay.editing .ov-hover { display: none; }
 .textbar {
@@ -1245,6 +1254,45 @@ body.resizing-panels #deckFrame { pointer-events: none; }
 .palette-foot kbd { font: 12px var(--ui-mono); padding: 0 4px; border: 1px solid var(--line-2); border-radius: 3px; margin-right: 2px; }
 .versions-card { width: 640px; }
 /* Insert > Interactive chart: the figure pasted, what is wrong with it, how it will look. */
+/* Insert > 3D structure (mol3d.js) */
+.mol3d-card { width: 900px; max-width: calc(100vw - 40px); display: grid; grid-template-columns: 1fr 380px; gap: 0 16px; }
+.mol3d-card h2 { grid-column: 1 / -1; }
+.mol3d-card .m3-left { display: flex; flex-direction: column; gap: 8px; min-height: 360px; min-width: 0; }
+.mol3d-card .help-tabs { margin-bottom: 4px; }
+.mol3d-card [data-pane] { display: flex; flex-direction: column; gap: 6px; }
+.mol3d-card [data-pane][hidden] { display: none; }
+.mol3d-card .m3-lab { font-size: var(--fs-label); color: var(--ink-2); }
+.mol3d-card .m3-row { display: flex; gap: 6px; align-items: center; }
+.mol3d-card .m3-row .insp-field { flex: 1; }
+.mol3d-card .m3-net { display: flex; gap: 8px; align-items: flex-start; margin-top: 6px; padding: 8px 10px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); font-size: var(--fs-label); color: var(--ink-2); line-height: 1.45; }
+.mol3d-card .m3-net svg { flex: none; margin-top: 1px; }
+.mol3d-card .m3-drop { border: 2px dashed var(--line-2); border-radius: 8px; padding: 26px 16px; text-align: center; color: var(--ink-3); font-size: 13px; line-height: 1.6; }
+.mol3d-card .m3-drop.full { border-style: solid; border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+.mol3d-card .m3-drop a { color: var(--accent); }
+.mol3d-card .m3-mono { font: 12px var(--ui-mono); }
+.mol3d-card .m3-small { font-size: var(--fs-label); }
+.mol3d-card textarea { display: block; width: 100%; font: 12px var(--ui-mono); }
+.mol3d-card .m3-err { padding: 8px 10px; border-radius: 6px; background: rgba(194,74,42,0.08); border: 1px solid rgba(194,74,42,0.35); color: var(--warn); font-size: 12.5px; line-height: 1.45; }
+.mol3d-card .m3-right { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--bg); }
+.mol3d-card .m3-pv { position: relative; flex: 1; min-height: 260px; background: #fff; }
+.mol3d-card .m3-live { position: absolute; inset: 0; }
+.mol3d-card .m3-empty { position: absolute; inset: 14px; display: flex; align-items: center; justify-content: center; padding: 18px; border: 1px dashed var(--line-2); border-radius: 8px; text-align: center; color: var(--ink-3); font-size: 13px; }
+.mol3d-card .m3-meta { padding: 10px 12px; min-height: 60px; border-top: 1px solid var(--line); }
+.mol3d-card .m3-start { padding: 0 12px 8px; grid-template-columns: 64px 1fr; }
+.mol3d-card .m3-foot { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.mol3d-card .m3-hint { margin-right: auto; font-size: var(--fs-label); color: var(--ink-3); }
+.mol3d-card .tb-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mol3d-card .tb-btn.primary:disabled { opacity: 0.45; cursor: default; }
+.m3-meta { font-size: 12.5px; line-height: 1.5; color: var(--ink-2); margin-bottom: 6px; overflow-wrap: anywhere; }
+.m3-meta b { color: var(--ink); }
+.m3-meta .m3-kept { color: var(--ink-3); }
+.m3-pic { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.m3-pic img { flex: none; width: 84px; height: 69px; object-fit: contain; border: 1px solid var(--line-2); border-radius: 4px; background: var(--bg); }
+.m3-speed { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.m3-speed[hidden] { display: none; }
+.m3-speed input { flex: 1; accent-color: var(--accent); }
+.m3-speed span { font-size: var(--fs-label); color: var(--ink-2); }
+#inspMol3d .insp-seg { height: 28px; }
 .plot-card { width: 720px; }
 .plot-card p { margin: 0 0 10px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
 .plot-card textarea { display: block; }

@@ -48,6 +48,26 @@
   coordinates is laid out from its SMILES, and one that does not read is
   listed under Problems. A binary ChemDraw `.cdx` needs saving as CDXML
   first.
+- **3D structures.** Insert > 3D structure... puts a protein or a molecule on
+  a slide, in 3D: by its ID from the Protein Data Bank, AlphaFold or PubChem
+  (fetched only when you press Fetch, and the dialog says which site it asks),
+  from a `.cif`, `.pdb`, `.sdf`, `.mol`, `.mol2` or `.xyz` file, or pasted. A
+  `.pdb`, `.cif`, `.mol2` or `.xyz` file dropped on a slide goes in at once.
+  The panel says what the file holds (chains, residues, the ligands by name;
+  a small molecule's formula) and sets the style (cartoon, sticks, spheres,
+  surface), the colours (by chain, rainbow, helices and sheets, by element,
+  the deck's), which ligands, water and hydrogens show, and which residues
+  are picked out as sticks. Double-click it to turn it: the view you leave it
+  in becomes its picture, which is what the PDF, PowerPoint and the slide
+  strip show. While presenting it can stay still, turn slowly, or turn and
+  zoom under the mouse. The file is kept in the deck (in `assets/` above
+  1 MB), so it works offline; a still structure adds no script to the deck,
+  and a turning one carries 3Dmol.js (BSD-3-Clause) beside it, trusted as
+  Diapo's own.
+- Presentation features script version 17: the wheel over a 3D structure
+  that turns under the mouse zooms it, also on a slide with steps. Every
+  template carries it, and a deck with an older edition offers the update when
+  it is opened (and gets it when it is saved).
 
 ## 1.4.4 - 2026-11-22
 

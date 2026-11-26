@@ -11,6 +11,7 @@ import { refreshCharts } from './core/chart.js';
 import { refreshMath } from './core/math.js';
 import { refreshChem, uprightLabels, chemLabel } from './core/chem.js';
 import { PLOT, refreshPlots, openPlotDialog, ensureDeckPlots } from './core/plot.js';
+import { Mol3dEditor, openMol3dDialog } from './core/mol3d.js';
 import { LAYOUTS } from './core/layouts.js';
 import { Cropper, canCrop, cropBoxOf } from './core/crop.js';
 import { Palette, iconEntries } from './core/palette.js';
@@ -1308,6 +1309,7 @@ function onKey(e) {
     const k = e.key;
     // Crop mode has the keys: Enter and Esc end it, arrows move the picture.
     if (app.cropper && app.cropper.active && !typing && app.cropper.handleKey(e)) return stop(e);
+    if (app.mol3d && app.mol3d.turning && !typing && app.mol3d.handleKey(e)) return stop(e);     // turning a 3D structure: Enter and Esc end it
 
     if (k === 'Escape') {
         if (app.layers && app.layers.endRename(false)) return stop(e);   // a name being typed in the Layers list
@@ -1566,11 +1568,13 @@ applyPanels();                     // the Layers list's remembered state
 app.cropper = new Cropper(app);
 app.problems = new Problems(app, { badge: $('problemsBadge') });
 app.fileDrop = new FileDrop(app, { canvas: $('canvas'), importDecks: importDroppedDecks, toast: (m, o) => toast(m, o) });
+app.mol3d = new Mol3dEditor(app);
 function runtimeState() {
     if (!app.deck.isOpen) return 'none';
     const el = app.deck.doc.getElementById('deck-runtime') || app.deck.doc.getElementById('deck-presenter');
     if (!el) return 'none';
-    return el.id === 'deck-runtime' && /version: (1[2-9]|[2-9]\d)\b/.test(el.textContent) ? 'current' : 'old';
+    const v = el.id === 'deck-runtime' && /version: (\d+)\b/.exec(el.textContent);
+    return v && +v[1] >= 17 ? 'current' : 'old';         // 17: the wheel over a 3D structure that is dragged to turn is its own
 }
 function showPresenterMenu(on) {
     const dd = $('presenterMenu').querySelector('.tb-dropdown');
@@ -1754,6 +1758,7 @@ function paletteEntries() {
         out.push({ group: 'Insert', label: 'Interactive chart (Plotly)...', keywords: 'plot plotly json figure graph live hover zoom', run: click('[data-insert="plot"]') });
         out.push({ group: 'Insert', label: 'Chemical structure', keywords: 'chemistry molecule smiles compound', run: click('[data-insert="structure"]') });
         out.push({ group: 'Insert', label: 'Chemical structure from file...', keywords: 'chemistry molecule molfile mol sdf cdxml chemdraw compound', run: click('[data-insert="structure-file"]') });
+        out.push({ group: 'Insert', label: '3D structure...', keywords: 'protein pdb alphafold pubchem molecule 3dmol cif mmcif sdf mol2 xyz', run: click('[data-insert="mol3d"]') });
         out.push({ group: 'Insert', label: 'Font Awesome icon...', keywords: 'icons fa', run: (q) => { app.iconPicker.open($('btnInsert')); const words = q.replace(/\b(font awesome|icon|icons|fa)\b/gi, '').trim(); if (words && app.iconPicker.search) { app.iconPicker.search.value = words; app.iconPicker.search.dispatchEvent(new Event('input')); } } });
         out.push(...iconEntries(app));
         if (has) {
@@ -1871,6 +1876,7 @@ $('insertMenu').addEventListener('click', async (e) => {
         case 'structure': drawnInsert(() => app.insert.structure(), 'structure'); break;
         case 'structure-file': $('insertChem').click(); break;
         case 'plot': openPlotDialog(app); break;
+        case 'mol3d': openMol3dDialog(app); break;
         case 'master-footer': app.insert.masterFooter(); break;
         case 'image': chooseImage(null); break;
         case 'image-url': { const url = prompt('Image address (URL):', 'https://'); if (url && url !== 'https://') creditFromUrl(app, app.insert.image(url.trim()), url.trim()); break; }

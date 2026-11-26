@@ -46,7 +46,7 @@ class DeckFiles(unittest.TestCase):
 
     def test_saving_brings_the_files_and_they_count_as_diapos(self):
         self.assertEqual(sorted(serve.ensure_deck_files(self.deck, PAGE)), ["deck-plot.js", "deck-plotly.min.js"])
-        for name in serve.DECK_FILES:
+        for name in ("deck-plotly.min.js", "deck-plot.js"):
             with open(self.beside(name), "rb") as a, open(source(name), "rb") as b:
                 self.assertEqual(a.read(), b.read(), name)
         self.assertEqual(serve.ensure_deck_files(self.deck, PAGE), [])            # nothing to do the second time
@@ -58,6 +58,16 @@ class DeckFiles(unittest.TestCase):
         policy = serve.deck_csp(scan["allow"], urls)
         self.assertTrue(policy.startswith("script-src http://127.0.0.1:8800/deck/my%20talk/deck-plotly.min.js http://127.0.0.1:8800/deck/my%20talk/deck-plot.js 'sha256-"))
         self.assertNotIn("unsafe", policy)
+
+    def test_a_turning_3d_structure_brings_3dmol_and_its_script(self):
+        page = PAGE.replace('<script src="deck-plotly.min.js" data-deck-plot="library"></script>', '<script src="deck-3dmol.min.js" data-deck-mol3d="library"></script>').replace(
+            '<script src="deck-plot.js" data-deck-plot="renderer"></script>', '<script src="deck-mol3d.js" data-deck-mol3d="renderer"></script>').replace(
+            '<script type="application/json" data-plot-figure>', '<script type="chemical/x-pdb" data-mol3d-source>')
+        with open(self.deck, "w", encoding="utf-8", newline="\n") as f:
+            f.write(page)
+        self.assertEqual(sorted(serve.ensure_deck_files(self.deck, page)), ["deck-3dmol.min.js", "deck-mol3d.js"])
+        scan = self.scan()
+        self.assertEqual((scan["own"], scan["files"]), ([], ["deck-3dmol.min.js", "deck-mol3d.js"]))     # the structure file is data, the two scripts Diapo's
 
     def test_a_file_of_that_name_with_other_contents_is_the_decks_own(self):
         serve.ensure_deck_files(self.deck, PAGE)

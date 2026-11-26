@@ -64,6 +64,8 @@ export const api = {
     citeDoi: (doi) => call('GET', '/api/cite/doi?' + q({ doi })),
     /* Who made a picture on Wikimedia Commons and under what licence ({by, from, license, url}), from its address. */
     commonsCredit: (url) => call('GET', '/api/credit/commons?' + q({ url })),
+    /* A 3D structure file by its ID ({text, format, name, site, url}): the server asks rcsb.org, AlphaFold or PubChem, only when the user presses Fetch. */
+    structure: (from, id) => call('GET', '/api/structure?' + q({ from, id })),
     uploadFonts: (file, files) => {
         const fd = new FormData();
         for (const f of files) fd.append('file', f, f.name);

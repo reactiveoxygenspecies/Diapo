@@ -61,6 +61,9 @@ Routes
                                  only when the user adds a reference by its DOI)
     GET  /api/credit/commons?url= {by, from, license, url}: who made a picture on Wikimedia Commons
                                  and its licence (asked only for a picture inserted from Commons)
+    GET  /api/structure?from=pdb|alphafold|pubchem&id= {text, format, name, site, url}: a 3D
+                                 structure file from the Protein Data Bank, AlphaFold or PubChem
+                                 (asked only when the user presses Fetch in Insert > 3D structure)
     POST /api/fonts/host?file=&embed=0|1  body = JSON {urls}: downloads the fonts behind
                                  Google Fonts stylesheet URLs into <deck folder>/fonts/ (or
                                  inlines them as data URIs) and returns the @font-face CSS
@@ -164,6 +167,9 @@ MAX_UPLOAD = 50 * 1024 * 1024
 # so a request from elsewhere can not plant a file that runs.
 UPLOAD_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".bmp", ".svg",
               ".mp4", ".webm", ".mov", ".mp3", ".m4a", ".wav", ".ogg"}
+# Structure files a 3D structure keeps in assets/ when it is too large to write into the page
+# (app/core/mol3d.js): plain text, read by the structure's own script, never run.
+STRUCTURE_EXT = {".pdb", ".cif", ".mmcif", ".sdf", ".mol", ".mol2", ".xyz", ".pqr"}
 
 
 # ------------------------------------------------------------------
@@ -862,7 +868,9 @@ DECK_DOC_EXT = (".html", ".htm", ".~draft")
 EDITOR_SCRIPTS = ("deck-runtime.js", "print/prep.js", "print/keeper.js")
 # Script files Diapo puts beside a deck: {name in the deck's folder: the file in app/}. An
 # interactive chart's library (plotly.js, exactly as npm ships it) and the script that draws it.
-DECK_FILES = {"deck-plotly.min.js": "vendor/plotly.min.js", "deck-plot.js": "deck-plot.js"}
+DECK_FILES = {"deck-plotly.min.js": "vendor/plotly.min.js", "deck-plot.js": "deck-plot.js",
+              # A 3D structure that turns while presented: 3Dmol.js (as npm ships it) and the script that shows it.
+              "deck-3dmol.min.js": "vendor/3Dmol-min.js", "deck-mol3d.js": "deck-mol3d.js"}
 _known = None
 _known_files = None
 _scan_cache = {}
@@ -1099,7 +1107,7 @@ def script_urls(host, route, srcs):
 
 def editor_csp(host):
     base = "http://" + host
-    files = " ".join(f"{base}/{p}" for p in ("editor.js", "look.js", "presenter.js", "deck-plot.js", "core/", "vendor/"))   # vendor/: MathJax, SmilesDrawer, plotly.js
+    files = " ".join(f"{base}/{p}" for p in ("editor.js", "look.js", "presenter.js", "deck-plot.js", "deck-mol3d.js", "core/", "vendor/"))   # vendor/: MathJax, SmilesDrawer, plotly.js, 3Dmol.js
     return f"script-src {files} {hash_sources(known_script_hashes())}; form-action 'none'; object-src 'none'; {FRAME_POLICY}"
 
 
@@ -1108,7 +1116,7 @@ def safe_upload_name(name):
     name = os.path.basename((name or "").replace("\\", "/"))
     name = re.sub(r"[^\w.\- ()]", "_", name).strip(" .")
     stem, ext = os.path.splitext(name)
-    if not stem or ext.lower() not in UPLOAD_EXT:
+    if not stem or ext.lower() not in UPLOAD_EXT | STRUCTURE_EXT:
         return None
     return stem + ext.lower()
 
@@ -1441,6 +1449,68 @@ def lookup_commons(url):
         return re.sub(r"\s+", " ", html_text.unescape(re.sub(r"<[^>]+>", " ", v))).strip()[:300]
     return {"by": text("Artist"), "from": "Wikimedia Commons", "license": text("LicenseShortName"),
             "url": info.get("descriptionurl") or ""}
+
+
+# -- 3D structures ------------------------------------------------------
+# Insert > 3D structure fetches a structure file by its ID, and only when the user presses Fetch:
+# from the Protein Data Bank (rcsb.org), the AlphaFold database (its API names the file) or PubChem
+# (a computed 3D conformer). Only the ID goes out; the file is then kept in the deck.
+STRUCTURE_TIMEOUT = 60
+STRUCTURE_MAX_BYTES = 50 * 1024 * 1024
+PDB_ID_RE = re.compile(r"^(\d[A-Za-z0-9]{3}|pdb_[0-9a-z]{8})$", re.I)
+UNIPROT_RE = re.compile(r"^(AF-)?([A-Z0-9]{6,10})(-F\d+)?$", re.I)
+STRUCTURE_SITES = {"pdb": "rcsb.org", "alphafold": "alphafold.ebi.ac.uk", "pubchem": "pubchem.ncbi.nlm.nih.gov"}
+
+
+def _structure_get(url, site, missing):
+    req = urllib.request.Request(url, headers={"User-Agent": LOOKUP_UA})
+    try:
+        with urllib.request.urlopen(req, timeout=STRUCTURE_TIMEOUT) as r:
+            raw = r.read(STRUCTURE_MAX_BYTES + 1)
+    except urllib.error.HTTPError as e:
+        if e.code in (400, 404):
+            raise LookupError_(missing)
+        raise LookupError_(f"{site} answered with an error ({e.code}). Try again later.")
+    except (urllib.error.URLError, OSError, TimeoutError):
+        raise LookupError_(f"Diapo couldn't reach {site}. Check the connection, or download the file from the site and drop it in the From a file tab.")
+    if len(raw) > STRUCTURE_MAX_BYTES:
+        raise LookupError_(f"The file {site} has for it is larger than {STRUCTURE_MAX_BYTES // (1024 * 1024)} MB, too large for a slide.")
+    return raw.decode("utf-8", "replace")
+
+
+def lookup_structure(source, ident):
+    """{text, format, name, site, url}: a structure file by its ID, from one of three sites."""
+    ident = (ident or "").strip()
+    if source == "pdb":
+        if not PDB_ID_RE.match(ident):
+            raise LookupError_("A PDB ID is four characters, a digit first (1FDN, 4HHB).")
+        url = f"https://files.rcsb.org/download/{ident.upper() if len(ident) == 4 else ident.lower()}.cif"
+        text = _structure_get(url, "rcsb.org", f"The Protein Data Bank has no entry {ident.upper()}.")
+        return {"text": text, "format": "cif", "name": ident.upper(), "site": "rcsb.org", "url": url}
+    if source == "alphafold":
+        m = UNIPROT_RE.match(ident)
+        if not m:
+            raise LookupError_("A UniProt ID is six or ten letters and digits (P00195, Q8W3K0).")
+        acc = m.group(2).upper()
+        api = f"https://alphafold.ebi.ac.uk/api/prediction/{acc}"
+        try:
+            entries = json.loads(_structure_get(api, "alphafold.ebi.ac.uk", f"AlphaFold has no prediction for {acc}."))
+        except ValueError:
+            raise LookupError_("alphafold.ebi.ac.uk did not answer as expected.")
+        entry = entries[0] if isinstance(entries, list) and entries else entries if isinstance(entries, dict) else None
+        url = str((entry or {}).get("cifUrl") or "")
+        if urllib.parse.urlparse(url).scheme != "https" or urllib.parse.urlparse(url).hostname != "alphafold.ebi.ac.uk":
+            raise LookupError_(f"AlphaFold has no structure file for {acc}.")     # only the one site, whatever the answer names
+        text = _structure_get(url, "alphafold.ebi.ac.uk", f"AlphaFold has no structure file for {acc}.")
+        return {"text": text, "format": "cif", "name": str((entry or {}).get("entryId") or ("AF-" + acc)), "site": "alphafold.ebi.ac.uk", "url": url}
+    if source == "pubchem":
+        if not ident or len(ident) > 200:
+            raise LookupError_("Give a compound's name or its CID (caffeine, 2519).")
+        by = "cid/" + ident if ident.isdigit() else "name/" + urllib.parse.quote(ident, safe="")
+        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/{by}/SDF?record_type=3d"
+        text = _structure_get(url, "pubchem.ncbi.nlm.nih.gov", f"PubChem has no 3D structure for {ident}.")
+        return {"text": text, "format": "sdf", "name": ident, "site": "pubchem.ncbi.nlm.nih.gov", "url": url}
+    raise LookupError_("Fetch from pdb, alphafold or pubchem.")
 
 
 def font_slug(s):
@@ -2238,6 +2308,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if route == "/api/cite/doi":
                 try:
                     return self._json({"ok": True, "item": lookup_doi(self._query().get("doi", ""))})
+                except LookupError_ as e:
+                    return self._fail(str(e), 502)
+            if route == "/api/structure":
+                try:
+                    q = self._query()
+                    return self._json({"ok": True, **lookup_structure(q.get("from", ""), q.get("id", ""))})
                 except LookupError_ as e:
                     return self._fail(str(e), 502)
             if route == "/api/credit/commons":

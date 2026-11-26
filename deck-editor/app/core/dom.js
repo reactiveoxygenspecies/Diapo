@@ -8,9 +8,9 @@
    ============================================================ */
 
 export const TEXT_TAGS = 'h1, h2, h3, h4, h5, h6, p, li, blockquote, pre, td, th, dt, dd, figcaption, label, [data-edit]';
-export const MEDIA_TAGS = 'img, video, audio, canvas, iframe, svg, [data-fig], [data-chart], [data-math]:not(span), [data-chem], [data-plot], [data-svg], picture, object';
+export const MEDIA_TAGS = 'img, video, audio, canvas, iframe, svg, [data-fig], [data-chart], [data-math]:not(span), [data-chem], [data-plot], [data-mol3d], [data-svg], picture, object';
 /* Figures the editor (or a deck's script) draws: picked, moved and sized as one, never edited inside. */
-export const DRAWN = '[data-fig], [data-chart], [data-math]:not(span), [data-chem], [data-plot]';
+export const DRAWN = '[data-fig], [data-chart], [data-math]:not(span), [data-chem], [data-plot], [data-mol3d]';
 /* An equation inside text (math.js): a word of its text, not a picture of its own. Its <svg> is
    no shape, no media and nothing to select apart from the text that holds it. */
 export const INLINE_MATH = 'span[data-math]';
@@ -259,6 +259,7 @@ export function describe(el) {
         : el.hasAttribute('data-math') ? 'equation'
         : el.hasAttribute('data-chem') ? 'structure'
         : el.hasAttribute('data-plot') ? 'interactive chart'
+        : el.hasAttribute('data-mol3d') ? '3D structure'
         : el.hasAttribute('data-fa') ? 'icon ' + el.getAttribute('data-fa')
         : el.hasAttribute('data-line') ? 'line'
         : el.hasAttribute('data-svg') ? 'inline SVG'
@@ -273,6 +274,7 @@ export function describe(el) {
     const text = el.hasAttribute('data-math') ? el.getAttribute('data-math').slice(0, 70)
         : el.hasAttribute('data-chem') ? (el.getAttribute('data-chem') || (el.querySelector(':scope > svg[aria-label]') || el).getAttribute('aria-label') || '').slice(0, 70)
         : el.hasAttribute('data-plot') ? ((el.querySelector('[data-plot-snapshot]') || el).getAttribute('alt') || '').slice(0, 70)
+        : el.hasAttribute('data-mol3d') ? ((el.querySelector('[data-mol3d-picture]') || el).getAttribute('alt') || '').replace(/^3D structure: /, '').slice(0, 70)
         : el.dataset.fig || el.hasAttribute('data-chart') ? '' : readableText(el).slice(0, 70);
     const name = (el.getAttribute('data-name') || '').trim();
     return { tag, classes: cls, role, text, name, id: el.getAttribute('data-id') || '', label: tag + (cls.length ? '.' + cls.join('.') : '') };

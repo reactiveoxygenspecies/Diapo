@@ -2095,12 +2095,14 @@ new SlidePresentation();
     // Mouse wheel and touch swipes in the deck also step through fragments first.
     window.addEventListener('wheel', function (e) {
         if (editing() || overview || Math.abs(e.deltaY) < 30) return;
+        // Something that keeps the wheel for itself (a 3D structure dragged to turn zooms with it).
+        if (e.target && e.target.closest && e.target.closest('[data-deck-wheel]')) return;
         var slide = slides()[current()];
         if (!slide || !fragmentsOf(slide).length) return;
         if (e.deltaY > 0 ? nextFragment() : prevFragment()) e.stopImmediatePropagation();
     }, { capture: true, passive: true });
 
-    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, openKeys: openKeys, closeKeys: closeKeys, search: search, reveal: reveal, openSearch: openSearch, openFinder: openFinder, version: 16 };
+    window.deckRuntime = { next: next, prev: prev, goTo: goTo, fragmentState: fragmentState, openPresenter: openPresenter, openOverview: openOverview, closeOverview: closeOverview, setLaser: setLaser, setDrawing: setDrawing, strokes: function () { return drawStore; }, playTransition: playTransition, playTextEffect: playTextEffect, setAuto: setAuto, autoRunning: function () { return autoOn; }, openKeys: openKeys, closeKeys: closeKeys, search: search, reveal: reveal, openSearch: openSearch, openFinder: openFinder, version: 17 };
 })();
 </script>
 </body>

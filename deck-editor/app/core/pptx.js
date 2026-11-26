@@ -31,7 +31,7 @@ import { bleed as lineBleed } from './lines.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SKIP = 'script, style, template, noscript, aside.notes, .notes, .deck-controls, .deck-overview, .deck-laser, .deck-draw, .deck-draw-bar, .deck-keys, .deck-keyhint, [data-placeholder]';
 const INLINE = new Set(['inline', 'contents']);
-const LEAF_MEDIA = 'img, svg, video, canvas, iframe, object, embed, picture, table, [data-chart], [data-math]:not(span), [data-chem], [data-plot], [data-fig]';
+const LEAF_MEDIA = 'img, svg, video, canvas, iframe, object, embed, picture, table, [data-chart], [data-math]:not(span), [data-chem], [data-plot], [data-mol3d], [data-fig]';
 /* An equation inside text: PowerPoint has no picture inside a line of text, so it goes in as
    its LaTeX read out (texToRuns), powers and indices raised and lowered. */
 const INLINE_MATH = 'span[data-math]';
@@ -121,6 +121,7 @@ export class PptxCollector {
         const tag = el.tagName.toLowerCase();
         const box = this.box(el, cs);
         if (isChart(el)) { out.push(this.chart(el, box, cs)); return; }
+        if (el.matches('[data-mol3d]')) { const img = el.querySelector(':scope > img[data-mol3d-picture]'); const p = img && img.getAttribute('src') ? await this.picture(img, box) : null; if (p) { p.name = this.name(el) || '3D structure'; out.push(p); } else this.note('a 3D structure without its picture was left out (open it in the editor once to draw it)'); return; }
         if (el.matches('[data-plot]')) { const p = await this.plotItem(el, box); if (p) { const a = this.opacity(el); if (a < 0.999) p.alpha = a; out.push(p); } return; }
         if (el.matches('[data-math], [data-chem], [data-fig]') || tag === 'svg') { const s = await this.svgItem(el, box); if (s) { const a = this.opacity(el); if (a < 0.999) s.alpha = a; out.push(s); } return; }
         if (el.matches('[data-crop]')) { const img = el.querySelector('img'); if (img) { const p = await this.picture(img, box, el); if (p) out.push(p); } return; }
