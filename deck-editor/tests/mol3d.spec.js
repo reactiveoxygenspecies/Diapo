@@ -1,4 +1,4 @@
-// 3D structures (Insert > 3D structure..., or a .pdb / .cif / .mol2 / .xyz file dropped on a slide):
+// 3D structures (Insert > 3D structure..., or a .pdb / .cif / .mol2 / .xyz / .stl file dropped on a slide):
 // a <figure data-mol3d> holding the structure file (never run), its settings and view as JSON, and a
 // picture of the view. The picture is what shows while editing, in the PDF, in PowerPoint and
 // wherever scripts do not run; "Turns slowly" and "Drag to turn" show it live while presenting,
@@ -392,4 +392,127 @@ test('mol3d: a file over 1 MB is kept in assets/; Publish copies it and the sing
     const single = fs.readFileSync(path.join(WS, 'mol3d-big', 'big-standalone.html'), 'utf8');
     expect(single).toMatch(/<script type="chemical\/x-pdb" data-mol3d-source="">\nHEADER/);
     expect(single).not.toContain('assets/helix-in-water.pdb');
+});
+
+// STL: a mesh (a 3D print, a CAD part, a surface exported from ChimeraX), not atoms. Kept as base64.
+const TORUS = path.join(FIX, 'torus-binary.stl');           // binary, 576 triangles, 80 x 80 x 20
+const PYRAMID = path.join(FIX, 'pyramid-ascii.stl');        // text, 6 triangles, 20 x 20 x 15
+const stlBytes = (page) => mol(page, (el) => Array.from(window.DeckMol3d.bytes(el.querySelector('script[data-mol3d-source]').textContent)));
+
+test('mol3d: an STL model, binary or text, comes in as one shape kept as base64, with its own styles; save, reopen, paste and drop', async ({ page }) => {
+    await newDeck(page, 'mol3d-stl');
+    await page.click('#btnInsert');
+    await page.click('[data-insert="mol3d"]');
+    await page.click('.mol3d-dialog [data-tab="file"]');
+    await page.setInputFiles('#m3File', TORUS);
+    await expect(page.locator('#m3Insert')).toBeEnabled({ timeout: 15000 });
+    await expect(page.locator('#m3Meta')).toContainText('Torus-binary');
+    await expect(page.locator('#m3Meta')).toContainText('576 triangles · 80 × 80 × 20 across');
+    await expect(page.locator('.mol3d-dialog .m3-start')).toBeHidden();       // a mesh starts solid
+    await page.click('#m3Insert');
+    await expect(page.locator('.mol3d-dialog')).toHaveCount(0, { timeout: 15000 });
+    await page.waitForFunction(() => { const s = window.deckEditor.selection.single; return s && s.matches('figure[data-mol3d]') && s.querySelector('img[data-mol3d-picture]').getAttribute('src'); });
+
+    expect(await mol(page, (el) => [el.getAttribute('data-mol3d'), el.querySelector('script[data-mol3d-source]').getAttribute('type'), el.querySelector('img').getAttribute('alt')]))
+        .toEqual(['stl', 'model/stl', '3D model: Torus-binary']);
+    expect(await stlBytes(page)).toEqual(Array.from(fs.readFileSync(TORUS)));
+    expect(await settingsOf(page)).toMatchObject({ style: 'solid', colour: 'deck', source: 'torus-binary.stl' });
+    expect((await inked(page)).share).toBeGreaterThan(0.02);
+    // The panel: a mesh's styles and colours, nothing about atoms.
+    await expect(page.locator('#m3pMeta')).toContainText('torus-part');
+    await expect(page.locator('#m3pStyle button')).toHaveText(['Solid', 'See-through', 'Wireframe']);
+    await expect(page.locator('#m3pColour option')).toHaveText(["The deck's colour", 'Light grey']);
+    for (const id of ['#m3pShowSub', '#m3pHRow', '#m3pWaterRow', '#m3pPickRow']) await expect(page.locator(id)).toBeHidden();
+    const solid = await pictureSrc(page);
+    await page.click('#m3pStyle [data-v="wire"]');
+    await expect.poll(async () => (await settingsOf(page)).style).toBe('wire');
+    await expect.poll(() => pictureSrc(page)).not.toBe(solid);
+    await page.selectOption('#m3pColour', 'plain');
+    await expect.poll(async () => (await settingsOf(page)).colour).toBe('plain');
+    const pic = await pictureSrc(page), settings = await settingsOf(page);
+
+    await save(page);
+    const html = fs.readFileSync(path.join(WS, 'mol3d-stl', 'index.html'), 'utf8');
+    expect(html).toMatch(/<script type="model\/stl" data-mol3d-source="">\n[A-Za-z0-9+/]{100}\n/);
+    await open(page, 'mol3d-stl');
+    expect(await settingsOf(page)).toEqual(settings);
+    expect(await stlBytes(page)).toEqual(Array.from(fs.readFileSync(TORUS)));
+    await page.waitForTimeout(800);
+    expect(await pictureSrc(page)).toBe(pic);                     // current: not drawn again on opening
+    await page.evaluate(() => window.deckEditor.selection.select(window.deckEditor.deck.doc.querySelector('figure[data-mol3d]')));
+    await expect(page.locator('#m3pMeta')).toContainText('576 triangles');
+
+    // The text kind, pasted.
+    await page.click('#btnInsert');
+    await page.click('[data-insert="mol3d"]');
+    await page.click('.mol3d-dialog [data-tab="paste"]');
+    const ascii = fs.readFileSync(PYRAMID, 'utf8');
+    await page.fill('#m3Paste', ascii);
+    await expect(page.locator('#m3Insert')).toBeEnabled({ timeout: 15000 });
+    await expect(page.locator('#m3Meta')).toContainText('Pyramid');
+    await expect(page.locator('#m3Meta')).toContainText('6 triangles · 20 × 20 × 15 across');
+    await page.click('#m3Insert');
+    await expect(page.locator('.mol3d-dialog')).toHaveCount(0, { timeout: 15000 });
+    const pasted = await page.evaluate(() => { const el = window.deckEditor.selection.single; return new TextDecoder().decode(window.DeckMol3d.bytes(el.querySelector('script[data-mol3d-source]').textContent)); });
+    expect(pasted).toBe(ascii);
+
+    // Dropped on the slide.
+    const bytes = Array.from(fs.readFileSync(TORUS));
+    const box = await page.locator('#canvas').boundingBox();
+    const dt = await page.evaluateHandle((b) => { const d = new DataTransfer(); d.items.add(new File([new Uint8Array(b)], 'ring.stl', { type: '' })); return d; }, bytes);
+    await page.dispatchEvent('#canvas', 'dragover', { dataTransfer: dt, clientX: box.x + box.width / 2, clientY: box.y + box.height / 2 });
+    await page.dispatchEvent('#canvas', 'drop', { dataTransfer: dt, clientX: box.x + box.width / 2, clientY: box.y + box.height / 2 });
+    await page.waitForFunction(() => window.deckEditor.deck.doc.querySelectorAll('figure[data-mol3d="stl"] img[src]').length === 3, null, { timeout: 15000 });
+
+    // A file that is not one: said in words.
+    await page.click('#btnInsert');
+    await page.click('[data-insert="mol3d"]');
+    await page.click('.mol3d-dialog [data-tab="file"]');
+    await page.setInputFiles('#m3File', { name: 'broken.stl', mimeType: 'model/stl', buffer: Buffer.from('not a mesh at all') });
+    await expect(page.locator('#m3Err')).toContainText('not an STL file');
+    await expect(page.locator('#m3Insert')).toBeDisabled();
+    await page.click('#m3Cancel');
+});
+
+test('mol3d: an STL over 1 MB is kept in assets/ as it was; the single file writes it in as base64 and turns offline', async ({ page, browser }) => {
+    await newDeck(page, 'mol3d-stl-big');
+    // 21,000 small triangles scattered in a box: 1.05 MB, binary.
+    const n = 21000, buf = Buffer.alloc(84 + 50 * n);
+    buf.write('scattered', 0);
+    buf.writeUInt32LE(n, 80);
+    let seed = 7;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let t = 0; t < n; t++) {
+        const c = [rnd() * 100, rnd() * 60, rnd() * 40];
+        const corners = [c, [c[0] + 2, c[1], c[2]], [c[0], c[1] + 2, c[2]]];
+        corners.forEach((v, i) => v.forEach((x, k) => buf.writeFloatLE(x, 84 + 50 * t + 12 + 12 * i + 4 * k)));
+    }
+    expect(buf.length).toBeGreaterThan(1024 * 1024);
+    const name = 'big part.stl';
+    await page.evaluate(async ([b, name]) => {
+        const { insertFiles } = await import('/core/mol3d.js');
+        await insertFiles(window.deckEditor, [new File([new Uint8Array(b)], name)]);
+    }, [Array.from(buf), name]);
+    expect(await mol(page, (el) => el.querySelector('script[data-mol3d-source]').getAttribute('src'))).toBe('assets/' + name);
+    expect(fs.readFileSync(path.join(WS, 'mol3d-stl-big', 'assets', name)).equals(buf)).toBe(true);
+    await expect(page.locator('#m3pMeta')).toContainText('21,000 triangles');
+    await page.click('#m3pStyle [data-v="glass"]');                // read back from assets/, drawn again
+    await expect.poll(async () => (await settingsOf(page)).style).toBe('glass');
+    await page.click('#m3pPresent [data-v="turns"]');
+    await save(page);
+
+    const r = await page.evaluate(() => window.deckEditor.exporter.standalone({ to: 'stl-standalone.html', fonts: false }));
+    expect(r.notes.join(' ')).not.toMatch(/big part/);
+    const single = fs.readFileSync(path.join(WS, 'mol3d-stl-big', 'stl-standalone.html'), 'utf8');
+    expect(single).not.toContain('assets/' + name);
+    const m = /<script type="model\/stl" data-mol3d-source="">\n([\s\S]*?)\n<\/script>/.exec(single);
+    expect(Buffer.from(m[1].replace(/\s+/g, ''), 'base64').equals(buf)).toBe(true);
+    const alone = path.join(WS, 'elsewhere-stl');
+    fs.mkdirSync(alone, { recursive: true });
+    fs.copyFileSync(path.join(WS, 'mol3d-stl-big', 'stl-standalone.html'), path.join(alone, 'part.html'));
+    const ctx = await browser.newContext({ offline: true });
+    const solo = await ctx.newPage();
+    await solo.goto('file:///' + path.join(alone, 'part.html').replace(/\\/g, '/'));
+    await solo.waitForFunction(() => document.querySelector('figure[data-mol3d] > .deck-mol3d-live.ready canvas'), null, { timeout: 20000 });
+    await ctx.close();
 });

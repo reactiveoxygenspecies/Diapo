@@ -274,7 +274,7 @@ export function describe(el) {
     const text = el.hasAttribute('data-math') ? el.getAttribute('data-math').slice(0, 70)
         : el.hasAttribute('data-chem') ? (el.getAttribute('data-chem') || (el.querySelector(':scope > svg[aria-label]') || el).getAttribute('aria-label') || '').slice(0, 70)
         : el.hasAttribute('data-plot') ? ((el.querySelector('[data-plot-snapshot]') || el).getAttribute('alt') || '').slice(0, 70)
-        : el.hasAttribute('data-mol3d') ? ((el.querySelector('[data-mol3d-picture]') || el).getAttribute('alt') || '').replace(/^3D structure: /, '').slice(0, 70)
+        : el.hasAttribute('data-mol3d') ? ((el.querySelector('[data-mol3d-picture]') || el).getAttribute('alt') || '').replace(/^3D (structure|model): /, '').slice(0, 70)
         : el.dataset.fig || el.hasAttribute('data-chart') ? '' : readableText(el).slice(0, 70);
     const name = (el.getAttribute('data-name') || '').trim();
     return { tag, classes: cls, role, text, name, id: el.getAttribute('data-id') || '', label: tag + (cls.length ? '.' + cls.join('.') : '') };

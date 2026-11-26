@@ -16,6 +16,10 @@
    (Enter, Esc, a click outside) makes that view the picture. Every
    change is one undo step: the settings and the picture together.
 
+   An STL file (a mesh, not atoms: a 3D print, a CAD part, a surface
+   exported from ChimeraX) goes the same way as data-mol3d="stl", kept
+   as base64 (it is often binary) and drawn as one shape.
+
    This module has the Insert dialog (by ID from the PDB, AlphaFold or
    PubChem through serve.py, a file, or pasted text), the panel's
    section, turn mode, file drops, and the script tags a deck with a
@@ -27,7 +31,7 @@ import { loadVendor } from './vendor.js';
 export const MOL3D = 'figure[data-mol3d]';
 /* The script tags a deck carries when one of its structures turns while presented, in this order. */
 export const MOL3D_SCRIPTS = [['deck-3dmol.min.js', 'library'], ['deck-mol3d.js', 'renderer']];
-export const FILE_EXT = ['pdb', 'cif', 'mmcif', 'sdf', 'mol', 'mol2', 'xyz', 'pqr'];
+export const FILE_EXT = ['pdb', 'cif', 'mmcif', 'sdf', 'mol', 'mol2', 'xyz', 'pqr', 'stl'];
 const INLINE_MAX = 1024 * 1024;              // a larger file goes to assets/
 const FILE_MAX = 50 * 1024 * 1024;           // the size the server's fetch and upload take too
 const PICTURE_STYLE = 'display:block;width:100%;height:100%;object-fit:contain;';
@@ -53,6 +57,19 @@ const pictureOf = (el) => el.querySelector(':scope > img[data-mol3d-picture]');
 const holderOf = (el) => el.querySelector(':scope > script[data-mol3d-source]');
 const readable = (err) => String(err && err.message || err || 'it could not be drawn').replace(/\s+/g, ' ').slice(0, 220);
 const extOf = (name) => { const m = /\.([^.\\/]+)$/.exec(name || ''); return m ? m[1].toLowerCase() : ''; };
+const isMesh = (fmt) => fmt === 'stl';
+/* Bytes as base64 (an STL file is kept so), in the editor before deck-mol3d.js has loaded. */
+function base64(bytes) {
+    let out = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(out);
+}
+/* A dropped or chosen file as the figure keeps it: its text, or base64 for an STL file. */
+async function fileText(f) {
+    return extOf(f.name) === 'stl' ? base64(new Uint8Array(await f.arrayBuffer())) : f.text();
+}
+/* Pasted text of an STL file (the text kind, "solid ... facet ..."), as the figure keeps it. */
+const pastedStl = (text) => base64(new TextEncoder().encode(text));
 
 /* ------------------------------------------------------------
    The libraries, in the editor page
@@ -84,6 +101,7 @@ export function detectFormat(text, name = '') {
     if (FILE_EXT.includes(ext)) return ext;
     const t = String(text || '');
     const head = t.slice(0, 4000);
+    if (/^\s*solid\b/.test(head) && /\bfacet\s+normal\b/.test(head)) return 'stl';
     if (/^data_/m.test(head) || /^_atom_site\./m.test(t.slice(0, 200000))) return 'cif';
     if (/@<TRIPOS>/.test(head)) return 'mol2';
     if (/^(ATOM  |HETATM|HEADER|CRYST1|MODEL )/m.test(head)) return 'pdb';
@@ -96,8 +114,8 @@ export function detectFormat(text, name = '') {
 /* What is wrong with a file as a 3D structure, in words, or '' when nothing is. */
 export function structureProblem(text, fmt) {
     if (!String(text || '').trim()) return 'The file is empty.';
-    if (text.length > FILE_MAX) return `The file is larger than ${FILE_MAX / 1048576} MB, too large for a slide.`;
-    if (!fmt) return 'This is not a structure file Diapo reads: give a .pdb, .cif, .sdf, .mol, .mol2 or .xyz file.';
+    if ((isMesh(fmt) ? text.length * 3 / 4 : text.length) > FILE_MAX) return `The file is larger than ${FILE_MAX / 1048576} MB, too large for a slide.`;
+    if (!fmt) return 'This is not a structure file Diapo reads: give a .pdb, .cif, .sdf, .mol, .mol2, .xyz or .stl file.';
     if (fmt === 'sdf' || fmt === 'mol') {
         // A Molfile's atom lines: x y z element. All z at 0 is a drawing, not a 3D structure.
         const block = text.split(/^M {2}END/m)[0].split(/\r?\n/);
@@ -205,6 +223,18 @@ function readModel($3D, text, fmt) {
 /* Everything the dialog and the panel say about a structure: { info, facts, title, lines[], picks[], defaultPick, formula }. */
 export function describe($3D, text, fmt, source = '') {
     const DM = window.DeckMol3d;
+    if (isMesh(fmt)) {
+        const info = DM.meshInfo(text);
+        const named = info.name && !/^(ascii|binary|stl|mesh|model|object|exported|solid)\b/i.test(info.name) ? info.name : '';
+        const out = { info, facts: { id: '', title: '', organism: '', names: {} }, lines: [], picks: [], defaultPick: '', formula: '' };
+        // Called by its file's name (what people save a part as), else by the name inside it.
+        const fromFile = /\.stl$/i.test(source) ? source.replace(/\.stl$/i, '').replace(/_+/g, ' ').trim() : '';
+        out.title = capital(fromFile || named || '3D model');
+        if (named && named !== out.title) out.lines.push(named);
+        const size = info.size.map(n => n >= 100 ? Math.round(n) : n >= 1 ? Math.round(n * 10) / 10 : Math.round(n * 1000) / 1000);
+        out.lines.push(`${info.triangles.toLocaleString('en')} triangles · ${size.join(' × ')} across`);
+        return out;
+    }
     const model = readModel($3D, text, fmt);
     const info = DM.analyse(model);
     const facts = fileFacts(text, fmt);
@@ -261,6 +291,7 @@ export function describe($3D, text, fmt, source = '') {
 
 /* Settings for a structure just read: the style it starts as, colours, ligands shown but additives. */
 export function startSettings(d, style = '') {
+    if (d.info.mesh) return { style: 'solid', colour: 'deck', ligands: { hidden: [] }, water: false, hydrogens: false, pick: '', present: 'still', speed: 0.4, view: null, bg: 'slide' };
     const small = d.info.small;
     return {
         style: style || (small ? 'ballstick' : 'cartoon'), colour: small ? 'element' : 'chain',
@@ -400,6 +431,7 @@ function makeHolder(doc, format, text, src) {
     holder.setAttribute('type', window.DeckMol3d.formats[format].mime);
     holder.setAttribute('data-mol3d-source', '');
     if (src) holder.setAttribute('src', src);
+    else if (isMesh(format)) holder.textContent = '\n' + (text.replace(/\s+/g, '').match(/.{1,100}/g) || []).join('\n') + '\n';     // base64, in lines
     else holder.textContent = '\n' + window.DeckMol3d.escape(text.replace(/\r\n?/g, '\n').replace(/\n+$/, '')) + '\n';
     return holder;
 }
@@ -409,7 +441,8 @@ async function keepLarge(app, text, format, name) {
     if (text.length <= INLINE_MAX) return '';
     const dir = app.deck.file.includes('/') ? app.deck.file.slice(0, app.deck.file.lastIndexOf('/')) : '';
     const base = (String(name || 'structure').replace(/\.[^.]+$/, '').replace(/[^\w.\- ()]/g, '_') || 'structure');
-    const file = new File([text], base + '.' + (format === 'cif' ? 'cif' : format), { type: 'text/plain' });
+    const file = isMesh(format) ? new File([window.DeckMol3d.bytes(text)], base + '.stl', { type: 'model/stl' })
+        : new File([text], base + '.' + (format === 'cif' ? 'cif' : format), { type: 'text/plain' });
     const r = await app.api.upload(dir, [file]);
     if (!r.files || !r.files.length) throw new Error('the file could not be kept in assets/');
     return r.files[0];
@@ -529,8 +562,8 @@ export function openMol3dDialog(app, { replace = null, file = null } = {}) {
             <div class="m3-net">${GLOBE}<span id="m3Net"></span></div>
           </div>
           <div data-pane="file" hidden>
-            <div class="m3-drop" id="m3Drop" tabindex="0">Drop a structure file here, or <a href="#" id="m3Choose">choose one</a><br><span class="m3-mono">.cif .pdb .sdf .mol .mol2 .xyz</span><br><span class="m3-small">From the PDB, AlphaFold, PubChem, ChemDraw 3D, RDKit, ORCA or Gaussian.</span></div>
-            <input type="file" id="m3File" accept=".cif,.mmcif,.pdb,.pqr,.sdf,.mol,.mol2,.xyz" hidden>
+            <div class="m3-drop" id="m3Drop" tabindex="0">Drop a structure file here, or <a href="#" id="m3Choose">choose one</a><br><span class="m3-mono">.cif .pdb .sdf .mol .mol2 .xyz .stl</span><br><span class="m3-small">From the PDB, AlphaFold, PubChem, ChemDraw 3D, RDKit, ORCA or Gaussian; .stl meshes from CAD, 3D printing or ChimeraX.</span></div>
+            <input type="file" id="m3File" accept=".cif,.mmcif,.pdb,.pqr,.sdf,.mol,.mol2,.xyz,.stl" hidden>
             <div class="insp-hint">Dropping a structure file on a slide does the same and skips this dialog.</div>
           </div>
           <div data-pane="paste" hidden>
@@ -569,6 +602,7 @@ export function openMol3dDialog(app, { replace = null, file = null } = {}) {
         const n = ++seq;
         error('');
         const format = detectFormat(text, name);
+        if (isMesh(format) && !name) text = pastedStl(text);      // pasted: the text kind of STL
         const problem = structureProblem(text, format);
         if (problem) { empty('Nothing to show.'); error(problem); return; }
         try {
@@ -598,6 +632,7 @@ export function openMol3dDialog(app, { replace = null, file = null } = {}) {
             $('m3Meta').querySelectorAll('span').forEach((s, i) => { s.textContent = d.lines[i]; });
             const first = $('m3Start').querySelector('[data-v=""]');
             first.textContent = d.info.small ? 'Ball and stick' : 'Cartoon';
+            $('m3Start').closest('.m3-start').hidden = !!d.info.mesh;       // a mesh starts solid
             $('m3Insert').disabled = false;
             $('m3Hint').textContent = 'Drag the preview to turn it. You can change all of this later in the panel.';
         } catch (err) {
@@ -620,7 +655,7 @@ export function openMol3dDialog(app, { replace = null, file = null } = {}) {
         $('m3Drop').innerHTML = '<b></b> · ' + Math.max(1, Math.round(f.size / 1024)) + ' KB<br><span class="m3-small">' + '<a href="#" id="m3Choose">choose another</a></span>';
         $('m3Drop').querySelector('b').textContent = f.name;
         $('m3Choose').addEventListener('click', (e) => { e.preventDefault(); $('m3File').click(); });
-        await show(await f.text(), f.name, f.name);
+        await show(await fileText(f), f.name, f.name);
     }
     async function fetchIt() {
         const from = $('m3Where').value, id = $('m3Id').value.trim();
@@ -671,7 +706,7 @@ export function openMol3dDialog(app, { replace = null, file = null } = {}) {
     setTimeout(() => $('m3Id').focus(), 0);
     return h;
 }
-const altOf = (d) => '3D structure: ' + d.title + (d.info.small && d.formula ? ' (' + d.formula + ')' : '');
+const altOf = (d) => (d.info.mesh ? '3D model: ' : '3D structure: ') + d.title + (d.info.small && d.formula ? ' (' + d.formula + ')' : '');
 
 /* Another file in the same box: the place, size and way of presenting stay; the rest starts again. */
 export async function replaceStructure(app, el, { text, format, settings, name = '', rotation = null, alt = '' }) {
@@ -705,7 +740,7 @@ export async function insertFiles(app, files, point = null) {
     const done = [];
     for (const [i, f] of files.entries()) {
         if (f.size > FILE_MAX) throw new Error(`${f.name} is larger than ${FILE_MAX / 1048576} MB`);
-        const text = await f.text();
+        const text = await fileText(f);
         const format = detectFormat(text, f.name);
         const problem = structureProblem(text, format);
         if (problem) throw new Error(f.name + ': ' + problem);
@@ -722,6 +757,8 @@ export async function insertFiles(app, files, point = null) {
    ============================================================ */
 const COLOURS = [['chain', 'By chain'], ['rainbow', 'Rainbow, start to end'], ['ss', 'Helices and sheets'], ['element', 'By element'], ['deck', "The deck's colours"]];
 const SMALL_COLOURS = [['element', 'By element'], ['deck', "The deck's colours"]];
+const MESH_COLOURS = [['deck', "The deck's colour"], ['plain', 'Light grey']];
+const MESH_STYLES = [['solid', 'Solid'], ['glass', 'See-through'], ['wire', 'Wireframe']];
 
 export class Mol3dSection {
     constructor(app, root) {
@@ -737,10 +774,10 @@ export class Mol3dSection {
           <div class="insp-btns"><button class="mini-btn" id="m3pReplace" title="Another structure in the same box">Replace...</button><button class="mini-btn" id="m3pSave" title="Save the structure as a file">Save the file...</button></div>
           <div class="insp-row"><label>Style</label><div class="insp-field insp-seg" id="m3pStyle"></div></div>
           <div class="insp-row"><label for="m3pColour">Colour</label><div class="insp-field"><select id="m3pColour"></select></div></div>
-          <div class="theme-sub">Show</div>
+          <div class="theme-sub" id="m3pShowSub">Show</div>
           <div id="m3pLigands"></div>
           <label class="align-toslide" id="m3pWaterRow"><input type="checkbox" id="m3pWater"> <span>Water</span></label>
-          <label class="align-toslide"><input type="checkbox" id="m3pH"> <span>Hydrogens</span></label>
+          <label class="align-toslide" id="m3pHRow"><input type="checkbox" id="m3pH"> <span>Hydrogens</span></label>
           <div class="insp-row" id="m3pPickRow"><label for="m3pPick">Pick out</label><div class="insp-field"><select id="m3pPick"></select></div></div>
           <div class="theme-sub">View</div>
           <div class="theme-row"><button class="mini-btn" id="m3pTurn" title="Drag to turn, scroll to zoom; the view becomes the picture">Turn it...</button><button class="mini-btn" id="m3pFit" title="The whole structure, centred">Fit</button><span class="insp-hint" style="margin:0">or double-click it</span></div>
@@ -806,7 +843,7 @@ export class Mol3dSection {
             const s = DMsettings(el);
             const name = (String(s.source || '').split(/\s+/).pop() || 'structure').replace(/\.[^.]+$/, '').replace(/[^\w.\-]+/g, '_') || 'structure';
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+            a.href = URL.createObjectURL(isMesh(fmt) ? new Blob([window.DeckMol3d.bytes(text)], { type: 'model/stl' }) : new Blob([text], { type: 'text/plain' }));
             a.download = name + '.' + fmt;
             document.body.appendChild(a); a.click(); a.remove();
             setTimeout(() => URL.revokeObjectURL(a.href), 5000);
@@ -845,7 +882,7 @@ export class Mol3dSection {
             } catch (err) { this._error('The structure file could not be read: ' + readable(err) + '.'); }
             if (this.el !== m) return;
         }
-        const small = d ? d.info.small : false;
+        const small = d ? d.info.small : false, mesh = isMesh(window.DeckMol3d.formatOf(m));
         const meta = $('m3pMeta');
         meta.innerHTML = '';
         if (d) {
@@ -856,15 +893,16 @@ export class Mol3dSection {
         const kept = document.createElement('span'); kept.className = 'm3-kept';
         kept.textContent = h && h.getAttribute('src') ? 'Kept beside the deck: ' + h.getAttribute('src') : 'Kept in the deck';
         meta.appendChild(kept);
-        const styles = small ? [['ballstick', 'Ball and stick'], ['sticks', 'Sticks'], ['spheres', 'Spheres'], ['surface', 'Surface']] : [['cartoon', 'Cartoon'], ['sticks', 'Sticks'], ['spheres', 'Spheres'], ['surface', 'Surface']];
+        const styles = mesh ? MESH_STYLES : small ? [['ballstick', 'Ball and stick'], ['sticks', 'Sticks'], ['spheres', 'Spheres'], ['surface', 'Surface']] : [['cartoon', 'Cartoon'], ['sticks', 'Sticks'], ['spheres', 'Spheres'], ['surface', 'Surface']];
         const style = s.style || styles[0][0];
         $('m3pStyle').innerHTML = styles.map(([v, l]) => `<button data-v="${v}"${v === style ? ' class="on"' : ''}>${l}</button>`).join('');
-        const colours = small ? SMALL_COLOURS : COLOURS;
+        const colours = mesh ? MESH_COLOURS : small ? SMALL_COLOURS : COLOURS;
         $('m3pColour').innerHTML = colours.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
         $('m3pColour').value = colours.some(c => c[0] === s.colour) ? s.colour : colours[0][0];
         $('m3pH').checked = s.hydrogens == null ? small : !!s.hydrogens;
         $('m3pClear').checked = s.bg === 'none';
-        $('m3pWaterRow').hidden = small || !(d && d.info.water);
+        $('m3pWaterRow').hidden = small || mesh || !(d && d.info.water);
+        $('m3pShowSub').hidden = $('m3pHRow').hidden = mesh;        // a mesh has no atoms to show or hide
         $('m3pWater').checked = !!s.water;
         const lig = $('m3pLigands');
         lig.innerHTML = '';
@@ -874,7 +912,7 @@ export class Mol3dSection {
             const t = document.createElement('span'); t.textContent = capital(plural(ligandName(l.resn, d.facts.names), l.count)) + ` (${l.resn}${l.count > 1 ? ', ' + l.count : ''})`;
             row.append(box, ' ', t); lig.appendChild(row);
         }
-        $('m3pPickRow').hidden = small || !d || !d.picks.length;
+        $('m3pPickRow').hidden = small || mesh || !d || !d.picks.length;
         if (d && !small) {
             const opts = [{ value: '', label: 'Nothing' }, ...d.picks];
             if (s.pick && !opts.some(o => o.value === s.pick)) opts.push({ value: s.pick, label: s.pick + ', as sticks' });

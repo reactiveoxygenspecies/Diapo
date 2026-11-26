@@ -64,6 +64,13 @@
   1 MB), so it works offline; a still structure adds no script to the deck,
   and a turning one carries 3Dmol.js (BSD-3-Clause) beside it, trusted as
   Diapo's own.
+- **3D models from STL files.** The same dialog, a drop or a paste takes an
+  `.stl` file, binary or text: a 3D print, a CAD part, a surface exported from
+  ChimeraX or PyMOL. It is drawn as one shape, seen from the front and a little
+  above, solid, see-through or as a wireframe, in the deck's colour or light
+  grey, and turns, presents and exports like a structure. The panel gives its
+  number of triangles and its size. The file is kept in the deck as base64 (in
+  `assets/` as it was above 1 MB), and a single-file export writes it in.
 - Presentation features script version 17: the wheel over a 3D structure
   that turns under the mouse zooms it, also on a slide with steps. Every
   template carries it, and a deck with an older edition offers the update when

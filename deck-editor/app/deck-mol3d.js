@@ -3,13 +3,14 @@
    dependencies but 3Dmol.js, beside the deck as deck-3dmol.min.js.
 
    A structure is a <figure data-mol3d="FORMAT"> (pdb, cif, sdf, mol,
-   mol2, xyz, pqr) holding
+   mol2, xyz, pqr; or stl, a mesh rather than atoms) holding
      <img data-mol3d-picture>                  a picture of its view, shown wherever
                                                the structure is not live: while editing,
                                                the PDF, PowerPoint, thumbnails, no WebGL
      <script type="chemical/x-..." data-mol3d-source>   the structure file, as text; or
                                                the same element with src="assets/..."
-                                               for a large one (never run: not JavaScript)
+                                               for a large one (never run: not JavaScript);
+                                               an STL file, binary or text, as base64
    and, on the figure, data-mol3d-settings: JSON
      { style, colour, ligands: {hidden: [...]}, water, hydrogens, pick,
        present: "still" | "turns" | "drag", speed, view: [8 numbers], bg }
@@ -37,8 +38,12 @@
         mol: { lib: 'sdf', mime: 'chemical/x-mdl-molfile' },
         mol2: { lib: 'mol2', mime: 'chemical/x-mol2' },
         xyz: { lib: 'xyz', mime: 'chemical/x-xyz' },
-        pqr: { lib: 'pqr', mime: 'chemical/x-pqr' }
+        pqr: { lib: 'pqr', mime: 'chemical/x-pqr' },
+        // A mesh of triangles (a 3D print, a CAD part, a surface exported from ChimeraX or PyMOL),
+        // drawn as one shape: no atoms, so no ligands, water or residues.
+        stl: { lib: '', mime: 'model/stl', mesh: true }
     };
+    var MESH_MAX = 2000000;      // triangles
     var WATER = ['HOH', 'WAT', 'DOD', 'H2O', 'SOL'];
     var DEFAULTS = { style: '', colour: '', ligands: { hidden: [] }, water: false, hydrogens: null, pick: '', present: 'still', speed: 0.4, view: null, bg: 'slide' };
     var FALLBACK = ['#2f6fed', '#f59e0b', '#10b981', '#e8503f', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
@@ -67,12 +72,92 @@
     function source(el) {
         var h = holderOf(el);
         if (!h) return Promise.reject(new Error('the structure has no file'));
-        var src = h.getAttribute('src');
-        if (!src) return Promise.resolve(unescape(h.textContent));
+        var src = h.getAttribute('src'), mesh = FORMATS[formatOf(el)].mesh;
+        if (!src) return Promise.resolve(mesh ? h.textContent.replace(/\s+/g, '') : unescape(h.textContent));
         return fetch(new URL(src, el.ownerDocument.baseURI).href).then(function (r) {
             if (!r.ok) throw new Error('could not read ' + src);
-            return r.text();
+            return mesh ? r.arrayBuffer().then(function (b) { return base64(new Uint8Array(b)); }) : r.text();
         });
+    }
+
+    /* Bytes as base64 and back: an STL file (often binary) is kept in the page as base64. */
+    function base64(bytes) {
+        var out = '';
+        for (var i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        return btoa(out);
+    }
+    function bytes(b64) {
+        var s = atob(String(b64).replace(/\s+/g, '')), u = new Uint8Array(s.length);
+        for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+        return u;
+    }
+
+    /* An STL file (base64), read: { mesh: true, triangles, positions (9 numbers a triangle), name,
+       min, max, size, centre, radius }, with what analyse() gives a structure, empty. The last one
+       read is kept: the editor reads a file for the panel, then again to draw it. */
+    var lastMesh = null;
+    function meshInfo(b64) {
+        if (lastMesh && lastMesh.text === b64) return lastMesh.info;
+        var u = bytes(b64), n = u.length >= 84 ? new DataView(u.buffer).getUint32(80, true) : -1;
+        var head = String.fromCharCode.apply(null, u.subarray(0, Math.min(u.length, 2000)));
+        var ascii = /^\s*solid\b/.test(head) && /\bfacet\b/.test(head) && !(n >= 0 && 84 + 50 * n === u.length);
+        var pos, count = 0, name = '';
+        var tooMany = function () { return new Error('it has more than ' + MESH_MAX.toLocaleString('en') + ' triangles, too many for a slide'); };
+        if (ascii) {
+            var text = new TextDecoder().decode(u), re = /vertex\s+(\S+)\s+(\S+)\s+(\S+)/g, m, list = [];
+            while ((m = re.exec(text))) list.push(+m[1], +m[2], +m[3]);
+            count = Math.floor(list.length / 9);
+            if (count > MESH_MAX) throw tooMany();
+            pos = new Float32Array(list.slice(0, count * 9));
+            name = ((/^\s*solid[ \t]+([^\r\n]*)/.exec(text) || [])[1] || '').trim();
+        } else {
+            if (n < 0 || 84 + 50 * n > u.length) throw new Error('this is not an STL file, or it is cut short');
+            if (n > MESH_MAX) throw tooMany();
+            count = n;
+            pos = new Float32Array(n * 9);
+            var dv = new DataView(u.buffer);
+            for (var t = 0; t < n; t++) for (var k = 0; k < 9; k++) pos[t * 9 + k] = dv.getFloat32(84 + 50 * t + 12 + 4 * k, true);
+            // The 80-byte header is free text: a name when it reads as one.
+            var h = head.slice(0, 80).replace(/\0[\s\S]*$/, '').replace(/^solid\s*/i, '').trim();
+            if (/^[\x20-\x7e]{1,80}$/.test(h)) name = h;
+        }
+        if (!count) throw new Error('no triangles were found in this file');
+        var min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+        for (var i = 0; i < pos.length; i++) {
+            var c = i % 3, x = pos[i];
+            if (!isFinite(x)) pos[i] = x = 0;
+            if (x < min[c]) min[c] = x;
+            if (x > max[c]) max[c] = x;
+        }
+        var size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+        var info = {
+            mesh: true, small: false, atoms: 0, chains: [], residues: 0, water: 0, hydrogens: 0, resi: [0, 0], ligands: [],
+            triangles: count, positions: pos, name: name, min: min, max: max, size: size,
+            centre: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2],
+            radius: Math.max(1e-6, Math.hypot(size[0], size[1], size[2]) / 2)
+        };
+        lastMesh = { text: b64, info: info };
+        return info;
+    }
+    /* A mesh as 3Dmol's custom shape takes it: three corners a triangle, each with the triangle's
+       own normal (flat, as a CAD part or a print looks). Made once per mesh. */
+    function geometry(info) {
+        if (info.geometry) return info.geometry;
+        var p = info.positions, n = info.triangles, vertexArr = new Array(n * 3), normalArr = new Array(n * 3), faceArr = new Array(n * 3);
+        for (var t = 0; t < n; t++) {
+            var o = t * 9;
+            var ax = p[o + 3] - p[o], ay = p[o + 4] - p[o + 1], az = p[o + 5] - p[o + 2];
+            var bx = p[o + 6] - p[o], by = p[o + 7] - p[o + 1], bz = p[o + 8] - p[o + 2];
+            var nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx, len = Math.hypot(nx, ny, nz) || 1;
+            var normal = { x: nx / len, y: ny / len, z: nz / len };
+            for (var c = 0; c < 3; c++) {
+                vertexArr[t * 3 + c] = { x: p[o + c * 3], y: p[o + c * 3 + 1], z: p[o + c * 3 + 2] };
+                normalArr[t * 3 + c] = normal;
+                faceArr[t * 3 + c] = t * 3 + c;
+            }
+        }
+        info.geometry = { vertexArr: vertexArr, normalArr: normalArr, faceArr: faceArr };
+        return info.geometry;
     }
 
     /* A CSS colour as #rrggbb (3Dmol reads hex), or null for a transparent one. */
@@ -148,6 +233,15 @@
     /* The look a figure's settings ask for, on a viewer holding its model. */
     function apply($3D, v, model, s, info, colours) {
         colours = colours || FALLBACK;
+        if (info.mesh) {
+            v.removeAllShapes();
+            var g = geometry(info), look = s.style || 'solid';
+            var shape = v.addCustom({ vertexArr: g.vertexArr, normalArr: g.normalArr, faceArr: g.faceArr, color: s.colour === 'plain' ? '#b9bfca' : colours[0], opacity: look === 'glass' ? 0.6 : 1, wireframe: look === 'wire' });
+            // What zoomTo() fits: worked out here, as 3Dmol does it only for a shape that takes clicks.
+            shape.boundingSphere.center = new $3D.Vector3(info.centre[0], info.centre[1], info.centre[2]);
+            shape.boundingSphere.radius = info.radius;
+            return Promise.resolve([]);
+        }
         v.removeAllSurfaces();
         v.setStyle({}, {});
         var done = [];
@@ -199,14 +293,16 @@
         // Surfaces in this thread: 3Dmol's workers start from blob: addresses, which a page whose
         // scripts are Diapo's alone (by hash) does not run.
         if ($3D.setSyncSurface) $3D.setSyncSurface(true);
-        var s = opts.settings || settings(el), fmt = FORMATS[opts.format || formatOf(el)].lib;
+        var s = opts.settings || settings(el), f = FORMATS[opts.format || formatOf(el)];
         var bg = s.bg === 'none' ? null : ground(el);
+        var info = f.mesh ? meshInfo(text) : null;      // read before the viewer: a bad file takes no WebGL context
         var v = $3D.createViewer(host, merge({ backgroundColor: bg || '#ffffff', backgroundAlpha: bg ? 1 : 0, antialias: true }, opts.config || {}));
-        var model = v.addModel(text, fmt, { keepH: true });
-        var info = analyse(model);
+        var model = f.mesh ? null : v.addModel(text, f.lib, { keepH: true });
+        if (!info) info = analyse(model);
         return apply($3D, v, model, s, info, palette(el)).then(function () {
             v.zoomTo();
             if (Array.isArray(s.view) && s.view.length === 8) v.setView(s.view);
+            else if (info.mesh) { v.rotate(60, 'x'); v.rotate(-30, 'z'); }     // STL files stand on z (as printed): seen from the front, a little above
             v.render();
             return { viewer: v, model: model, info: info, settings: s };
         });
@@ -237,7 +333,7 @@
         try { var c = document.createElement('canvas'); return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl'))); } catch (e) { return false; }
     }
 
-    window.DeckMol3d = { version: 1, selector: SELECTOR, formats: FORMATS, settings: settings, formatOf: formatOf, source: source, escape: escape, unescape: unescape, ground: ground, palette: palette, analyse: analyse, apply: apply, build: build, dispose: dispose, sync: function () {} };
+    window.DeckMol3d = { version: 1, selector: SELECTOR, formats: FORMATS, settings: settings, formatOf: formatOf, source: source, escape: escape, unescape: unescape, base64: base64, bytes: bytes, meshInfo: meshInfo, ground: ground, palette: palette, analyse: analyse, apply: apply, build: build, dispose: dispose, sync: function () {} };
 
     /* ------------------------------------------------------------
        The live structure. Everything below needs a deck around it.

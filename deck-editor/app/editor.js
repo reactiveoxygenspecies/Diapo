@@ -1758,7 +1758,7 @@ function paletteEntries() {
         out.push({ group: 'Insert', label: 'Interactive chart (Plotly)...', keywords: 'plot plotly json figure graph live hover zoom', run: click('[data-insert="plot"]') });
         out.push({ group: 'Insert', label: 'Chemical structure', keywords: 'chemistry molecule smiles compound', run: click('[data-insert="structure"]') });
         out.push({ group: 'Insert', label: 'Chemical structure from file...', keywords: 'chemistry molecule molfile mol sdf cdxml chemdraw compound', run: click('[data-insert="structure-file"]') });
-        out.push({ group: 'Insert', label: '3D structure...', keywords: 'protein pdb alphafold pubchem molecule 3dmol cif mmcif sdf mol2 xyz', run: click('[data-insert="mol3d"]') });
+        out.push({ group: 'Insert', label: '3D structure...', keywords: 'protein pdb alphafold pubchem molecule 3dmol cif mmcif sdf mol2 xyz stl mesh model cad', run: click('[data-insert="mol3d"]') });
         out.push({ group: 'Insert', label: 'Font Awesome icon...', keywords: 'icons fa', run: (q) => { app.iconPicker.open($('btnInsert')); const words = q.replace(/\b(font awesome|icon|icons|fa)\b/gi, '').trim(); if (words && app.iconPicker.search) { app.iconPicker.search.value = words; app.iconPicker.search.dispatchEvent(new Event('input')); } } });
         out.push(...iconEntries(app));
         if (has) {

@@ -168,8 +168,8 @@ MAX_UPLOAD = 50 * 1024 * 1024
 UPLOAD_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".bmp", ".svg",
               ".mp4", ".webm", ".mov", ".mp3", ".m4a", ".wav", ".ogg"}
 # Structure files a 3D structure keeps in assets/ when it is too large to write into the page
-# (app/core/mol3d.js): plain text, read by the structure's own script, never run.
-STRUCTURE_EXT = {".pdb", ".cif", ".mmcif", ".sdf", ".mol", ".mol2", ".xyz", ".pqr"}
+# (app/core/mol3d.js): plain text (STL: a mesh, often binary), read by the structure's own script, never run.
+STRUCTURE_EXT = {".pdb", ".cif", ".mmcif", ".sdf", ".mol", ".mol2", ".xyz", ".pqr", ".stl"}
 
 
 # ------------------------------------------------------------------
@@ -1746,6 +1746,13 @@ class Inliner:
                 full = self.resolve(src)
             if not full:
                 return m.group(0)
+            if re.search(r"\stype\s*=\s*[\"']model/stl[\"']", attrs + attrs2, re.I):
+                # A 3D model's STL file (often binary), written in as the figure keeps it: base64, in lines.
+                with open(full, "rb") as f:
+                    raw = base64.b64encode(f.read()).decode("ascii")
+                self.files += 1
+                self.bytes += len(raw)
+                return "<script" + attrs + attrs2 + ">\n" + "\n".join(raw[i:i + 100] for i in range(0, len(raw), 100)) + "\n</script>"
             with open(full, "r", encoding="utf-8", errors="replace") as f:
                 js = f.read()
             self.files += 1

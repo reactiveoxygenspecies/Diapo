@@ -7,7 +7,7 @@
      from screen pixels into stage pixels through the canvas zoom,
      the first file is centred on it and the next ones step down
      and right from it. One undo step.
-   - A 3D structure file (.pdb, .cif, .mmcif, .mol2, .xyz, .pqr)
+   - A 3D structure file (.pdb, .cif, .mmcif, .mol2, .xyz, .pqr) or an STL model
      becomes a 3D structure where it was dropped (mol3d.js).
    - A chemical structure file (.mol, .sdf, .cdxml) dropped on the
      canvas becomes a structure where it was dropped (chem.js): read
@@ -38,7 +38,7 @@ import { CHEM_EXT } from './chemfile.js';
 export const MEDIA_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'svg', 'mp4', 'webm', 'mov', 'mp3', 'm4a', 'wav', 'ogg'];
 export const DECK_EXT = ['pptx', 'md', 'markdown'];
 /* 3D structure files: inserted as a 3D structure (mol3d.js), kept in the deck. */
-export const STRUCTURE_EXT = ['pdb', 'cif', 'mmcif', 'mol2', 'xyz', 'pqr'];
+export const STRUCTURE_EXT = ['pdb', 'cif', 'mmcif', 'mol2', 'xyz', 'pqr', 'stl'];
 const DECK_TYPES = /presentationml|markdown/i;
 
 const extOf = (name) => { const m = /\.([^.\\/]+)$/.exec(name || ''); return m ? m[1].toLowerCase() : ''; };
@@ -161,7 +161,7 @@ export class FileDrop {
         const where = this._where(e, inDeck);
         const toast = this.host.toast;
         const cdx = refused.some(f => extOf(f.name) === 'cdx') ? '; a ChemDraw .cdx needs saving as CDXML (.cdxml) first' : '';
-        const refusedNote = refused.length ? `Not added: ${refused.map(f => f.name).join(', ')} (a slide takes pictures, video, sound, structure files (.mol, .sdf, .cdxml) and 3D structure files (.pdb, .cif, .mol2, .xyz, .pqr); a PowerPoint or Markdown file becomes a new deck${cdx})` : '';
+        const refusedNote = refused.length ? `Not added: ${refused.map(f => f.name).join(', ')} (a slide takes pictures, video, sound, structure files (.mol, .sdf, .cdxml), 3D structure files (.pdb, .cif, .mol2, .xyz, .pqr) and 3D models (.stl); a PowerPoint or Markdown file becomes a new deck${cdx})` : '';
         const ready = () => {
             if (!this.deck.isOpen) toast('Open a deck first, then drop pictures, video or sound on a slide.', { ms: 4000 });
             else if (this.app.preview) toast('Leave the preview (Esc) to add files to a slide.', { ms: 4000 });

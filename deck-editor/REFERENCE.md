@@ -638,7 +638,7 @@ Markdown (.md) file dropped anywhere is offered as a new deck (the drawer's
 Import, the file uploaded), which opens in a tab of its own. A structure file
 (.mol, .sdf, .cdxml) becomes a chemical structure where it was dropped (see
 Equations and chemical structures), and a 3D structure file (`.pdb`, `.cif`,
-`.mmcif`, `.mol2`, `.xyz`, `.pqr`) a 3D structure (see 3D structures). Other files are
+`.mmcif`, `.mol2`, `.xyz`, `.pqr`) or an `.stl` model a 3D structure (see 3D structures). Other files are
 refused with a note saying what can be dropped; with no deck open, a picture
 only brings a hint. A file dropped where nothing takes it is never opened by
 the browser in place of the editor.
@@ -881,8 +881,10 @@ the deck's, and still need its trust.
   the dialog says so and suggests downloading the file and using the next tab.
 - **From a file**: `.cif` / `.mmcif`, `.pdb`, `.pqr`, `.sdf` / `.mol` (with 3D
   coordinates; a flat, 2D Molfile is refused with a note), `.mol2`, `.xyz`
-  (what ORCA, Gaussian, xtb or CREST write).
-- **Paste**: the text of any of those files (the format is read from it).
+  (what ORCA, Gaussian, xtb or CREST write); `.stl`, binary or text (a mesh: a
+  3D print, a CAD part, a surface exported from ChimeraX or PyMOL).
+- **Paste**: the text of any of those files (the format is read from it; for
+  STL, the text kind).
 
 The preview turns slowly; drag it to turn it (the view it is left in is the one
 the structure starts with). Under it: what the file holds, read from the file
@@ -891,7 +893,7 @@ for a small molecule its formula and number of atoms), and **Start as**
 (Cartoon or Ball and stick, Sticks, Surface).
 
 **A structure file dropped on a slide** (`.pdb`, `.cif`, `.mmcif`, `.mol2`,
-`.xyz`, `.pqr`) is inserted at once, where it lands, with the same defaults.
+`.xyz`, `.pqr`, `.stl`) is inserted at once, where it lands, with the same defaults.
 A `.mol` or `.sdf` dropped on a slide is a 2D chemical structure; for its 3D
 coordinates, use the dialog.
 
@@ -919,6 +921,12 @@ On the slide it is a picture you move and size like any other. The panel's
   on the slide with no ground of its own (by default it has the slide's colour,
   which every browser draws; one that draws nothing on a see-through
   background keeps the colour and says so).
+- **An STL model** has no atoms, so no Show or Pick out: its **Style** is Solid,
+  See-through or Wireframe, its **Colour** the deck's first accent or light
+  grey, and the panel gives its number of triangles and its size (in the file's
+  own units, usually millimetres). Its file name names it; the name inside the
+  file is shown under it. It starts seen from the front and a little above (an
+  STL file stands on its z axis, as printed). Up to 2,000,000 triangles.
 - **While presenting**: **Still** (the picture: no script in the deck),
   **Turns slowly** (with its speed), or **Drag to turn** (turn and zoom it with
   the mouse; the wheel over it zooms it and does not step the slide).
@@ -943,10 +951,12 @@ HEADER    ELECTRON TRANSPORT ...
 `chemical/x-mol2`, `chemical/x-xyz`, `chemical/x-pqr`): a script block of a type
 that is not JavaScript never runs, so it is data, and the trust check and the
 problems list leave it alone (in the text, `</script` and `<!--` are written
-`<\/script` and `<\!--`). A file over 1 MB (a ribosome, a virus) is kept in
+`<\/script` and `<\!--`). An STL model is `data-mol3d="stl"` with a holder of type
+`model/stl` holding the file as base64 in lines of 100 (it is often binary). A file over 1 MB (a ribosome, a virus) is kept in
 `assets/` instead, and the holder names it: `<script type="chemical/x-mmcif"
 data-mol3d-source src="assets/4v9d.cif"></script>` (the browser does not load it;
-the structure's own script reads it). Either way the deck works offline.
+the structure's own script reads it; an STL file stays binary there, and a
+single-file export writes it in as base64). Either way the deck works offline.
 `view` is 3Dmol's `getView()` (eight numbers: the position, the zoom and a
 quaternion); `null` means fitted. A list of views (for click steps) can come
 later beside it. The picture is the view at twice the box's size, WebP
