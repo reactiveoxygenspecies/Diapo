@@ -10,13 +10,18 @@
 
      plotly.min.js         plotly.js (MIT), the full bundle: interactive
                            charts from a figure's JSON (core/plot.js)
+     3Dmol-min.js          3Dmol.js (BSD-3-Clause, with pako, UPNG.js,
+                           iobuffer and netcdfjs inside, MIT and zlib):
+                           3D molecular structures (core/mol3d.js)
 
    MathJax and SmilesDrawer run in the editor only (math.js, chem.js): a
    deck keeps the source and the drawing, never the library. plotly.js is
    the one library a deck does carry: serve.py copies it beside a deck that
    has an interactive chart (as deck-plotly.min.js) and counts it as one of
    Diapo's own scripts by its SHA-256, so the file is written byte for byte
-   as npm ships it, with no banner added. The editor's
+   as npm ships it, with no banner added. 3Dmol.js is carried the same
+   way (as deck-3dmol.min.js) by a deck with a 3D structure that turns
+   while it is presented (app/deck-mol3d.js). The editor's
    Content-Security-Policy allows scripts from vendor/ (serve.py).
    ============================================================ */
 const fs = require('fs');
@@ -33,6 +38,7 @@ const FILES = [
 // Copied as they are: the bytes are what serve.py recognises.
 const VERBATIM = [
     [path.join('plotly.js-dist-min', 'plotly.min.js'), 'plotly.min.js'],
+    [path.join('3dmol', 'build', '3Dmol-min.js'), '3Dmol-min.js'],
 ];
 const LICENCES = [
     [path.join('mathjax', 'LICENSE'), 'LICENSE-mathjax.txt'],
@@ -49,8 +55,17 @@ for (const [src, dst, note] of FILES) {
 }
 for (const [src, dst] of VERBATIM) {
     fs.copyFileSync(path.join(NM, src), path.join(OUT, dst));
-    console.log(dst, Math.round(fs.statSync(path.join(OUT, dst)).size / 1024) + ' KB', '(plotly.js ' + version('plotly.js-dist-min') + ')');
+    console.log(dst, Math.round(fs.statSync(path.join(OUT, dst)).size / 1024) + ' KB', '(' + src.split(path.sep)[0] + ' ' + version(src.split(path.sep)[0]) + ')');
 }
+// 3Dmol.js's licence, and those of the packages its bundle carries (pako's zlib notice, UPNG.js, iobuffer, netcdfjs).
+fs.writeFileSync(path.join(OUT, 'LICENSE-3dmol.txt'), `3Dmol.js ${version('3dmol')} (https://3dmol.org), BSD-3-Clause:
+
+` + fs.readFileSync(path.join(NM, '3dmol', 'LICENSE'), 'utf8')
+    + ['pako', 'upng-js', 'iobuffer', 'netcdfjs'].map(p => `
+
+The bundle includes ${p} ${version(p)}:
+
+` + fs.readFileSync(path.join(NM, p, 'LICENSE'), 'utf8')).join(''));
 for (const [src, dst] of LICENCES) fs.copyFileSync(path.join(NM, src), path.join(OUT, dst));
 console.log('licences:', LICENCES.map(l => l[1]).join(', '));
 
