@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.5.0 - 2026-11-26
 
 - **Equations in a PowerPoint file come in as equations you can edit.** An
   equation made with PowerPoint's Insert > Equation used to arrive as a
