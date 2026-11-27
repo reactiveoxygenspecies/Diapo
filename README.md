@@ -78,6 +78,31 @@ a script or a font.
 
 ![A slide with a fatty acid structure, a reaction and a rate equation; the equation is selected and the panel shows its LaTeX with buttons for operators, Greek letters, chemistry and arrows](docs/equations.webp)
 
+**Structures straight from ChemDraw.** Paste or drop a ChemDraw **CDXML** file, a **Molfile** (V2000 or V3000) or an
+**SDF**, and the structure is drawn from the file's own coordinates, so it keeps the layout you drew originally: wedges and hashes,
+labels like OMe or Boc, and on a CDXML page the reaction arrows and the conditions written over them. The file stays
+in the deck with the drawing, so you can edit it again later, and the panel gives the formula and a SMILES. (A binary
+`.cdx` needs saving as CDXML first.)
+
+![A reaction dropped on the slide from a ChemDraw CDXML file: 4-methoxyacetophenone reduced to the (S)-alcohol, with the wedge and hashed bonds, the OMe labels and the conditions over the arrow; the panel shows the CDXML and the formula](docs/cdxml.webp)
+
+**3D structures.** Insert > **3D structure...** puts a protein or a molecule on the slide in 3D: by its ID from the
+Protein Data Bank, AlphaFold or PubChem, or from a `.cif`, `.pdb`, `.sdf`, `.mol2` or `.xyz` file (from ORCA,
+Gaussian or xtb). The panel says what the file holds (chains, residues, the ligands or metals by name) and
+sets the style (cartoon, sticks, spheres, surface), the colours, which ligands, water and
+hydrogens to show, and which residues are picked out, like the ones holding a metal. Double-click it to turn and zoom it
+until it shows what you want: that view becomes its picture in the PDF and in PowerPoint. While presenting it can
+stay still, turn slowly, or follow the mouse so you can turn it while you answer a question. An `.stl` file (a 3D
+print, a CAD part, a surface exported from ChimeraX) goes in the same way. The structure is kept inside the deck, so it
+works offline.
+
+![The editor with plastocyanin (PDB 1PLC) on a slide, in the deck's green, with the residues around its copper ion picked out as sticks; the panel's 3D structure section shows the style, the colours, what is shown and how it presents](docs/structure-3d.webp)
+
+<p>
+  <img src="docs/structure-3d-insert.webp" alt="The Insert a 3D structure dialog: PDB ID 1PLC fetched from rcsb.org, a turning preview of plastocyanin, and 1 chain, 99 residues, 1 copper ion" width="49%">
+  <img src="docs/structure-3d-turn.webp" alt="Turning the structure on the slide: a dashed outline round it and a bar that says drag to turn, scroll to zoom, with Fit and Done" width="49%">
+</p>
+
 **Citations.** Import your library from Zotero, Mendeley or JabRef (`.bib`, RIS or CSL-JSON), or add a paper by its
 DOI. While typing, **Alt+[** or `[@` finds a reference and puts the citation in. Each slide can list what it cites at
 its foot, and the **Sources slide** collects every reference and picture credit and keeps itself up to
@@ -130,7 +155,8 @@ A lot of the work on Diapo went into things that are easy to miss but that will 
 
 - **Things land in a free spot.** A new chart, equation or picture goes to the centre when it's free, otherwise to
   the nearest clear place, instead of piling up on top of each other.
-- **Drag files onto the slide.** Pictures, video and sound land where you drop them; a PowerPoint or Markdown file
+- **Drag files onto the slide.** Pictures, video and sound land where you drop them, and so do structure files
+  (`.cdxml`, `.mol`, `.sdf`) and 3D ones (`.pdb`, `.cif`, `.mol2`, `.xyz`, `.stl`); a PowerPoint or Markdown file
   dropped into the window becomes a new deck.
 - **Paste from anywhere.** A table pasted into a chart fills it, an image address becomes a picture, a YouTube link
   a player, and text from Word or a web page keeps its bold, colours and links (Ctrl+Shift+V for plain text).
@@ -168,7 +194,8 @@ A lot of the work on Diapo went into things that are easy to miss but that will 
 
 ## Bringing your stuff along
 
-You can import PowerPoint (.pptx) and Markdown files, and export a deck as a PDF, as a handout with your speaker
+You can import PowerPoint (.pptx) and Markdown files (a PowerPoint equation comes in as an equation you can edit, not
+a picture of one), and export a deck as a PDF, as a handout with your speaker
 notes, as a single self-contained HTML file, as a folder ready to publish on a free web host you own (Netlify Drop,
 GitHub Pages; Diapo hosts nothing itself), or back to an editable PowerPoint file, charts included.
 
@@ -185,7 +212,8 @@ up is in [REFERENCE.md](deck-editor/REFERENCE.md#diapo-for-ai-agents-mcp).
 ## Nothing leaves your computer
 
 Diapo runs locally: no account, no sign-in, no telemetry. It only goes online when you look up a Google Font, put a
-video or web page from elsewhere on a slide, look up a reference by its DOI, or check for updates. Diapo checks
+video or web page from elsewhere on a slide, look up a reference by its DOI, fetch a 3D structure by its ID (from the
+Protein Data Bank, AlphaFold or PubChem, and the dialog says which), or check for updates. Diapo checks
 when it starts, at most once a day, by asking GitHub for the latest release; it sends nothing about you or your
 decks, and "Check for updates when Diapo starts" (About Diapo, under the "?" button) turns it off. Your decks stay in
 the folders you keep them in.
@@ -216,8 +244,10 @@ On any system, Diapo also runs from this repository. All it needs is Python 3.8 
 ![The New deck gallery: the designs in a grid with Light, Dark and style filters, and Terrarium chosen, with a closer look at its slides on the right](docs/gallery.webp)
 
 Diapo looks for Chrome or Edge first, because either one gives it a window of its own and prints PDFs directly.
-Without them, it opens in a tab of your default browser, Firefox included, and PDFs are saved through the browser's
-print dialog; only the picker for fonts installed on your computer needs Chrome or Edge. Started from the repository
+Without them, or if you'd rather have it in your usual browser (About Diapo > **Open Diapo in**), it opens in a tab,
+Firefox included. PDFs are then saved through the browser's print dialog, and Diapo tells you which options to pick
+first; only the picker for fonts installed on your computer needs Chrome or Edge. In a tab, Diapo stops by itself a
+few seconds after you close its last tab, and **File > Quit Diapo** stops it on purpose. Started from the repository
 for the first time, Diapo opens the `workspace/` folder.
 
 ## Documentation
@@ -267,5 +297,6 @@ Diapo was built almost entirely with Claude Opus 5 and more recently with Opus 5
 
 Diapo is open source under the [MIT license](LICENSE), by Daniele Rossetto. The decks you make are yours, and the
 format they follow is published separately under the same license, so no deck depends on Diapo to be shown.
-Work by other authors that Diapo includes (templates, icons, fonts, and the MathJax and SmilesDrawer libraries) is
+Work by other authors that Diapo includes (templates, icons, fonts, and the MathJax, SmilesDrawer, plotly.js,
+citation.js and 3Dmol.js libraries) is
 listed with its license in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
